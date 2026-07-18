@@ -5,6 +5,9 @@ on:
     - cron: '0 2 * * *'   # 02:00 UTC daily
   workflow_dispatch:       # allow manual trigger for testing
 
+permissions:
+  contents: write          # required to push to db-backups orphan branch
+
 jobs:
   backup:
     name: Dump and commit
@@ -36,10 +39,17 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Switch to (or create) the orphan backup branch
-          git checkout db-backups 2>/dev/null || git checkout --orphan db-backups
+          # Switch to (or create) the orphan backup branch.
+          # On first run --orphan leaves the working tree staged from main —
+          # unstage everything so only the dump file is committed.
+          if git checkout db-backups 2>/dev/null; then
+            : # branch already exists; working tree is clean
+          else
+            git checkout --orphan db-backups
+            git rm -rf --cached . 2>/dev/null || true
+          fi
 
-          # Stage only the dump file (not the rest of the repo)
+          # Stage only the dump file and commit
           git add dump_*.sql
           git commit -m "backup: $(date -u +%Y-%m-%d)"
 
