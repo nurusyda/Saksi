@@ -169,7 +169,7 @@ def compile_check(mode: str) -> str:
 # --------------------------------------------------------------------------- #
 def _secret_re() -> "re.Pattern":
     return re.compile(
-        r'(?:api[_-]?key|token|secret|password|service[_-]?role)\s*[:=]\s*["\'][^\s"\']{12,}["\']'
+        r'(?:api[_-]?key|token|secret|password|service[_-]?role)\s*[:=]\s*["\'](?!env\()[^\s"\']{12,}["\']'
         r'|sk-[a-zA-Z0-9]{20,}'
         r'|eyJ[a-zA-Z0-9_-]{30,}\.[a-zA-Z0-9_-]{10,}'   # JWT-shaped (Supabase keys)
         r'|AIza[a-zA-Z0-9_-]{30,}'                        # Google API keys (Gemini)
