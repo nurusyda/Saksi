@@ -1,0 +1,46 @@
+name: Supabase backup + keepalive
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily
+  workflow_dispatch:       # allow manual trigger for testing
+
+jobs:
+  backup:
+    name: Dump and commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # fetch the db-backups orphan branch if it exists; ignore error on first run
+          fetch-depth: 0
+
+      - name: Set up orphan branch (first run only)
+        run: |
+          git fetch origin db-backups:db-backups 2>/dev/null || true
+
+      - name: Install Supabase CLI
+        run: |
+          curl -sSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
+            | tar xz -C /usr/local/bin supabase
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f dump_$(date -u +%Y%m%d).sql
+
+      - name: Commit dump to orphan branch
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Switch to (or create) the orphan backup branch
+          git checkout db-backups 2>/dev/null || git checkout --orphan db-backups
+
+          # Stage only the dump file (not the rest of the repo)
+          git add dump_*.sql
+          git commit -m "backup: $(date -u +%Y-%m-%d)"
+
+          git push origin db-backups
