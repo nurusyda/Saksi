@@ -3,7 +3,9 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { JoinDealState } from './actions';
-import { ATTESTATIONS, TC_LABEL } from '@/lib/copy';
+import { ATTESTATIONS } from '@/lib/copy';
+import { TCLabel } from '@/components/TCLabel';
+import { PrivacyLink } from '@/components/PrivacyLink';
 
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
   const { pending } = useFormStatus();
@@ -83,8 +85,9 @@ export function JoinDealForm({
             onChange={() => toggle(ATTESTATIONS.length)}
             className="mt-0.5 shrink-0"
           />
-          <span>{TC_LABEL}</span>
+          <TCLabel />
         </label>
+        <PrivacyLink />
       </fieldset>
 
       <SubmitButton allChecked={allChecked} />

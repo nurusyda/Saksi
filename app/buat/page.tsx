@@ -3,9 +3,10 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { createDeal, type CreateDealState } from './actions';
+import { TCLabel } from '@/components/TCLabel';
+import { PrivacyLink } from '@/components/PrivacyLink';
 import {
   ATTESTATIONS,
-  TC_LABEL,
   ROLE_LABELS,
   ROLE_PAIR,
   ROLE_PAIR_HELPER_PREFIX,
@@ -254,8 +255,9 @@ export default function BuatPage() {
                 onChange={() => toggle(ATTESTATIONS.length)}
                 className="mt-0.5 shrink-0"
               />
-              <span>{TC_LABEL}</span>
+              <TCLabel />
             </label>
+            <PrivacyLink />
           </fieldset>
 
           <SubmitButton allChecked={allChecked} />
