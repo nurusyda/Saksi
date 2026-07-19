@@ -19,10 +19,6 @@ jobs:
           # fetch the db-backups orphan branch if it exists; ignore error on first run
           fetch-depth: 0
 
-      - name: Set up orphan branch (first run only)
-        run: |
-          git fetch origin db-backups:db-backups 2>/dev/null || true
-
       - name: Install Supabase CLI
         run: |
           curl -sSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
@@ -39,18 +35,14 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Switch to (or create) the orphan backup branch.
-          # On first run --orphan leaves the working tree staged from main —
-          # unstage everything so only the dump file is committed.
-          if git checkout db-backups 2>/dev/null; then
-            : # branch already exists; working tree is clean
-          else
-            git checkout --orphan db-backups
-            git rm -rf --cached . 2>/dev/null || true
-          fi
+          # Force-recreate the orphan branch every run. Each dump file is a
+          # standalone backup — no need to preserve branch history.
+          git branch -D db-backups 2>/dev/null || true
+          git checkout --orphan db-backups
+          git rm -rf --cached . 2>/dev/null || true
 
           # Stage only the dump file and commit
           git add dump_*.sql
           git commit -m "backup: $(date -u +%Y-%m-%d)"
 
-          git push origin db-backups
+          git push origin db-backups --force

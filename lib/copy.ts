@@ -117,6 +117,32 @@ export const STATUS_DIAJUKAN =
 export const ERROR_SELF_JOIN =
   'Nomor HP ini sudah digunakan untuk membuat kesepakatan ini. Masukkan nomor HP pihak lain.';
 
+// Not in copy-id.md — repeated across joinDeal/acceptDeal in the same file;
+// centralized to avoid the wording drifting between call sites.
+export const ERROR_DEAL_NOT_FOUND = 'Kesepakatan tidak ditemukan.';
+export const ERROR_DEAL_CLOSED = 'Kesepakatan ini sudah tidak dapat dimasuki.';
+
+// copy-id.md §12 — accept step (DIAJUKAN -> DISEPAKATI)
+export const ACCEPT_BUTTON_LABEL = 'Setuju';
+
+export const STATUS_ALREADY_ACCEPTED =
+  'Anda sudah menyetujui. Menunggu persetujuan pihak lain.';
+
+export const ERROR_PHONE_NOT_IN_DEAL =
+  'Nomor ini tidak terdaftar pada kesepakatan ini.';
+
+export const STATUS_DISEPAKATI_PLACEHOLDER =
+  'Kesepakatan telah disetujui kedua pihak.';
+
+// Not in copy-id.md — accept-screen phone-guess rate limit (distinct from
+// ERROR_RATE_LIMIT, which is specifically about the daily deal-creation cap;
+// reusing that wording here would misstate what limit was actually hit).
+export const ERROR_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Coba lagi nanti.';
+
+// record_party_acceptance RPC failed for a real reason (network/DB error) —
+// distinct from the RPC succeeding but affecting 0 rows (STATUS_ALREADY_ACCEPTED).
+export const ERROR_ACCEPT_FAILED = 'Gagal menyetujui. Coba lagi.';
+
 // Validation errors — not in copy-id.md; in copy.ts because both action files use them
 export const ERROR_PHONE_INVALID =
   'Nomor HP tidak valid. Gunakan format 08xx atau +628xx.';

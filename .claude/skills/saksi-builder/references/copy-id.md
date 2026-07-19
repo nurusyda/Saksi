@@ -111,6 +111,31 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 **Join technical failure (RPC failed for a non-race reason — network/DB error; distinct from "already closed" race):**
 > Gagal bergabung. Coba lagi.
 
+**Accept step (DIAJUKAN, phone re-entry to identify which party — reuses the join
+form heading above, no separate instruction line since there are no checkboxes on
+this screen):**
+
+**Accept button label:**
+`Setuju`
+
+**Already-accepted status line (this party already has their flag set):**
+> Anda sudah menyetujui. Menunggu persetujuan pihak lain.
+
+**Wrong-phone error (phone matches neither the proposer nor the counterpart):**
+> Nomor ini tidak terdaftar pada kesepakatan ini.
+
+**DISEPAKATI placeholder (shown once both parties have accepted; replaced by the
+real DISEPAKATI screen in a later slice):**
+> Kesepakatan telah disetujui kedua pihak.
+
+**Accept technical failure (RPC failed for a real reason — network/DB error;
+distinct from the RPC succeeding with 0 rows affected, which is the
+already-accepted state above, not an error):**
+> Gagal menyetujui. Coba lagi.
+
+**Too-many-attempts (phone-guess rate limit on the accept step):**
+> Terlalu banyak percobaan. Coba lagi nanti.
+
 ## 13. Role labels and pairings
 
 **Proposer role labels** (displayed in deal summary card and form; values are stored in `deals.proposer_role`):

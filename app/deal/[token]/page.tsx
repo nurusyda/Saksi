@@ -3,11 +3,13 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { DealStatus } from '@/lib/db/transitions';
 import { DealShareButton } from './DealShareButton';
 import { JoinDealForm } from './JoinDealForm';
-import { joinDeal } from './actions';
+import { AcceptDealForm } from './AcceptDealForm';
+import { joinDeal, acceptDeal } from './actions';
 import {
   JOIN_FORM_HEADING,
   JOIN_DEAL_INSTRUCTION,
   STATUS_DIAJUKAN,
+  STATUS_DISEPAKATI_PLACEHOLDER,
   ROLE_LABELS,
   ROLE_PAIR,
   COUNTERPART_FALLBACK_LABEL,
@@ -43,7 +45,10 @@ export default async function DealPage({
     .eq('token', token)
     .single();
 
-  if (!deal || ![DealStatus.DRAF, DealStatus.DIAJUKAN].includes(deal.status)) {
+  if (
+    !deal ||
+    ![DealStatus.DRAF, DealStatus.DIAJUKAN, DealStatus.DISEPAKATI].includes(deal.status)
+  ) {
     notFound();
   }
 
@@ -55,6 +60,7 @@ export default async function DealPage({
   const shareUrl = `https://saksi.app/deal/${token}`;
 
   const boundJoinDeal = joinDeal.bind(null, token);
+  const boundAcceptDeal = acceptDeal.bind(null, token);
 
   return (
     <div className="min-h-screen bg-white px-4 py-10">
@@ -124,8 +130,23 @@ export default async function DealPage({
         )}
 
         {deal.status === DealStatus.DIAJUKAN && (
+          <>
+            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+              {STATUS_DIAJUKAN}
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 p-5">
+              <p className="mb-4 text-sm font-semibold text-zinc-900">
+                {JOIN_FORM_HEADING}
+              </p>
+              <AcceptDealForm action={boundAcceptDeal} />
+            </div>
+          </>
+        )}
+
+        {deal.status === DealStatus.DISEPAKATI && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-            {STATUS_DIAJUKAN}
+            {STATUS_DISEPAKATI_PLACEHOLDER}
           </div>
         )}
       </div>
