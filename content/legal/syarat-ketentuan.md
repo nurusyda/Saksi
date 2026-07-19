@@ -45,10 +45,10 @@ Bagian ini adalah inti dari SAKSI. Bacalah dengan saksama.
 5. Catatan yang dipublikasikan menyatakan **apa yang tercatat dan diklaim**, bukan penilaian moral atas seseorang. Kalimat pada catatan disusun agar tetap benar pada setiap kemungkinan keadaan, termasuk jika di kemudian hari terbukti pelapor keliru.
 6. **Dengan menyetujui kesepakatan di SAKSI, kedua pihak menyetujui bahwa catatan sebagaimana dijelaskan di atas dapat dipublikasikan jika kesepakatan tidak terpenuhi.** Persetujuan ini adalah dasar hukum pemrosesan dan publikasi tersebut, dan dicatat beserta versi dokumen ini pada saat Anda menyetujuinya.
 
-## 5. Hak jawab dan sengketa
+## 5. Hak jawab dan klaim berbeda
 
 1. Pihak terlapor dapat menanggapi laporan dalam 14 hari sejak pemberitahuan.
-2. Tanggapan berupa bantahan mengubah status catatan menjadi **dalam sengketa**. Catatan yang dalam sengketa menampilkan bantahan tersebut; SAKSI tidak memutus siapa yang benar.
+2. Tanggapan pihak terlapor, dengan atau tanpa bukti pendukung, mengubah status catatan menjadi **klaim berbeda**. Catatan yang klaim berbeda menampilkan bantahan tersebut; SAKSI tidak memutus siapa yang benar.
 3. Jika setelah membantah pihak terlapor tidak melanjutkan tanggapan dalam 14 hari berikutnya, catatan mencantumkan bahwa terlapor tidak merespons dalam 14 hari.
 4. Kesepakatan yang kemudian dipenuhi setelah tercatat tidak terpenuhi dapat diperbarui statusnya atas konfirmasi kedua pihak. Riwayat sebelumnya tetap tercatat; pemenuhan yang terlambat tercatat sebagai pemenuhan yang terlambat, bukan sebagai penghapusan.
 

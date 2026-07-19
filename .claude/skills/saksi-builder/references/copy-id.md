@@ -17,7 +17,10 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - GRATIS: `1 kesepakatan tercatat tidak dipenuhi ([tgl]). Identitas para pihak tidak diverifikasi. Terlapor tidak merespons dalam 14 hari.`
 - LIMA_RIBU: `1 kesepakatan tercatat tidak dipenuhi ([tgl]). Nomor HP kedua pihak terverifikasi. Terlapor tidak merespons dalam 14 hari.`
 - BERMETERAI: `1 kesepakatan bermeterai tidak dipenuhi ([tgl]). Identitas terverifikasi (e-KYC). Dokumen siap diajukan sebagai bukti. Terlapor tidak merespons dalam 14 hari.`
-- DISPUTED suffix (replaces the last sentence when hak jawab filed): `Terlapor membantah laporan ini. Status: dalam sengketa.`
+- DISPUTED suffix (replaces the last sentence when hak jawab filed): `Terlapor memberikan tanggapan. Status: klaim berbeda.`
+  - If terlapor attached evidence, append: `Terlapor menyertakan bukti pada tanggapannya.`
+
+**Note:** `SENGKETA` remains the internal status value only (`DealStatus.SENGKETA`, `flags.hak_jawab_status`); the word "sengketa" must never appear on any user-facing surface.
 
 ## 2. Forced-check page (payer, before copy-rekening activates)
 
@@ -62,8 +65,10 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 - PERPANJANGAN: `Batas waktu diperpanjang ke [tgl], disepakati kedua pihak.`
 - DIBATALKAN_BERSAMA: `Dibatalkan atas kesepakatan bersama ([tgl]).`
-- DIBATALKAN_SEPIHAK_PRA_BAYAR: `Disepakati [tgl]; dibatalkan sepihak sebelum pembayaran.`
+- TIDAK_DILANJUTKAN: `Disepakati [tgl]; tidak dilanjutkan. Belum ada transfer tercatat.`
+- KEDALUWARSA: `Disepakati [tgl]; pembayaran diklaim [tgl], tidak ada tindak lanjut dari kedua pihak selama 30 hari. Catatan kedaluwarsa.`
 - DIKEMBALIKAN_PENUH: `Dibatalkan; dana dikembalikan penuh, dikonfirmasi kedua pihak ([tgl]).`
+- DIKEMBALIKAN_SEBAGIAN: `Dibatalkan; sebagian dana dikembalikan, dikonfirmasi kedua pihak ([tgl]).`
 - SENGKETA silence: `Terlapor tidak merespons dalam 14 hari.`
 
 ## 8. Trust-washing guards
@@ -139,3 +144,11 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 | `GRATIS` | Gratis |
 | `LIMA_RIBU` | Rp5.000/pihak |
 | `BERMETERAI` | Rp50.000/pihak |
+
+## 14. Per-deal-type confirmation labels (keyed on role pair; shown on the fulfillment-confirmation action)
+
+| Deal type | Role pair | Confirmation label |
+|---|---|---|
+| Jual-beli | PENJUAL / PEMBELI | `Konfirmasi barang diterima` |
+| Pinjam-meminjam | PEMBERI_PINJAMAN / PEMINJAM | `Konfirmasi uang sudah dikembalikan` |
+| Sewa-menyewa | PEMILIK / PENYEWA | `Konfirmasi sudah menempati` |

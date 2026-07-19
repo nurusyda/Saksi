@@ -40,6 +40,22 @@ deferred, and the milestone it's tied to.
   plumbing to be live first.
 - **Target:** Tier C (paid launch).
 
+### Vercel Hobby cron reliability for the deadline sweep
+- **What it is:** Hobby-tier scheduled cron jobs aren't guaranteed to fire at
+  the exact scheduled time, and can be delayed or occasionally skipped under
+  load, unlike Pro. The deadline sweep's own day-count logic tolerates late
+  runs fine (nudge/TENGGAT_LEWAT/KEDALUWARSA_LAPSED windows are multi-day, not
+  minute-precise). The real risk is a fully skipped run — since the sweep is
+  stateless per invocation rather than queued, a skipped day isn't
+  automatically caught up, just picked up whenever the next run happens.
+- **Why deferred:** Acceptable for now since the free tier has no payment on
+  the line yet.
+- **Target:** Tier C (paid launch) — already a required upgrade (see the
+  existing Vercel Hobby→Pro note in `ops.md`); worth confirming at that point
+  whether Pro's cron reliability is sufficient on its own, or whether the
+  sweep needs a "did yesterday's run actually complete" self-check as a
+  safety net.
+
 ## Post-launch
 
 ### Open-banking mutasi verification (flag rung 2)

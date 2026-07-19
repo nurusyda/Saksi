@@ -6,8 +6,10 @@ export const DealStatus = {
   DIKONFIRMASI_TERIMA: 'DIKONFIRMASI_TERIMA',
   SELESAI: 'SELESAI',
   DIBATALKAN_BERSAMA: 'DIBATALKAN_BERSAMA',
-  DIBATALKAN_SEPIHAK_PRA_BAYAR: 'DIBATALKAN_SEPIHAK_PRA_BAYAR',
+  TIDAK_DILANJUTKAN: 'TIDAK_DILANJUTKAN',
+  KEDALUWARSA: 'KEDALUWARSA',
   DIKEMBALIKAN_PENUH: 'DIKEMBALIKAN_PENUH',
+  DIKEMBALIKAN_SEBAGIAN: 'DIKEMBALIKAN_SEBAGIAN',
   TIDAK_DIPENUHI: 'TIDAK_DIPENUHI',
   SENGKETA: 'SENGKETA',
 } as const;
@@ -34,6 +36,8 @@ export const DealEventName = {
   REFUND_UPLOADED: 'REFUND_UPLOADED',
   // Buyer/lender confirms refund received
   REFUND_CONFIRMED: 'REFUND_CONFIRMED',
+  // Buyer/lender confirms a partial refund received (mirrors REFUND_CONFIRMED)
+  REFUND_CONFIRMED_PARTIAL: 'REFUND_CONFIRMED_PARTIAL',
   // Deadline extension (self-transition — status unchanged)
   PERPANJANGAN_PROPOSED: 'PERPANJANGAN_PROPOSED',
   PERPANJANGAN_ACCEPTED: 'PERPANJANGAN_ACCEPTED',
@@ -43,6 +47,8 @@ export const DealEventName = {
   HAK_JAWAB_FILED: 'HAK_JAWAB_FILED',
   // 14-day hak jawab + 14-day sengketa silence elapsed
   SENGKETA_KADALUARSA: 'SENGKETA_KADALUARSA',
+  // System: 30 days of silence after a payment claim, no laporan ever filed
+  KEDALUWARSA_LAPSED: 'KEDALUWARSA_LAPSED',
 } as const;
 export type DealEventName = (typeof DealEventName)[keyof typeof DealEventName];
 
@@ -68,7 +74,7 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
   [DealStatus.DISEPAKATI]: [
     { event: DealEventName.BUKTI_UPLOADED, next: DealStatus.DIBAYAR_DIKLAIM },
     { event: DealEventName.CANCEL_AGREED, next: DealStatus.DIBATALKAN_BERSAMA },
-    { event: DealEventName.CANCEL_UNILATERAL, next: DealStatus.DIBATALKAN_SEPIHAK_PRA_BAYAR },
+    { event: DealEventName.CANCEL_UNILATERAL, next: DealStatus.TIDAK_DILANJUTKAN },
     { event: DealEventName.PERPANJANGAN_PROPOSED, next: DealStatus.DISEPAKATI },
     { event: DealEventName.PERPANJANGAN_ACCEPTED, next: DealStatus.DISEPAKATI },
   ],
@@ -76,7 +82,9 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.RECEIPT_CONFIRMED, next: DealStatus.DIKONFIRMASI_TERIMA },
     { event: DealEventName.REFUND_UPLOADED, next: DealStatus.DIBAYAR_DIKLAIM }, // self; awaiting REFUND_CONFIRMED
     { event: DealEventName.REFUND_CONFIRMED, next: DealStatus.DIKEMBALIKAN_PENUH },
+    { event: DealEventName.REFUND_CONFIRMED_PARTIAL, next: DealStatus.DIKEMBALIKAN_SEBAGIAN },
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
+    { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
     { event: DealEventName.PERPANJANGAN_PROPOSED, next: DealStatus.DIBAYAR_DIKLAIM },
     { event: DealEventName.PERPANJANGAN_ACCEPTED, next: DealStatus.DIBAYAR_DIKLAIM },
   ],
@@ -88,8 +96,10 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
   ],
   [DealStatus.SELESAI]: [],
   [DealStatus.DIBATALKAN_BERSAMA]: [],
-  [DealStatus.DIBATALKAN_SEPIHAK_PRA_BAYAR]: [],
+  [DealStatus.TIDAK_DILANJUTKAN]: [],
+  [DealStatus.KEDALUWARSA]: [],
   [DealStatus.DIKEMBALIKAN_PENUH]: [],
+  [DealStatus.DIKEMBALIKAN_SEBAGIAN]: [],
   [DealStatus.TIDAK_DIPENUHI]: [
     { event: DealEventName.HAK_JAWAB_FILED, next: DealStatus.SENGKETA },
   ],

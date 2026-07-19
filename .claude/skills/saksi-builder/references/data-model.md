@@ -84,9 +84,11 @@ DRAF → DIAJUKAN → DISEPAKATI → DIBAYAR_DIKLAIM → DIKONFIRMASI_TERIMA →
 - `SELESAI`: recipient of goods/repayment confirms fulfillment. Terminal, positive.
 
 Exit states (D5 — all terminal unless noted):
-- `DIBATALKAN_BERSAMA`: either side proposes cancel, other accepts. Weight: none. Mandatory exit door.
-- `DIBATALKAN_SEPIHAK_PRA_BAYAR`: one side cancels/ghosts after DISEPAKATI but before any payment claim. Recorded as its own category (this is HnR). Light weight.
+- `DIBATALKAN_BERSAMA`: either side proposes cancel, other accepts. Weight: none. Mandatory exit door. **Guard: valid only from `DISEPAKATI`. Unreachable once `DIBAYAR_DIKLAIM` exists — after a payment claim, the only exits are `DIKEMBALIKAN_PENUH`, `DIKEMBALIKAN_SEBAGIAN`, or the breach pipeline.**
+- `TIDAK_DILANJUTKAN`: one side explicitly cancels or the deadline lapses with no payment ever claimed and no mutual cancel agreed. Recorded as its own category (this is HnR). Light weight.
+- `KEDALUWARSA` (terminal): from `DIBAYAR_DIKLAIM`, 30 days past deadline with no confirmation, no SELESAI, and no laporan ever filed — a filed laporan routes into the breach pipeline instead. Records genuine mutual silence. No weight against either party.
 - `DIKEMBALIKAN_PENUH`: after payment, seller exits honestly — uploads bukti refund (kind=REFUND), buyer confirms. Neutral-positive. **The refund screen MUST display the N8 warning (copy-id.md §4) — refund scams solicit additional transfers.**
+- `DIKEMBALIKAN_SEBAGIAN`: after payment, seller exits partially — uploads bukti refund (kind=REFUND) for a partial amount, buyer confirms. Neutral-positive, mirrors `DIKEMBALIKAN_PENUH`. **The refund screen MUST display the N8 warning (copy-id.md §4) — refund scams solicit additional transfers.**
 - `TIDAK_DIPENUHI`: deadline passed after payment claim/confirmation, no delivery, no response within the 14-day hak jawab window → flag published at the correct rung. The heavy terminal state.
 - `SENGKETA` (non-terminal): flagged party responds within 14 days disputing. Flag shows DISPUTED. Mid-dispute silence for 14 more days → recorded as "tidak merespons dalam 14 hari".
 
@@ -114,4 +116,4 @@ Fee charged at DISEPAKATI, non-refundable, either party may pay for both (record
 
 ## Profile page (public, per phone_hash or rekening)
 
-Counts per outcome, never a score: selesai · dibatalkan bersama · dibatalkan sepihak pra-bayar (HnR) · dikembalikan penuh · tidak dipenuhi · sengketa aktif. Plus account age and verification level. Rendering a composite score, stars, or a safety color is FORBIDDEN — a score is a verdict wearing math.
+Counts per outcome, never a score: selesai · dibatalkan bersama · tidak dilanjutkan (HnR) · kedaluwarsa · dikembalikan penuh · dikembalikan sebagian · tidak dipenuhi · klaim berbeda aktif. Plus account age and verification level. Rendering a composite score, stars, or a safety color is FORBIDDEN — a score is a verdict wearing math.
