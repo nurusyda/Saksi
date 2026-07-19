@@ -4,32 +4,22 @@ import { DealStatus } from '@/lib/db/transitions';
 import { DealShareButton } from './DealShareButton';
 import { JoinDealForm } from './JoinDealForm';
 import { AcceptDealForm } from './AcceptDealForm';
+import { DisepakatiPanel } from './DisepakatiPanel';
+import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
+import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
+import { SelesaiPanel } from './SelesaiPanel';
 import { joinDeal, acceptDeal } from './actions';
+import { formatRp, formatDate } from '@/lib/format';
+import { maskRekening } from '@/lib/db/accountHistory';
 import {
   JOIN_FORM_HEADING,
   JOIN_DEAL_INSTRUCTION,
   STATUS_DIAJUKAN,
-  STATUS_DISEPAKATI_PLACEHOLDER,
   ROLE_LABELS,
   ROLE_PAIR,
   COUNTERPART_FALLBACK_LABEL,
   TIER_LABELS,
 } from '@/lib/copy';
-
-function formatRp(amount: number | bigint): string {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(amount));
-}
-
-function formatDate(iso: string): string {
-  // Date-only strings parse as UTC midnight. Render explicitly in WIB so the
-  // displayed calendar date is correct regardless of the server's default TZ.
-  return new Date(iso).toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Asia/Jakarta',
-  });
-}
 
 export default async function DealPage({
   params,
@@ -47,8 +37,25 @@ export default async function DealPage({
 
   if (
     !deal ||
-    ![DealStatus.DRAF, DealStatus.DIAJUKAN, DealStatus.DISEPAKATI].includes(deal.status)
+    ![
+      DealStatus.DRAF,
+      DealStatus.DIAJUKAN,
+      DealStatus.DISEPAKATI,
+      DealStatus.DIBAYAR_DIKLAIM,
+      DealStatus.DIKONFIRMASI_TERIMA,
+      DealStatus.SELESAI,
+    ].includes(deal.status)
   ) {
+    notFound();
+  }
+
+  // Defense in depth: migration 0013's CHECK constraint guarantees
+  // rekening_tujuan/rekening_bank are non-null once a deal leaves DRAF, but
+  // `deal` here is untyped (select('*') with no generated Database schema)
+  // so TypeScript can't catch a drift between the constraint and this
+  // assumption. DisepakatiPanel and friends are typed to expect non-null
+  // strings for these fields.
+  if (deal.status !== DealStatus.DRAF && (!deal.rekening_tujuan || !deal.rekening_bank)) {
     notFound();
   }
 
@@ -79,10 +86,15 @@ export default async function DealPage({
             <p>
               <span className="font-medium">Nominal:</span> {formatRp(deal.amount_idr)}
             </p>
-            <p>
-              <span className="font-medium">Rekening tujuan:</span> {deal.rekening_bank}{' '}
-              {deal.rekening_tujuan}
-            </p>
+            {/* Masked — this card renders for anyone with the link, before
+                any party identity is confirmed. Full number only appears
+                post-identification (DisepakatiPanel and friends). */}
+            {deal.rekening_tujuan && deal.rekening_bank && (
+              <p>
+                <span className="font-medium">Rekening tujuan:</span> {deal.rekening_bank}{' '}
+                {maskRekening(deal.rekening_tujuan)}
+              </p>
+            )}
             <p>
               <span className="font-medium">Batas waktu:</span> {formatDate(deal.deadline)}
             </p>
@@ -124,7 +136,7 @@ export default async function DealPage({
               <p className="mb-4 text-xs text-zinc-500">
                 {JOIN_DEAL_INSTRUCTION}
               </p>
-              <JoinDealForm action={boundJoinDeal} />
+              <JoinDealForm action={boundJoinDeal} needsRekening={deal.proposer_role === 'PEMBELI'} />
             </div>
           </>
         )}
@@ -145,10 +157,27 @@ export default async function DealPage({
         )}
 
         {deal.status === DealStatus.DISEPAKATI && (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-            {STATUS_DISEPAKATI_PLACEHOLDER}
-          </div>
+          <DisepakatiPanel
+            deal={{
+              token,
+              item_desc: deal.item_desc,
+              amount_idr: Number(deal.amount_idr),
+              proposer_role: deal.proposer_role,
+            }}
+          />
         )}
+
+        {deal.status === DealStatus.DIBAYAR_DIKLAIM && (
+          <DibayarDiklaimPanel deal={{ token, proposer_role: deal.proposer_role }} />
+        )}
+
+        {deal.status === DealStatus.DIKONFIRMASI_TERIMA && (
+          <DikonfirmasiTerimaPanel
+            deal={{ token, item_desc: deal.item_desc, proposer_role: deal.proposer_role }}
+          />
+        )}
+
+        {deal.status === DealStatus.SELESAI && <SelesaiPanel token={token} />}
       </div>
     </div>
   );

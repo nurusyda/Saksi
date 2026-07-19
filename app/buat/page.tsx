@@ -17,17 +17,45 @@ import {
   TIER_LIMA_RIBU_DESC,
   TIER_BERMETERAI_DESC,
   TIER_FOOTER,
+  BELUM_TERSEDIA_LABEL,
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
   formatAccountHistory,
+  PHONE_FIELD_LABEL,
+  PHONE_FORMAT_HINT,
+  NOTIFY_ME_LABEL,
+  DEAL_TYPE_LABELS,
+  SEGERA_HADIR_LABEL,
+  PENDING_SAVE_LABEL,
 } from '@/lib/copy';
 
-const ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
+// Deal-type gating: only jual-beli is selectable for now. Backend/schema/
+// state machine keep supporting all role pairs — see actions.ts for the
+// matching server-side rejection.
+const SELECTABLE_ROLES = [
+  { value: 'PENJUAL', label: ROLE_LABELS.PENJUAL },
+  { value: 'PEMBELI', label: ROLE_LABELS.PEMBELI },
+];
 
-const TIERS = [
+// Pemberi Pinjaman/Peminjam and Pemilik/Penyewa are no longer listed here —
+// the jenis-transaksi selector above (Section B) now covers "not available"
+// messaging for those two deal types at a higher level. LAINNYA isn't a
+// jenis-transaksi option, so it keeps its own disabled card here.
+const UNAVAILABLE_ROLE_GROUPS = [
+  { key: 'LAINNYA', label: ROLE_LABELS.LAINNYA },
+];
+
+// Section B — jenis transaksi selector. Only jual-beli is functional;
+// pinjam-meminjam/sewa-menyewa render disabled with an interest checkbox.
+const UNAVAILABLE_DEAL_TYPES = [
+  { key: 'PINJAM_MEMINJAM', label: DEAL_TYPE_LABELS.PINJAM_MEMINJAM, fieldName: 'interest_pinjam_meminjam' },
+  { key: 'SEWA_MENYEWA', label: DEAL_TYPE_LABELS.SEWA_MENYEWA, fieldName: 'interest_sewa_menyewa' },
+];
+
+const TIERS: { value: string; label: string; desc: string; interestFieldName?: string }[] = [
   { value: 'GRATIS', label: TIER_LABELS.GRATIS, desc: TIER_GRATIS_DESC },
-  { value: 'LIMA_RIBU', label: TIER_LABELS.LIMA_RIBU, desc: TIER_LIMA_RIBU_DESC },
-  { value: 'BERMETERAI', label: TIER_LABELS.BERMETERAI, desc: TIER_BERMETERAI_DESC },
+  { value: 'LIMA_RIBU', label: TIER_LABELS.LIMA_RIBU, desc: TIER_LIMA_RIBU_DESC, interestFieldName: 'interest_tier_lima_ribu' },
+  { value: 'BERMETERAI', label: TIER_LABELS.BERMETERAI, desc: TIER_BERMETERAI_DESC, interestFieldName: 'interest_tier_bermeterai' },
 ];
 
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
@@ -38,7 +66,7 @@ function SubmitButton({ allChecked }: { allChecked: boolean }) {
       disabled={!allChecked || pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? 'Mencatat...' : 'Buat Kesepakatan'}
+      {pending ? PENDING_SAVE_LABEL : 'Buat Kesepakatan'}
     </button>
   );
 }
@@ -107,12 +135,36 @@ export default function BuatPage() {
         )}
 
         <form action={formAction} className="flex flex-col gap-6">
+          {/* Jenis transaksi (Section B) — Jual-beli is the only functional
+              type; the other two are visible but disabled with a
+              notify-me checkbox. Not a DB field: deal type is fully implied
+              by proposer_role (validated server-side in actions.ts), so this
+              selector carries no name and posts nothing on its own. */}
+          <fieldset>
+            <legend className="text-sm font-medium text-zinc-700">Jenis transaksi</legend>
+            <div className="mt-2 flex flex-col gap-2">
+              <div className="flex cursor-default items-center gap-2 rounded-lg border border-zinc-900 bg-zinc-50 px-3 py-2 text-sm">
+                <span className="font-medium text-zinc-900">{DEAL_TYPE_LABELS.JUAL_BELI}</span>
+              </div>
+              {UNAVAILABLE_DEAL_TYPES.map((d) => (
+                <div key={d.key} className="rounded-lg border border-zinc-200 p-3 text-sm">
+                  <span className="font-medium text-zinc-900">{d.label}</span>
+                  <p className="text-zinc-500">{SEGERA_HADIR_LABEL}</p>
+                  <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+                    <input type="checkbox" name={d.fieldName} className="shrink-0" />
+                    {NOTIFY_ME_LABEL}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+
           {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-zinc-700" htmlFor="proposer_phone">
-              Nomor HP Anda
+              {PHONE_FIELD_LABEL}
             </label>
-            <p className="mb-1 text-xs text-zinc-400">Format: 08xx atau +628xx</p>
+            <p className="mb-1 text-xs text-zinc-500">{PHONE_FORMAT_HINT}</p>
             <input
               id="proposer_phone"
               name="proposer_phone"
@@ -128,7 +180,7 @@ export default function BuatPage() {
           <fieldset>
             <legend className="text-sm font-medium text-zinc-700">Peran Anda</legend>
             <div className="mt-2 flex flex-wrap gap-2">
-              {ROLES.map((r) => (
+              {SELECTABLE_ROLES.map((r) => (
                 <label
                   key={r.value}
                   className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50"
@@ -153,6 +205,14 @@ export default function BuatPage() {
                 </p>
               );
             })()}
+            <div className="mt-2 flex flex-col gap-2">
+              {UNAVAILABLE_ROLE_GROUPS.map((g) => (
+                <div key={g.key} className="rounded-lg border border-zinc-200 p-3 text-sm">
+                  <span className="font-medium text-zinc-900">{g.label}</span>
+                  <p className="text-zinc-500">{BELUM_TERSEDIA_LABEL}</p>
+                </div>
+              ))}
+            </div>
             <FieldError msg={fe.proposer_role} />
           </fieldset>
 
@@ -167,7 +227,7 @@ export default function BuatPage() {
               rows={3}
               maxLength={500}
               placeholder={ITEM_DESC_PLACEHOLDER[selectedRole] ?? ITEM_DESC_PLACEHOLDER.LAINNYA}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
             />
             <FieldError msg={fe.item_desc} />
           </div>
@@ -188,71 +248,77 @@ export default function BuatPage() {
             <FieldError msg={fe.amount_idr} />
           </div>
 
-          {/* Rekening */}
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
-                Bank
-              </label>
-              <select
-                id="rekening_bank_select"
-                value={bank}
-                onChange={(e) => setBank(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-              >
-                <option value="">Pilih bank</option>
-                {BANK_OPTIONS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-                <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
-              </select>
-              {bank === BANK_OTHER_VALUE && (
-                <input
-                  type="text"
-                  value={customBank}
-                  onChange={(e) => setCustomBank(e.target.value)}
-                  placeholder="Nama bank"
-                  className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-                />
-              )}
-              <input type="hidden" name="rekening_bank" value={effectiveBank} />
-              <FieldError msg={fe.rekening_bank} />
-            </div>
-            <div className="flex-[2]">
-              <label
-                className="block text-sm font-medium text-zinc-700"
-                htmlFor="rekening_tujuan"
-              >
-                Nomor rekening tujuan pembayaran
-              </label>
-              <input
-                id="rekening_tujuan"
-                name="rekening_tujuan"
-                type="text"
-                inputMode="numeric"
-                value={rekening}
-                onChange={(e) => setRekening(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-              />
-              <FieldError msg={fe.rekening_tujuan} />
-            </div>
-          </div>
+          {/* Rekening (C1) — only Penjual has a destination account to offer
+              at create time. When proposer is Pembeli, the seller supplies
+              this later when joining (see JoinDealForm.tsx, C2). */}
+          {selectedRole === 'PENJUAL' && (
+            <>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
+                    Bank
+                  </label>
+                  <select
+                    id="rekening_bank_select"
+                    value={bank}
+                    onChange={(e) => setBank(e.target.value)}
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+                  >
+                    <option value="">Pilih bank</option>
+                    {BANK_OPTIONS.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                    <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
+                  </select>
+                  {bank === BANK_OTHER_VALUE && (
+                    <input
+                      type="text"
+                      value={customBank}
+                      onChange={(e) => setCustomBank(e.target.value)}
+                      placeholder="Nama bank"
+                      className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+                    />
+                  )}
+                  <input type="hidden" name="rekening_bank" value={effectiveBank} />
+                  <FieldError msg={fe.rekening_bank} />
+                </div>
+                <div className="flex-[2]">
+                  <label
+                    className="block text-sm font-medium text-zinc-700"
+                    htmlFor="rekening_tujuan"
+                  >
+                    Nomor rekening tujuan pembayaran
+                  </label>
+                  <input
+                    id="rekening_tujuan"
+                    name="rekening_tujuan"
+                    type="text"
+                    inputMode="numeric"
+                    value={rekening}
+                    onChange={(e) => setRekening(e.target.value)}
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+                  />
+                  <FieldError msg={fe.rekening_tujuan} />
+                </div>
+              </div>
 
-          {history.status !== 'idle' && (
-            <p className="-mt-3 text-xs text-zinc-500">
-              {history.status === 'found' &&
-                formatAccountHistory(
-                  effectiveBank,
-                  history.rekeningMasked,
-                  history.selesaiCount,
-                  history.tidakDipenuhiCount,
-                  history.sinceLabel,
-                )}
-              {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-              {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
-            </p>
+              {history.status !== 'idle' && (
+                <p className="-mt-3 text-xs text-zinc-500">
+                  {history.status === 'found' &&
+                    formatAccountHistory(
+                      effectiveBank,
+                      history.rekeningMasked,
+                      history.selesaiCount,
+                      history.tidakDipenuhiCount,
+                      history.sinceLabel,
+                    )}
+                  {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+                  {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+                </p>
+              )}
+            </>
           )}
 
           {/* Deadline */}
@@ -297,14 +363,14 @@ export default function BuatPage() {
                     <span className="font-medium text-zinc-900">{t.label}</span>
                     <p className="text-zinc-500">{t.desc}</p>
                     <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
-                      <input type="checkbox" className="shrink-0" />
-                      Beri tahu saat tersedia.
+                      <input type="checkbox" name={t.interestFieldName} className="shrink-0" />
+                      {NOTIFY_ME_LABEL}
                     </label>
                   </div>
                 ),
               )}
             </div>
-            <p className="mt-2 text-xs text-zinc-400">
+            <p className="mt-2 text-xs text-zinc-500">
               {TIER_FOOTER}
             </p>
             <FieldError msg={fe.tier} />

@@ -10,7 +10,7 @@ export const ATTESTATIONS: readonly string[] = [
 ];
 
 export const TC_LABEL =
-  'Saya menyetujui Syarat & Ketentuan SAKSI, termasuk publikasi catatan wanprestasi, proses hak jawab, dan larangan bukti palsu.';
+  'Saya menyetujui Syarat & Ketentuan SAKSI: publikasi kesepakatan tidak terpenuhi, hak menjawab dalam 14 hari jika dilaporkan, dan larangan bukti palsu.';
 
 // copy-id.md §15 — description-field placeholder by proposer role
 export const ITEM_DESC_PLACEHOLDER: Record<string, string> = {
@@ -69,7 +69,26 @@ export const TIER_BERMETERAI_DESC =
 
 // copy-id.md §6 — shared footer below tier cards
 export const TIER_FOOTER =
-  'Tier menentukan bobot pembuktian, bukan tingkat keamanan. Melaporkan wanprestasi selalu gratis di semua tier.';
+  'Tingkatan menunjukkan kekuatan verifikasi identitas kedua pihak, bukan keamanan kesepakatan. Mengajukan dan melihat laporan selalu gratis di semua tingkatan.';
+
+// copy-id.md §6a — disabled deal-type role cards (create flow gating)
+export const BELUM_TERSEDIA_LABEL = 'Belum tersedia';
+
+// copy-id.md §6 — pre-existing shipped copy (Phase 0.6), was hardcoded only
+// in the paid-tier disabled cards; centralized here since it's now also used
+// on the jenis-transaksi disabled cards (Section B).
+export const NOTIFY_ME_LABEL = 'Beri tahu saat tersedia.';
+
+// copy-id.md §14 — deal-type names, extracted from the existing confirmation-
+// label table rather than re-typed, for the jenis-transaksi selector.
+export const DEAL_TYPE_LABELS: Record<'JUAL_BELI' | 'PINJAM_MEMINJAM' | 'SEWA_MENYEWA', string> = {
+  JUAL_BELI: 'Jual-beli',
+  PINJAM_MEMINJAM: 'Pinjam-meminjam',
+  SEWA_MENYEWA: 'Sewa-menyewa',
+};
+
+// copy-id.md §6a — deal-type selector "coming soon" badge (locked 2026-07-20)
+export const SEGERA_HADIR_LABEL = 'Segera hadir';
 
 // copy-id.md §8 — canonical domain line for badge/share card/footer
 export const CANONICAL_DOMAIN =
@@ -143,6 +162,18 @@ export const ERROR_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Coba lagi nant
 // distinct from the RPC succeeding but affecting 0 rows (STATUS_ALREADY_ACCEPTED).
 export const ERROR_ACCEPT_FAILED = 'Gagal menyetujui. Coba lagi.';
 
+// Cross-file duplicated UI chrome (JoinDealForm.tsx + AcceptDealForm.tsx) —
+// not legally adjacent copy, but Law 3 still applies to identical strings
+// used verbatim in more than one file.
+export const PHONE_FIELD_LABEL = 'Nomor HP Anda';
+export const PHONE_FORMAT_HINT = 'Format: 08xx atau +628xx';
+
+// Cross-file duplicated submit-pending labels — found by monster_check
+// (2026-07-19 batch): 'Memproses...' was independently typed in three
+// SubmitButton components, 'Mencatat...' in two.
+export const PENDING_DEFAULT_LABEL = 'Memproses...';
+export const PENDING_SAVE_LABEL = 'Mencatat...';
+
 // Validation errors — not in copy-id.md; in copy.ts because both action files use them
 export const ERROR_PHONE_INVALID =
   'Nomor HP tidak valid. Gunakan format 08xx atau +628xx.';
@@ -160,3 +191,116 @@ export const ERROR_DEAL_SAVE_FAILED = 'Gagal mencatat kesepakatan. Coba lagi.';
 // copy-id.md §12 — join RPC failed for a non-race reason (network/DB error)
 // Distinct from the "already closed" race message which uses a hardcoded string.
 export const ERROR_JOIN_FAILED = 'Gagal bergabung. Coba lagi.';
+
+// ============================================================
+// Section C (2026-07-19 batch) — locked strings, extracted from copy-id.md
+// sections that existed before this batch but had no TS constant yet because
+// the phases that needed them (forced-check page, bukti upload) hadn't been
+// built.
+// ============================================================
+
+// copy-id.md §2 — copy-rekening button, disabled until history resolves
+export const COPY_REKENING_DISABLED_LABEL = 'Lihat riwayat dulu';
+export const COPY_REKENING_ENABLED_LABEL = 'Salin nomor rekening';
+
+// Not in copy-id.md — transient post-click confirmation, not legally
+// adjacent, but centralized per Law 3 discipline anyway.
+export const COPY_REKENING_COPIED_LABEL = 'Tersalin';
+
+// copy-id.md §3 — blocking attestation at bukti upload
+export const BUKTI_ATTESTATION =
+  'Bukti yang saya unggah asli dan belum diubah. Mengunggah bukti palsu adalah tanggung jawab hukum saya.';
+
+// copy-id.md §5 — OCR verdict labels (never say "asli"/"terverifikasi").
+// TIDAK_KONSISTEN carries copy-id.md's own [...] interpolation marker —
+// found by monster_check rendering the literal bracketed placeholder
+// unsubstituted. Use formatOcrVerdictLabel() below, not this map directly,
+// wherever a verdict is actually displayed.
+export const OCR_VERDICT_LABELS: Record<'KONSISTEN' | 'TIDAK_KONSISTEN' | 'TIDAK_TERBACA', string> = {
+  KONSISTEN:
+    'Bukti konsisten dengan kesepakatan (nominal, tanggal, rekening tujuan cocok). Pemeriksaan konsistensi, bukan verifikasi bank.',
+  TIDAK_KONSISTEN: 'Bukti tidak konsisten dengan kesepakatan: [field yang berbeda]. Periksa kembali sebelum melanjutkan.',
+  TIDAK_TERBACA: 'Bukti tidak dapat dibaca otomatis. Dicatat sebagai klaim tanpa pemeriksaan konsistensi.',
+};
+
+export function formatOcrVerdictLabel(
+  verdict: 'KONSISTEN' | 'TIDAK_KONSISTEN' | 'TIDAK_TERBACA',
+  mismatchedFieldLabels: string[],
+): string {
+  if (verdict !== 'TIDAK_KONSISTEN') return OCR_VERDICT_LABELS[verdict];
+  const fields = mismatchedFieldLabels.length > 0 ? mismatchedFieldLabels.join(', ') : 'data';
+  return OCR_VERDICT_LABELS.TIDAK_KONSISTEN.replace('[field yang berbeda]', fields);
+}
+
+export const ERROR_REKENING_LOAD_FAILED = 'Gagal memuat rekening tujuan. Muat ulang halaman.';
+
+// copy-id.md §14 — jual-beli fulfillment-confirmation label (Pembeli, C5)
+export const CONFIRM_FULFILLMENT_LABEL_JUAL_BELI = 'Konfirmasi barang diterima';
+
+// Functional error messages (same category as ERROR_PHONE_INVALID etc. —
+// not legal-adjacent copy, not in copy-id.md by design).
+export const ERROR_BUKTI_ATTESTATION_REQUIRED = 'Centang pernyataan bukti sebelum mengunggah.';
+export const ERROR_BUKTI_FILE_REQUIRED = 'Pilih file bukti transfer.';
+export const ERROR_BUKTI_UPLOAD_FAILED = 'Gagal mengunggah bukti. Coba lagi.';
+export const ERROR_BUKTI_SAVE_FAILED = 'Gagal mencatat bukti. Coba lagi.';
+export const ERROR_CONFIRM_FAILED = 'Gagal mengonfirmasi. Coba lagi.';
+export const ERROR_WRONG_PARTY_PEMBELI_ONLY = 'Hanya pihak pembeli yang dapat melakukan ini.';
+export const ERROR_WRONG_PARTY_PENJUAL_ONLY = 'Hanya pihak penjual yang dapat melakukan ini.';
+
+// ============================================================
+// copy-id.md §16 — Section C payment lifecycle (locked 2026-07-20). Started
+// as DRAFT (2026-07-19 batch); reviewed line-by-line against copy-id.md's
+// forbidden-words/fact-not-person rules and data-model.md's breach pipeline
+// before locking — see §16 for the one wording fix that came out of that
+// review (BARANG_TIDAK_SESUAI_CONSEQUENCES' identity-verification bullet).
+// ============================================================
+
+// C4 — Penjual's DIBAYAR_DIKLAIM page
+export const CONFIRM_RECEIPT_LABEL = 'Konfirmasi uang diterima';
+export const PAYMENT_NOT_RECEIVED_LABEL = 'Dana belum masuk';
+export const OCR_AUTHENTICITY_DISCLAIMER =
+  'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
+
+// C5 — DIKONFIRMASI_TERIMA, both sides
+export const SHIP_INSTRUCTION =
+  'Uang telah dikonfirmasi diterima. Kirim barang sesuai kesepakatan.';
+export const BARANG_TIDAK_SESUAI_BUTTON = 'Barang tidak sesuai kesepakatan';
+
+// C6 — "barang tidak sesuai" stub (submit always disabled, no RPC call)
+export const BARANG_TIDAK_SESUAI_PROMPT =
+  'Bagian mana dari keterangan di atas yang tidak dipenuhi?';
+export const BARANG_TIDAK_SESUAI_CONSEQUENCES: readonly string[] = [
+  'Laporan tercatat sebagai klaim Anda, bukan putusan SAKSI.',
+  'Penjual mendapat 14 hari untuk menanggapi.',
+  'Laporan Anda dan tanggapan pihak lain (jika ada) sama-sama tercatat permanen di catatan rekening ini.',
+  'SAKSI tidak menengahi dan tidak mengembalikan dana.',
+  'Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini.',
+];
+export const BARANG_TIDAK_SESUAI_GATE_BANNER =
+  'Fitur pelaporan memerlukan verifikasi nomor HP (OTP), belum tersedia. Kami akan memberi tahu saat siap.';
+export const BARANG_TIDAK_SESUAI_SUBMIT_LABEL = 'Kirim Laporan';
+
+// C7 — SELESAI, minimal placeholder pending a real design pass
+export const SELESAI_CLOSING_LINE = 'Kesepakatan selesai. Tercatat di SAKSI.';
+
+// C5/C7 — "riwayat" timeline event labels (deal_events.event -> display text).
+// Only the event names actually reachable on the jual-beli happy path built
+// so far are covered; an unmapped event falls back to the raw event name.
+export const TIMELINE_EVENT_LABELS: Record<string, string> = {
+  CREATED: 'Kesepakatan dibuat',
+  COUNTERPART_JOINED: 'Pihak lain bergabung',
+  PROPOSER_ACCEPTED: 'Pengaju menyetujui',
+  COUNTERPART_ACCEPTED: 'Pihak lain menyetujui',
+  ACCEPTED: 'Kesepakatan disetujui kedua pihak',
+  BUKTI_UPLOADED: 'Bukti transfer diunggah',
+  RECEIPT_CONFIRMED: 'Penerimaan dana dikonfirmasi',
+  FULFILLMENT_CONFIRMED: 'Barang/pemenuhan dikonfirmasi',
+};
+
+// copy-id.md §16 — minimal fill-ins for the non-Section-C-defined side of
+// each merged status page (e.g. what Penjual sees while waiting at
+// DISEPAKATI, what Pembeli sees while waiting at DIBAYAR_DIKLAIM).
+export const WAITING_FOR_PAYMENT_PROOF =
+  'Menunggu pihak pembeli mengunggah bukti transfer.';
+export const WAITING_FOR_RECEIPT_CONFIRMATION =
+  'Menunggu konfirmasi penerimaan dari pihak penjual.';

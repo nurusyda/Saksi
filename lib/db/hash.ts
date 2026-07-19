@@ -12,8 +12,8 @@ export interface CanonicalDealPayload {
   proposer_role: string;
   item_desc: string;
   amount_idr: number;
-  rekening_tujuan: string;
-  rekening_bank: string;
+  rekening_tujuan: string | null;   // null only while status is DRAF (Pembeli-initiated)
+  rekening_bank: string | null;
   deadline: string;   // ISO-8601 date
   status: string;
   meterai_applied: boolean;
@@ -81,8 +81,8 @@ export function buildCanonicalPayload(
     proposer_role: string;
     item_desc: string;
     amount_idr: number | bigint;
-    rekening_tujuan: string;
-    rekening_bank: string;
+    rekening_tujuan: string | null;
+    rekening_bank: string | null;
     deadline: string;
     status: string;
     meterai_applied: boolean;

@@ -6,6 +6,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
+import { identifyPartyByPhone, type WhichParty } from '@/lib/db/party';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import {
   ATTESTATIONS,
@@ -62,6 +63,20 @@ export async function joinDeal(
     fieldErrors.counterpart_phone = ERROR_PHONE_INVALID;
   }
 
+  // C2 — when the proposer's role was Pembeli, the counterpart is Penjual
+  // and must supply the destination account here (the proposer never had
+  // one to give at create time). Not required in the other direction: a
+  // Penjual-proposed deal already has its rekening set from CREATE.
+  const counterpartSuppliesRekening = deal.proposer_role === 'PEMBELI';
+  let rekeningTujuan: string | null = null;
+  let rekeningBank: string | null = null;
+  if (counterpartSuppliesRekening) {
+    rekeningTujuan = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
+    rekeningBank = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
+    if (!rekeningTujuan) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
+    if (!rekeningBank) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
+  }
+
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   // Upsert counterpart party
@@ -109,7 +124,13 @@ export async function joinDeal(
   // Reconstruct the post-update deal state locally to compute the hash before the RPC
   // runs. Safe only while deals has no triggers or computed columns that fire on UPDATE
   // — a future migration adding either must also update this reconstruction.
-  const virtualDeal = { ...deal, counterpart_id: party.id, status: DealStatus.DIAJUKAN };
+  const virtualDeal = {
+    ...deal,
+    counterpart_id: party.id,
+    status: DealStatus.DIAJUKAN,
+    rekening_tujuan: rekeningTujuan ?? deal.rekening_tujuan,
+    rekening_bank: rekeningBank ?? deal.rekening_bank,
+  };
   const canonical = buildCanonicalPayload(
     virtualDeal,
     {
@@ -129,6 +150,8 @@ export async function joinDeal(
       p_counterpart_id: party.id,
       p_prior_hash: priorHash,
       p_new_hash: newHash,
+      p_rekening_tujuan: rekeningTujuan,
+      p_rekening_bank: rekeningBank,
     })
     .single();
 
@@ -193,122 +216,171 @@ export async function acceptDeal(
   // parties' numbers are already on file from creation/join. There's no
   // login/session, so this is the only way to know which party is acting.
   const rawPhone = (formData.get('phone') as string | null)?.trim() ?? '';
-  let phoneE164 = '';
+  let whichParty: WhichParty | null = null;
   try {
-    phoneE164 = normalizePhone(rawPhone);
+    whichParty = await identifyPartyByPhone(db, deal, rawPhone);
   } catch {
     return { error: ERROR_PHONE_INVALID };
   }
-  const pHash = phoneHash(phoneE164);
-
-  const [{ data: proposerParty }, { data: counterpartParty }] = await Promise.all([
-    db.from('parties').select('phone_hash').eq('id', deal.proposer_id).single(),
-    deal.counterpart_id
-      ? db.from('parties').select('phone_hash').eq('id', deal.counterpart_id).single()
-      : Promise.resolve({ data: null }),
-  ]);
-
-  let whichParty: 'proposer' | 'counterpart' | null = null;
-  if (proposerParty?.phone_hash === pHash) whichParty = 'proposer';
-  else if (counterpartParty?.phone_hash === pHash) whichParty = 'counterpart';
 
   if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const alreadyAccepted =
-    whichParty === 'proposer' ? deal.proposer_accepted : deal.counterpart_accepted;
-  if (alreadyAccepted) return { info: STATUS_ALREADY_ACCEPTED };
 
   const flagColumn = whichParty === 'proposer' ? 'proposer_accepted' : 'counterpart_accepted';
   const eventName =
     whichParty === 'proposer' ? DealEventName.PROPOSER_ACCEPTED : DealEventName.COUNTERPART_ACCEPTED;
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
 
-  const { data: lastEvent } = await db
-    .from('deal_events')
-    .select('new_hash')
-    .eq('deal_id', deal.id)
-    .order('id', { ascending: false })
-    .limit(1)
-    .single();
-  const priorHash = lastEvent?.new_hash ?? null;
+  // Bounded retry: fetch a fresh deal row at the top of each iteration so
+  // the hash is always computed from current state. If the other party's
+  // accept landed since our last attempt, the already-accepted guard fires
+  // here (typed read) instead of depending on the RPC's 0-row return.
+  const RETRY_LIMIT = 3;
+  let recordedFlags: { proposer_accepted: boolean; counterpart_accepted: boolean } | null = null;
+  let recordedNewHash: string | null = null;
 
-  // Status is unchanged by this event — deal is passed through as-is.
-  const canonical = buildCanonicalPayload(
-    deal,
-    { name: eventName, actor, payload: null },
-    priorHash,
-  );
-  const newHash = hashDeal(canonical);
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    // Not load-bearing (the RPC's row lock already serializes the only two
+    // possible actors), but cheap insurance against pointless back-to-back
+    // retries.
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
 
-  const { data: updatedRow, error: rpcErr } = await db
-    .rpc('record_party_acceptance', {
-      p_deal_id: deal.id,
-      p_flag_column: flagColumn,
-      p_event: eventName,
-      p_actor: actor,
-      p_prior_hash: priorHash,
-      p_new_hash: newHash,
-    })
-    .single();
+    const { data: cur, error: curErr } = await db
+      .from('deals')
+      .select('*')
+      .eq('id', deal.id)
+      .single();
+    if (curErr || !cur || cur.status !== DealStatus.DIAJUKAN)
+      return { error: ERROR_DEAL_CLOSED };
+    const already =
+      whichParty === 'proposer' ? cur.proposer_accepted : cur.counterpart_accepted;
+    if (already) return { info: STATUS_ALREADY_ACCEPTED };
 
-  if (rpcErr) return { error: ERROR_ACCEPT_FAILED };
-  if (!updatedRow) {
-    // RPC ran fine but affected 0 rows — this party's flag was already true,
-    // or the deal moved on (record_party_acceptance's own guard). A real no-op,
-    // not an error.
-    return { info: STATUS_ALREADY_ACCEPTED };
-  }
-
-  // record_party_acceptance's return type isn't generated/typed by Supabase
-  // here, so the two flag columns need an explicit shape to read safely.
-  const updatedFlags = updatedRow as {
-    proposer_accepted: boolean;
-    counterpart_accepted: boolean;
-  };
-
-  void submitAnchor(newHash);
-
-  // Always attempt to finalize right after — record_party_acceptance's own
-  // guard (WHERE status = 'DIAJUKAN' AND proposer_accepted AND
-  // counterpart_accepted) makes this a safe no-op when the other party
-  // hasn't accepted yet.
-  if (updatedFlags.proposer_accepted && updatedFlags.counterpart_accepted) {
-    const { data: lastEvent2 } = await db
+    const { data: lastEvent } = await db
       .from('deal_events')
       .select('new_hash')
       .eq('deal_id', deal.id)
       .order('id', { ascending: false })
       .limit(1)
       .single();
-    const priorHash2 = lastEvent2?.new_hash ?? null;
+    const priorHash = lastEvent?.new_hash ?? null;
 
-    // Defense in depth — matches the pattern everywhere else in this file.
-    assertTransition(DealStatus.DIAJUKAN, DealEventName.ACCEPTED);
-
-    // Built from the original, fully-typed `deal` fetch (not the untyped RPC
-    // row) — only status and the two flags actually changed.
-    const virtualDeal = {
-      ...deal,
-      proposer_accepted: true,
-      counterpart_accepted: true,
-      status: DealStatus.DISEPAKATI,
-    };
-    const canonical2 = buildCanonicalPayload(
-      virtualDeal,
-      { name: DealEventName.ACCEPTED, actor: 'SYSTEM', payload: null },
-      priorHash2,
+    const canonical = buildCanonicalPayload(
+      cur,
+      { name: eventName, actor, payload: null },
+      priorHash,
     );
-    const newHash2 = hashDeal(canonical2);
+    const newHash = hashDeal(canonical);
 
-    const { data: finalizedRow } = await db
-      .rpc('finalize_deal_acceptance', {
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('record_party_acceptance', {
         p_deal_id: deal.id,
-        p_prior_hash: priorHash2,
-        p_new_hash: newHash2,
+        p_flag_column: flagColumn,
+        p_event: eventName,
+        p_actor: actor,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
       })
-      .single();
+      .maybeSingle();
 
-    if (finalizedRow) void submitAnchor(newHash2);
+    if (rpcErr) return { error: ERROR_ACCEPT_FAILED };
+
+    if (rpcRow) {
+      recordedFlags = rpcRow as { proposer_accepted: boolean; counterpart_accepted: boolean };
+      recordedNewHash = newHash;
+      break;
+    }
+
+    // 0 rows with prior_hash already verified by the RPC's row lock: the
+    // other party's accept landed between our fresh `cur` fetch and the RPC
+    // call, invalidating our prior_hash. Loop retries with a new snapshot.
+  }
+
+  if (!recordedFlags || !recordedNewHash) return { error: ERROR_ACCEPT_FAILED };
+
+  void submitAnchor(recordedNewHash);
+
+  // Always attempt to finalize right after — finalize_deal_acceptance's own
+  // guard (WHERE status = 'DIAJUKAN' AND proposer_accepted AND
+  // counterpart_accepted) makes this a safe no-op when the other party
+  // hasn't accepted yet. Same stale-prior_hash race applies here too (two
+  // individual-accept flows can each reach this step around the same time),
+  // so it gets the same bounded retry.
+  if (recordedFlags.proposer_accepted && recordedFlags.counterpart_accepted) {
+    // Defense in depth — matches the pattern everywhere else in this file.
+    try {
+      assertTransition(DealStatus.DIAJUKAN, DealEventName.ACCEPTED);
+    } catch {
+      return { error: ERROR_ACCEPT_FAILED };
+    }
+
+    let finalized = false;
+
+    for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+      const { data: lastEvent2 } = await db
+        .from('deal_events')
+        .select('new_hash')
+        .eq('deal_id', deal.id)
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
+      const priorHash2 = lastEvent2?.new_hash ?? null;
+
+      // Built from the original, fully-typed `deal` fetch — only status and
+      // the two flags actually changed.
+      const virtualDeal = {
+        ...deal,
+        proposer_accepted: true,
+        counterpart_accepted: true,
+        status: DealStatus.DISEPAKATI,
+      };
+      const canonical2 = buildCanonicalPayload(
+        virtualDeal,
+        { name: DealEventName.ACCEPTED, actor: 'SYSTEM', payload: null },
+        priorHash2,
+      );
+      const newHash2 = hashDeal(canonical2);
+
+      const { data: finalizedRow, error: finalizeErr } = await db
+        .rpc('finalize_deal_acceptance', {
+          p_deal_id: deal.id,
+          p_prior_hash: priorHash2,
+          p_new_hash: newHash2,
+        })
+        .maybeSingle();
+
+      if (finalizeErr) return { error: ERROR_ACCEPT_FAILED };
+
+      if (finalizedRow) {
+        void submitAnchor(newHash2);
+        finalized = true;
+        break;
+      }
+
+      // 0 rows: either a concurrent request already finalized it (check
+      // status fresh — fine, nothing more to do) or our prior_hash was
+      // stale (retry).
+      const { data: freshDeal2 } = await db
+        .from('deals')
+        .select('status')
+        .eq('id', deal.id)
+        .single();
+      if (freshDeal2?.status === DealStatus.DISEPAKATI) {
+        finalized = true;
+        break;
+      }
+    }
+
+    // Bug flagged twice (once by me mid-session, then again by
+    // monster_check): without this, exhausting every retry silently fell
+    // through to the redirect below, leaving proposer_accepted and
+    // counterpart_accepted both true but status stuck at DIAJUKAN — a
+    // dead-end state with no way forward for either party.
+    if (!finalized) {
+      console.error('finalize_deal_acceptance exhausted retries', deal.id);
+      return { error: ERROR_ACCEPT_FAILED };
+    }
   }
 
   revalidatePath(`/deal/${token}`);

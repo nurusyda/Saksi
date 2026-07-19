@@ -39,7 +39,7 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 3. `Saya setuju data saya diproses untuk pencatatan dan pencocokan riwayat kesepakatan.`
 4. `Saya paham SAKSI hanya mencatat, tidak menahan dana atau menjamin pihak lain.`
 
-**Bundled T&C line (single checkbox):** `Saya menyetujui Syarat & Ketentuan SAKSI, termasuk publikasi catatan wanprestasi, proses hak jawab, dan larangan bukti palsu.`
+**Bundled T&C line (single checkbox):** `Saya menyetujui Syarat & Ketentuan SAKSI: publikasi kesepakatan tidak terpenuhi, hak menjawab dalam 14 hari jika dilaporkan, dan larangan bukti palsu.`
 
 **At bukti upload (blocking checkbox):**
 > Bukti yang saya unggah asli dan belum diubah. Mengunggah bukti palsu adalah tanggung jawab hukum saya.
@@ -59,7 +59,12 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - GRATIS — `Catat kesepakatan. Rekening tujuan terekam dari bukti transfer.`
 - LIMA_RIBU — `Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).`
 - BERMETERAI — `Rp50.000/pihak · Identitas terverifikasi (e-KYC) + meterai elektronik + berkas bukti siap diajukan.`
-- Shared footer: `Tier menentukan bobot pembuktian, bukan tingkat keamanan. Melaporkan wanprestasi selalu gratis di semua tier.`
+- Shared footer: `Tingkatan menunjukkan kekuatan verifikasi identitas kedua pihak, bukan keamanan kesepakatan. Mengajukan dan melihat laporan selalu gratis di semua tingkatan.`
+- Notify-me checkbox label (paid-tier disabled cards, shipped Phase 0.6; also reused on jenis-transaksi disabled cards, §6a): `Beri tahu saat tersedia.`
+
+## 6a. Deal-type gating (create flow)
+
+- Unavailable deal-type label (disabled role cards, same visual pattern as non-selectable tier cards): `Belum tersedia`
 
 ## 7. Extension & exit-state record lines (public record wording)
 
@@ -98,6 +103,10 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 **Join form instruction (visible to all viewers with the link in DRAF state):**
 > Nomor HP yang Anda masukkan akan tercatat sebagai pihak dalam kesepakatan ini. Centang semua pernyataan di bawah untuk melanjutkan.
+
+**Phone field label (used verbatim in both join & accept forms):** `Nomor HP Anda`
+
+**Phone format hint (used verbatim in both join & accept forms):** `Format: 08xx atau +628xx`
 
 **DIAJUKAN status line (shown after both parties joined, awaiting acceptance):**
 > Kedua pihak tercatat. Menunggu persetujuan kedua pihak.
@@ -186,3 +195,50 @@ already-accepted state above, not an error):**
 | PEMBERI_PINJAMAN / PEMINJAM (Pinjam-meminjam) | `Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."` |
 | PEMILIK / PENYEWA (Sewa-menyewa) | `Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."` |
 | LAINNYA / belum dipilih | `Contoh: "Jelaskan kesepakatan secara singkat dan jelas."` |
+
+## 16. Section C — payment lifecycle (DISEPAKATI → SELESAI, jual-beli; locked 2026-07-20)
+
+Started as DRAFT in the Section C build; reviewed against this file's own forbidden-words/fact-not-person rule (§8) and data-model.md's breach pipeline before locking. One string was corrected during that review (see the consequences list below).
+
+**Deal-type selector, "coming soon" badge (§6a's disabled jenis-transaksi cards):**
+> Segera hadir
+
+**C4 — Penjual's DIBAYAR_DIKLAIM page:**
+- Confirm-receipt button: `Konfirmasi uang diterima`
+- "Funds not received" button (Option A — no state change, no notification): `Dana belum masuk`
+- OCR authenticity disclaimer: `Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.`
+
+**C5 — DIKONFIRMASI_TERIMA, both sides:**
+- Penjual's ship instruction: `Uang telah dikonfirmasi diterima. Kirim barang sesuai kesepakatan.`
+- "Barang tidak sesuai" entry button: `Barang tidak sesuai kesepakatan`
+
+**C6 — "Barang tidak sesuai" stub (submit is permanently disabled; no RPC call on submit attempt until OTP-gated reporting is built):**
+- Prompt: `Bagian mana dari keterangan di atas yang tidak dipenuhi?`
+- Consequences list:
+  1. `Laporan tercatat sebagai klaim Anda, bukan putusan SAKSI.`
+  2. `Penjual mendapat 14 hari untuk menanggapi.`
+  3. `Laporan Anda dan tanggapan pihak lain (jika ada) sama-sama tercatat permanen di catatan rekening ini.`
+  4. `SAKSI tidak menengahi dan tidak mengembalikan dana.`
+  5. `Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini.` — **corrected during locking review**: the original draft said "Identitas pelapor terverifikasi... atas nama Anda," which overclaimed identity verification when only phone/OTP verification is actually performed at report-filing time (breach filing is free and phone-OTP-gated at every tier, including GRATIS, which verifies nothing else about the person — §8's rule that "terverifikasi" may only modify a fact, never a person's character, applies here).
+- Gate banner (shown while submit stays disabled): `Fitur pelaporan memerlukan verifikasi nomor HP (OTP), belum tersedia. Kami akan memberi tahu saat siap.`
+- Submit button label (disabled): `Kirim Laporan`
+
+**C7 — SELESAI (minimal, both sides identical, no action buttons; pending a real design pass):**
+> Kesepakatan selesai. Tercatat di SAKSI.
+
+**Deal-event timeline labels (C5/C7's "Riwayat" card; an unmapped event falls back to the raw event name):**
+
+| Event | Label |
+|---|---|
+| `CREATED` | `Kesepakatan dibuat` |
+| `COUNTERPART_JOINED` | `Pihak lain bergabung` |
+| `PROPOSER_ACCEPTED` | `Pengaju menyetujui` |
+| `COUNTERPART_ACCEPTED` | `Pihak lain menyetujui` |
+| `ACCEPTED` | `Kesepakatan disetujui kedua pihak` |
+| `BUKTI_UPLOADED` | `Bukti transfer diunggah` |
+| `RECEIPT_CONFIRMED` | `Penerimaan dana dikonfirmasi` |
+| `FULFILLMENT_CONFIRMED` | `Barang/pemenuhan dikonfirmasi` |
+
+**Waiting-state fill-ins (the non-active-party side of each merged status page; not explicitly specced in the original build order, minimal placeholders):**
+- Penjual waiting at DISEPAKATI: `Menunggu pihak pembeli mengunggah bukti transfer.`
+- Pembeli waiting at DIBAYAR_DIKLAIM: `Menunggu konfirmasi penerimaan dari pihak penjual.`

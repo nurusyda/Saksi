@@ -23,6 +23,34 @@ export type CreateDealState = {
   fieldErrors?: Record<string, string>;
 };
 
+// "Notify me" checkboxes (feature_interest, migration 0012, extended by
+// 0016 to also cover the paid-tier checkboxes below — those shipped in
+// Phase 0.6 with no backend at all). Purpose-limited signup for
+// not-yet-available deal types/tiers; never merged into marketing consent,
+// never blocks deal creation.
+type FeatureInterest = 'pinjam_meminjam' | 'sewa_menyewa' | 'tier_lima_ribu' | 'tier_bermeterai';
+
+async function captureFeatureInterest(
+  db: ReturnType<typeof supabaseServer>,
+  pHash: string,
+  formData: FormData,
+): Promise<void> {
+  const features: FeatureInterest[] = [];
+  if (formData.get('interest_pinjam_meminjam') === 'on') features.push('pinjam_meminjam');
+  if (formData.get('interest_sewa_menyewa') === 'on') features.push('sewa_menyewa');
+  if (formData.get('interest_tier_lima_ribu') === 'on') features.push('tier_lima_ribu');
+  if (formData.get('interest_tier_bermeterai') === 'on') features.push('tier_bermeterai');
+  if (features.length === 0) return;
+
+  const { error } = await db
+    .from('feature_interest')
+    .upsert(
+      features.map((feature) => ({ phone_hash: pHash, feature })),
+      { onConflict: 'phone_hash,feature', ignoreDuplicates: true },
+    );
+  if (error) console.error('feature_interest upsert failed', error);
+}
+
 export async function createDeal(
   _prev: CreateDealState,
   formData: FormData,
@@ -31,8 +59,8 @@ export async function createDeal(
   const proposerRole = (formData.get('proposer_role') as string | null) ?? '';
   const itemDesc = (formData.get('item_desc') as string | null)?.trim() ?? '';
   const amountRaw = (formData.get('amount_idr') as string | null) ?? '';
-  const rekeningTujuan = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
-  const rekeningBank = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
+  const rekeningTujuanRaw = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
+  const rekeningBankRaw = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
   const deadline = (formData.get('deadline') as string | null)?.trim() ?? '';
   const tier = (formData.get('tier') as string | null) ?? 'GRATIS';
 
@@ -51,7 +79,11 @@ export async function createDeal(
     fieldErrors.proposer_phone = ERROR_PHONE_INVALID;
   }
 
-  const validRoles = ['PENJUAL', 'PEMBELI', 'PEMBERI_PINJAMAN', 'PEMINJAM', 'PEMILIK', 'PENYEWA', 'LAINNYA'];
+  // Only jual-beli roles are selectable in the UI (deal-type gating) — reject
+  // anything else server-side too, since a hand-crafted POST could otherwise
+  // still create a sewa-menyewa/pinjam-meminjam/lainnya deal the UI no longer
+  // offers. Backend/schema/ROLE_PAIR/state machine unchanged.
+  const validRoles = ['PENJUAL', 'PEMBELI'];
   if (!validRoles.includes(proposerRole)) fieldErrors.proposer_role = 'Pilih peran Anda.';
 
   if (itemDesc.length < 5) fieldErrors.item_desc = 'Deskripsi terlalu singkat.';
@@ -61,8 +93,14 @@ export async function createDeal(
   if (!Number.isFinite(amountIdr) || !Number.isInteger(amountIdr) || amountIdr < 1)
     fieldErrors.amount_idr = 'Nominal harus bilangan bulat lebih dari 0.';
 
-  if (!rekeningTujuan) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
-  if (!rekeningBank) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
+  // C1 — only Penjual has a destination account to offer at create time; a
+  // Pembeli-proposed deal leaves these null until the joining Penjual
+  // supplies them (see JoinDealForm.tsx / joinDeal, C2).
+  const rekeningRequired = proposerRole === 'PENJUAL';
+  if (rekeningRequired && !rekeningTujuanRaw) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
+  if (rekeningRequired && !rekeningBankRaw) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
+  const rekeningTujuan = rekeningRequired ? rekeningTujuanRaw : null;
+  const rekeningBank = rekeningRequired ? rekeningBankRaw : null;
 
   if (!deadline) {
     fieldErrors.deadline = 'Batas waktu wajib diisi.';
@@ -93,6 +131,11 @@ export async function createDeal(
     .single();
 
   if (partyErr || !party) return { error: ERROR_PARTY_SAVE_FAILED };
+
+  // Section B — jenis-transaksi "notify me" checkboxes. Best-effort: a
+  // failure here must never block deal creation, so errors are logged, not
+  // returned.
+  await captureFeatureInterest(db, pHash, formData);
 
   // Rate limit: max 20 deals created per party per UTC day.
   // Known check-then-act race: two concurrent requests can both pass the count
