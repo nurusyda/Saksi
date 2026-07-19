@@ -42,4 +42,4 @@ OpenTimestamps proves a hash existed; it does not preserve the record. On the fr
 - Copy strings come from `references/copy-id.md` verbatim; if a needed string is missing, STOP and ask — never improvise legal-adjacent Indonesian copy.
 - Prefer plan-then-execute for anything touching schema, state machine, or public-facing copy.
 - Keep diffs small and committed frequently; the human operator is learning the stack — narrate what matters, skip what doesn't.
-- Known deliberate gaps (do not silently "fix"): T&C document not yet drafted (checkbox in copy-id.md §3 references it; page can ship as placeholder route linking to a draft), retention policy not yet specified (D7 pending).
+- Output brevity: report only what needs human judgment — warnings, flags, design decisions, deviations from the agreed plan, and the final diff/result. Skip narrating routine steps. No "now checking X" preamble — just the finding, or silence if there's nothing to flag.
