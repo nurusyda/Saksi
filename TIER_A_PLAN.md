@@ -9,29 +9,35 @@ before applying.
 
 ## Status snapshot
 
-**Done:** exit-state rename batch (TIDAK_DILANJUTKAN, KEDALUWARSA,
-DIKEMBALIKAN_SEBAGIAN) committed and live in production Supabase. Deadline-sweep
-plan fully reviewed and locked (not yet built). Slice 2 *backend* done — migrations
-0007/0008, `record_party_acceptance`/`finalize_deal_acceptance` RPCs,
-`PROPOSER_ACCEPTED`/`COUNTERPART_ACCEPTED`/`ACCEPTED` events, T&C hash now captured
-at `CREATED`/`COUNTERPART_JOINED`. Gemini API key live in env (local + Vercel).
+**Done and committed:** exit-state rename batch (TIDAK_DILANJUTKAN, KEDALUWARSA,
+DIKEMBALIKAN_SEBAGIAN). Slice 2 *backend* — migrations 0007/0008,
+`record_party_acceptance`/`finalize_deal_acceptance` RPCs,
+`PROPOSER_ACCEPTED`/`COUNTERPART_ACCEPTED`/`ACCEPTED` events, T&C version+hash now
+captured at `CREATED`/`COUNTERPART_JOINED`. Phase 0 (all 8 items below). A PII RLS
+gap present since the initial schema was found and closed along the way (migration
+0009 — `deals`/`parties` no longer directly readable by anon/authenticated, only
+through the masked `deals_public`/`parties_public` views). Unused PERPANJANGAN
+state-machine wiring removed (never had a real procedure behind it — see the
+ROADMAP entry under Tier A+). Deadline-sweep plan fully reviewed and locked (not
+yet built). Gemini API key live in env (local + Vercel).
 
-**Not done:** every *frontend* piece connecting to that backend, the real gated
-forced-check page, bukti upload + OCR, SELESAI, the sweep's actual code, per-deal-type
-confirmation labels wired in.
+**Not done:** Phase 1's frontend (the accept screen itself — backend is ready),
+the real gated forced-check page, bukti upload + OCR, SELESAI, the sweep's actual
+code, per-deal-type confirmation labels wired in.
 
 ---
 
-## Phase 0 — UI copy batch
+## Phase 0 — UI copy batch ✅ done, committed (`54cdceb`)
 
-- [ ] 0.1 Landing tagline → "Percaya itu baik. Tercatat lebih baik."
-- [ ] 0.2 Remove homepage search bar ("Cek rekening atau nomor HP (segera hadir)")
-- [ ] 0.3 Description field role-based placeholders
-- [ ] 0.4 Bank field → dropdown of standard Indonesian bank names
-- [ ] 0.5 Live (ungated) account-history check on create-deal form, shared query fn
-- [ ] 0.6 Tier cards: heading rename, remove paid-tier radios, add "notify me" checkboxes
-- [ ] 0.7 Attestation checkboxes 1-4 tightened wording (5 unchanged)
-- [ ] 0.8 Wanprestasi term — audit first, don't guess
+- [x] 0.1 Landing tagline → "Percaya itu baik. Tercatat lebih baik."
+- [x] 0.2 Remove homepage search bar ("Cek rekening atau nomor HP (segera hadir)")
+- [x] 0.3 Description field role-based placeholders
+- [x] 0.4 Bank field → dropdown of standard Indonesian bank names
+- [x] 0.5 Live (ungated) account-history check on create-deal form, shared query fn
+- [x] 0.6 Tier cards: heading rename, remove paid-tier radios, add "notify me" checkboxes
+- [x] 0.7 Attestation checkboxes 1-4 tightened wording (5 unchanged)
+- [x] 0.8 Wanprestasi term — audited, decided to keep as-is (never previously
+      reconsidered; standard correct legal term)
 
 ## Phase 1 — Slice 2 frontend: the accept screen
 
