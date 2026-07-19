@@ -43,6 +43,31 @@ export function hashDeal(payload: CanonicalDealPayload): string {
 }
 
 /**
+ * Normalize a raw Indonesian phone input to E.164 (+628xx...).
+ * Accepts: 08xx, 628xx, +628xx. Throws on unrecognizable format.
+ */
+export function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  let e164: string;
+  if (digits.startsWith('0')) {
+    e164 = '+62' + digits.slice(1);
+  } else if (digits.startsWith('62')) {
+    e164 = '+' + digits;
+  } else {
+    throw new Error(`Nomor HP tidak dikenali: ${raw}`);
+  }
+  if (!/^\+628\d{7,11}$/.test(e164)) {
+    throw new Error(`Nomor HP tidak valid: ${raw}`);
+  }
+  return e164;
+}
+
+/** SHA-256 of E.164 phone string — the public clustering key. */
+export function phoneHash(phoneE164: string): string {
+  return createHash('sha256').update(phoneE164, 'utf8').digest('hex');
+}
+
+/**
  * Build the CanonicalDealPayload from a deal row + the triggering event.
  * Caller is responsible for supplying prior_hash from the previous deal_event row.
  */

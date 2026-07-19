@@ -14,6 +14,8 @@ export const DealStatus = {
 export type DealStatus = (typeof DealStatus)[keyof typeof DealStatus];
 
 export const DealEventName = {
+  // Initial event when the deal row is created (DRAF, no incoming transition)
+  CREATED: 'CREATED',
   // Counterpart joins or declines via link
   COUNTERPART_JOINED: 'COUNTERPART_JOINED',
   COUNTERPART_DECLINED: 'COUNTERPART_DECLINED',      // → hard delete, no status transition

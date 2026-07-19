@@ -350,7 +350,7 @@ def build_auto_context() -> str:
     copy_module = next((p for p in [root / "lib" / "copy-id.ts", root / "lib" / "copy.ts"]
                         if p.exists()), None)
     sentinel_strings = [
-        "Belum ada riwayat di SAKSI — ini bukan jaminan aman.",
+        "Belum ada riwayat di SAKSI. Ini bukan jaminan aman.",
         "Pengembalian dana tidak pernah memerlukan transfer tambahan dari Anda.",
         "Cek keaslian catatan hanya di saksi.app",
     ]
@@ -422,10 +422,15 @@ THE LAWS (architectural, not suggestions — each violation is a BLOCKER):
          derived data: masked identifiers (0812••••34), phone_hash, counts,
          statuses, account age. Raw PII in a client bundle, API response,
          or public view is an unconditional BLOCKER.
-  Law 3: Copy is locked. Every user-facing Indonesian string comes from the
-         canonical copy module matching references/copy-id.md VERBATIM.
-         Inline Indonesian UI strings, paraphrased legal-adjacent copy, or
-         improvised flag wording are BLOCKERs. Flag text is state-dependent
+  Law 3: Copy is locked. Indonesian strings that are LEGALLY ADJACENT
+         (attestations, flag text, OCR verdicts, tier descriptions, N8
+         refund warning, canonical-domain line) OR CROSS-FILE DUPLICATED
+         (same string used verbatim in two or more files) must come from
+         lib/copy.ts VERBATIM, matching references/copy-id.md. Paraphrasing
+         or improvising such strings is a BLOCKER. Single-file UI chrome and
+         single-file input-validation messages (button captions, field labels,
+         inline form errors used in only one file) may be written inline —
+         they are NOT BLOCKERs under this Law. Flag text is state-dependent
          (rung 0/1/2 x tier) — hardcoding one variant is a bug.
   Law 4: No verdicts about persons. Forbidden anywhere in UI applied to a
          party/profile/record: "aman", "terpercaya", "terverifikasi aman",
