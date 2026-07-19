@@ -6,6 +6,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
+import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import {
   ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
@@ -105,7 +106,11 @@ export async function joinDeal(
   const virtualDeal = { ...deal, counterpart_id: party.id, status: DealStatus.DIAJUKAN };
   const canonical = buildCanonicalPayload(
     virtualDeal,
-    { name: DealEventName.COUNTERPART_JOINED, actor: 'COUNTERPART', payload: null },
+    {
+      name: DealEventName.COUNTERPART_JOINED,
+      actor: 'COUNTERPART',
+      payload: { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH },
+    },
     priorHash,
   );
   const newHash = hashDeal(canonical);

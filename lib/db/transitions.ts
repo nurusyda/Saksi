@@ -23,6 +23,10 @@ export const DealEventName = {
   COUNTERPART_DECLINED: 'COUNTERPART_DECLINED',      // → hard delete, no status transition
   // Both parties complete attestations and accept
   ACCEPTED: 'ACCEPTED',
+  // Individual party consent toward ACCEPTED (self-transition; ACCEPTED itself
+  // fires once both of these exist for a deal)
+  PROPOSER_ACCEPTED: 'PROPOSER_ACCEPTED',
+  COUNTERPART_ACCEPTED: 'COUNTERPART_ACCEPTED',
   // Payer uploads bukti transfer (attested)
   BUKTI_UPLOADED: 'BUKTI_UPLOADED',
   // Payee confirms receipt in-app
@@ -38,9 +42,6 @@ export const DealEventName = {
   REFUND_CONFIRMED: 'REFUND_CONFIRMED',
   // Buyer/lender confirms a partial refund received (mirrors REFUND_CONFIRMED)
   REFUND_CONFIRMED_PARTIAL: 'REFUND_CONFIRMED_PARTIAL',
-  // Deadline extension (self-transition — status unchanged)
-  PERPANJANGAN_PROPOSED: 'PERPANJANGAN_PROPOSED',
-  PERPANJANGAN_ACCEPTED: 'PERPANJANGAN_ACCEPTED',
   // System: deadline passed in an eligible status
   TENGGAT_LEWAT: 'TENGGAT_LEWAT',
   // Flagged party files hak jawab within 14-day window
@@ -55,28 +56,26 @@ export type DealEventName = (typeof DealEventName)[keyof typeof DealEventName];
 // null next = the deal record is deleted, not transitioned
 type Transition = { event: DealEventName; next: DealStatus | null };
 
-// Self-transitions (status unchanged; valid from multiple states)
-const PERPANJANGAN_TRANSITIONS: Transition[] = [
-  { event: DealEventName.PERPANJANGAN_PROPOSED, next: null }, // null = same state (handled below)
-  { event: DealEventName.PERPANJANGAN_ACCEPTED, next: null },
-];
-
-// For self-transitions, null next means "keep current status"
 export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
   [DealStatus.DRAF]: [
     { event: DealEventName.COUNTERPART_JOINED, next: DealStatus.DIAJUKAN },
     // auto-delete by pg_cron after 7 days — not a named transition
   ],
   [DealStatus.DIAJUKAN]: [
+    // ACCEPTED here validates only the abstract graph edge (DIAJUKAN -> DISEPAKATI).
+    // It does NOT check proposer_accepted/counterpart_accepted — that gate lives
+    // in finalize_deal_acceptance()'s guarded UPDATE (the sole authority allowed
+    // to actually fire this transition). Do not call assertTransition(DIAJUKAN,
+    // ACCEPTED) and write the event/status yourself outside that RPC.
     { event: DealEventName.ACCEPTED, next: DealStatus.DISEPAKATI },
+    { event: DealEventName.PROPOSER_ACCEPTED, next: DealStatus.DIAJUKAN },
+    { event: DealEventName.COUNTERPART_ACCEPTED, next: DealStatus.DIAJUKAN },
     { event: DealEventName.COUNTERPART_DECLINED, next: null }, // hard delete
   ],
   [DealStatus.DISEPAKATI]: [
     { event: DealEventName.BUKTI_UPLOADED, next: DealStatus.DIBAYAR_DIKLAIM },
     { event: DealEventName.CANCEL_AGREED, next: DealStatus.DIBATALKAN_BERSAMA },
     { event: DealEventName.CANCEL_UNILATERAL, next: DealStatus.TIDAK_DILANJUTKAN },
-    { event: DealEventName.PERPANJANGAN_PROPOSED, next: DealStatus.DISEPAKATI },
-    { event: DealEventName.PERPANJANGAN_ACCEPTED, next: DealStatus.DISEPAKATI },
   ],
   [DealStatus.DIBAYAR_DIKLAIM]: [
     { event: DealEventName.RECEIPT_CONFIRMED, next: DealStatus.DIKONFIRMASI_TERIMA },
@@ -85,14 +84,10 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.REFUND_CONFIRMED_PARTIAL, next: DealStatus.DIKEMBALIKAN_SEBAGIAN },
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
     { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
-    { event: DealEventName.PERPANJANGAN_PROPOSED, next: DealStatus.DIBAYAR_DIKLAIM },
-    { event: DealEventName.PERPANJANGAN_ACCEPTED, next: DealStatus.DIBAYAR_DIKLAIM },
   ],
   [DealStatus.DIKONFIRMASI_TERIMA]: [
     { event: DealEventName.FULFILLMENT_CONFIRMED, next: DealStatus.SELESAI },
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
-    { event: DealEventName.PERPANJANGAN_PROPOSED, next: DealStatus.DIKONFIRMASI_TERIMA },
-    { event: DealEventName.PERPANJANGAN_ACCEPTED, next: DealStatus.DIKONFIRMASI_TERIMA },
   ],
   [DealStatus.SELESAI]: [],
   [DealStatus.DIBATALKAN_BERSAMA]: [],
@@ -118,7 +113,7 @@ export class InvalidTransitionError extends Error {
 /**
  * Validate and return the next status for a given transition.
  * Returns null when the transition means "delete the deal record" (COUNTERPART_DECLINED).
- * Returns the current status for self-transitions (PERPANJANGAN_*, REFUND_UPLOADED).
+ * Returns the current status for self-transitions (REFUND_UPLOADED, PROPOSER_ACCEPTED, COUNTERPART_ACCEPTED).
  * Throws InvalidTransitionError on illegal transitions.
  */
 export function assertTransition(current: DealStatus, event: DealEventName): DealStatus | null {

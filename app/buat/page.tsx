@@ -1,12 +1,14 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { createDeal, type CreateDealState } from './actions';
+import { createDeal, checkAccountHistory, type CreateDealState, type AccountHistoryDisplay } from './actions';
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
+import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import {
   ATTESTATIONS,
+  ITEM_DESC_PLACEHOLDER,
   ROLE_LABELS,
   ROLE_PAIR,
   ROLE_PAIR_HELPER_PREFIX,
@@ -15,6 +17,9 @@ import {
   TIER_LIMA_RIBU_DESC,
   TIER_BERMETERAI_DESC,
   TIER_FOOTER,
+  FORCED_CHECK_EMPTY_STATE,
+  ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
+  formatAccountHistory,
 } from '@/lib/copy';
 
 const ROLES = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -51,6 +56,32 @@ export default function BuatPage() {
     Array(ATTESTATIONS.length + 1).fill(false),
   );
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [bank, setBank] = useState('');
+  const [customBank, setCustomBank] = useState('');
+  const [rekening, setRekening] = useState('');
+  const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
+  const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
+
+  useEffect(() => {
+    if (!effectiveBank || !rekening) {
+      setHistory({ status: 'idle' });
+      return;
+    }
+    let ignore = false;
+    const timer = setTimeout(() => {
+      checkAccountHistory(effectiveBank, rekening)
+        .then((r) => {
+          if (!ignore) setHistory(r);
+        })
+        .catch(() => {
+          if (!ignore) setHistory({ status: 'error' });
+        });
+    }, 500);
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+    };
+  }, [effectiveBank, rekening]);
 
   const fe = state.fieldErrors ?? {};
   const allChecked = checked.every(Boolean);
@@ -135,6 +166,7 @@ export default function BuatPage() {
               name="item_desc"
               rows={3}
               maxLength={500}
+              placeholder={ITEM_DESC_PLACEHOLDER[selectedRole] ?? ITEM_DESC_PLACEHOLDER.LAINNYA}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
             />
             <FieldError msg={fe.item_desc} />
@@ -159,15 +191,33 @@ export default function BuatPage() {
           {/* Rekening */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank">
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
                 Bank
               </label>
-              <input
-                id="rekening_bank"
-                name="rekening_bank"
-                type="text"
+              <select
+                id="rekening_bank_select"
+                value={bank}
+                onChange={(e) => setBank(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-              />
+              >
+                <option value="">Pilih bank</option>
+                {BANK_OPTIONS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+                <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
+              </select>
+              {bank === BANK_OTHER_VALUE && (
+                <input
+                  type="text"
+                  value={customBank}
+                  onChange={(e) => setCustomBank(e.target.value)}
+                  placeholder="Nama bank"
+                  className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+                />
+              )}
+              <input type="hidden" name="rekening_bank" value={effectiveBank} />
               <FieldError msg={fe.rekening_bank} />
             </div>
             <div className="flex-[2]">
@@ -182,11 +232,28 @@ export default function BuatPage() {
                 name="rekening_tujuan"
                 type="text"
                 inputMode="numeric"
+                value={rekening}
+                onChange={(e) => setRekening(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
               />
               <FieldError msg={fe.rekening_tujuan} />
             </div>
           </div>
+
+          {history.status !== 'idle' && (
+            <p className="-mt-3 text-xs text-zinc-500">
+              {history.status === 'found' &&
+                formatAccountHistory(
+                  effectiveBank,
+                  history.rekeningMasked,
+                  history.selesaiCount,
+                  history.tidakDipenuhiCount,
+                  history.sinceLabel,
+                )}
+              {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+              {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+            </p>
+          )}
 
           {/* Deadline */}
           <div>
@@ -205,26 +272,37 @@ export default function BuatPage() {
 
           {/* Tier */}
           <fieldset>
-            <legend className="text-sm font-medium text-zinc-700">Tier pencatatan</legend>
+            <legend className="text-sm font-medium text-zinc-700">Tingkatan pencatatan</legend>
             <div className="mt-2 flex flex-col gap-2">
-              {TIERS.map((t) => (
-                <label
-                  key={t.value}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50"
-                >
-                  <input
-                    type="radio"
-                    name="tier"
-                    value={t.value}
-                    defaultChecked={t.value === 'GRATIS'}
-                    className="mt-0.5 shrink-0"
-                  />
-                  <div>
+              {TIERS.map((t) =>
+                t.value === 'GRATIS' ? (
+                  <label
+                    key={t.value}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50"
+                  >
+                    <input
+                      type="radio"
+                      name="tier"
+                      value={t.value}
+                      defaultChecked
+                      className="mt-0.5 shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-zinc-900">{t.label}</span>
+                      <p className="text-zinc-500">{t.desc}</p>
+                    </div>
+                  </label>
+                ) : (
+                  <div key={t.value} className="rounded-lg border border-zinc-200 p-3 text-sm">
                     <span className="font-medium text-zinc-900">{t.label}</span>
                     <p className="text-zinc-500">{t.desc}</p>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+                      <input type="checkbox" className="shrink-0" />
+                      Beri tahu saat tersedia.
+                    </label>
                   </div>
-                </label>
-              ))}
+                ),
+              )}
             </div>
             <p className="mt-2 text-xs text-zinc-400">
               {TIER_FOOTER}

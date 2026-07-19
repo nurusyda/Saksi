@@ -3,14 +3,25 @@
 // No em dashes. Do not paraphrase.
 
 export const ATTESTATIONS: readonly string[] = [
-  'Saya berusia 18 tahun ke atas dan cakap hukum untuk membuat kesepakatan ini.',
-  'Nomor HP dan rekening yang saya masukkan adalah milik saya sendiri.',
-  'Saya setuju data pengenal saya (nomor HP, nomor rekening) diproses untuk mencatat kesepakatan dan menyusun riwayat kesepakatan saya (selesai, dibatalkan, diperpanjang, maupun tidak terpenuhi).',
-  'Saya memahami SAKSI hanya mencatat kesepakatan, tidak menahan dana, tidak menjamin pihak lain, dan tidak menjamin pengembalian dana.',
+  'Saya berusia 18 tahun ke atas.',
+  'Nomor HP dan rekening yang saya masukkan milik saya sendiri.',
+  'Saya setuju data saya diproses untuk pencatatan dan pencocokan riwayat kesepakatan.',
+  'Saya paham SAKSI hanya mencatat, tidak menahan dana atau menjamin pihak lain.',
 ];
 
 export const TC_LABEL =
   'Saya menyetujui Syarat & Ketentuan SAKSI, termasuk publikasi catatan wanprestasi, proses hak jawab, dan larangan bukti palsu.';
+
+// copy-id.md §15 — description-field placeholder by proposer role
+export const ITEM_DESC_PLACEHOLDER: Record<string, string> = {
+  PENJUAL: 'Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."',
+  PEMBELI: 'Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."',
+  PEMBERI_PINJAMAN: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
+  PEMINJAM: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
+  PEMILIK: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
+  PENYEWA: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
+  LAINNYA: 'Contoh: "Jelaskan kesepakatan secara singkat dan jelas."',
+};
 
 // copy-id.md §13 — role labels (cross-file: buat/page.tsx + deal/[token]/page.tsx)
 export const ROLE_LABELS: Record<string, string> = {
@@ -68,13 +79,30 @@ export const CANONICAL_DOMAIN =
 export const FORCED_CHECK_EMPTY_STATE =
   'Belum ada riwayat di SAKSI. Ini bukan jaminan aman. Sebagian besar rekening belum tercatat.';
 
+// Account-history lookup failed (network/DB error) — distinct from the empty
+// state on purpose. Never fall back to the empty-state line on error: that
+// would let a transient failure hide real history behind a reassuring message.
+export const ERROR_ACCOUNT_HISTORY_UNAVAILABLE =
+  'Riwayat tidak dapat dimuat saat ini. Coba lagi.';
+
+// copy-id.md §2 — account-history line (with history). A function, not a plain
+// constant, since it has interpolated values; the template itself is locked.
+export function formatAccountHistory(
+  bank: string,
+  rekeningMasked: string,
+  selesaiCount: number,
+  tidakDipenuhiCount: number,
+  sinceLabel: string,
+): string {
+  return `Rekening tujuan: ${bank} ${rekeningMasked} · ${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
+}
+
 // copy-id.md §4 — refund warning (always visible, not dismissible)
 export const N8_REFUND_WARNING =
   'Pengembalian dana tidak pernah memerlukan transfer tambahan dari Anda. Jika Anda diminta membayar lagi agar dana "cair", itu ciri penipuan.';
 
 // copy-id.md §11 — landing page subheading + meta description (must be identical)
-export const LANDING_TAGLINE =
-  'Catat kesepakatan. Bukan rekening bersama, bukan jaminan pihak lain.';
+export const LANDING_TAGLINE = 'Percaya itu baik. Tercatat lebih baik.';
 
 // copy-id.md §12 — deal join flow
 export const JOIN_FORM_HEADING =

@@ -7,6 +7,8 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
+import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
+import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import {
   ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
@@ -70,8 +72,10 @@ export async function createDeal(
     if (deadline <= todayWib) fieldErrors.deadline = 'Batas waktu harus di masa depan.';
   }
 
-  if (!['GRATIS', 'LIMA_RIBU', 'BERMETERAI'].includes(tier))
-    fieldErrors.tier = 'Tier tidak valid.';
+  // Only GRATIS is selectable in the UI (paid tiers have no radio input at all,
+  // Phase 0.6) — reject anything else server-side too, since a direct form POST
+  // could otherwise still submit a paid tier the UI no longer offers.
+  if (tier !== 'GRATIS') fieldErrors.tier = 'Tier tidak valid.';
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
@@ -127,7 +131,11 @@ export async function createDeal(
   };
   const canonical = buildCanonicalPayload(
     virtualDeal,
-    { name: DealEventName.CREATED, actor: 'PROPOSER', payload: null },
+    {
+      name: DealEventName.CREATED,
+      actor: 'PROPOSER',
+      payload: { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH },
+    },
     null,
   );
   const newHash = hashDeal(canonical);
@@ -155,4 +163,30 @@ export async function createDeal(
   void submitAnchor(newHash);
 
   redirect(`/deal/${token}`);
+}
+
+export type AccountHistoryDisplay =
+  | { status: 'found'; selesaiCount: number; tidakDipenuhiCount: number; sinceLabel: string; rekeningMasked: string }
+  | { status: 'empty' }
+  | { status: 'error' }
+  | { status: 'idle' };
+
+// Called directly from a client component (not bound to a form) once both
+// bank + rekening are filled in. Informational only — never blocks submission
+// (that's Phase 3's gated forced-check page, a different surface).
+export async function checkAccountHistory(
+  bank: string,
+  rekening: string,
+): Promise<AccountHistoryDisplay> {
+  if (!bank || !rekening) return { status: 'idle' };
+  const result = await getAccountHistory(bank, rekening);
+  if (result.status === 'error') return { status: 'error' };
+  if (result.status === 'empty') return { status: 'empty' };
+  return {
+    status: 'found',
+    selesaiCount: result.history.selesaiCount,
+    tidakDipenuhiCount: result.history.tidakDipenuhiCount,
+    sinceLabel: result.history.sinceLabel,
+    rekeningMasked: maskRekening(rekening),
+  };
 }

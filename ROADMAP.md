@@ -12,7 +12,35 @@ deferred, and the milestone it's tied to.
   data integrity.
 - **Target:** Tier A polish pass.
 
+### Full switchable guided-template system for deal descriptions
+- **What it is:** Replace the current single textarea + role-based placeholder
+  text (Phase 0.3) with a real Typeform/Google-Forms-style system: separate
+  structured fields per deal type (jual-beli, pinjam-meminjam, sewa-menyewa),
+  not just smarter placeholder copy in one shared box.
+- **Why deferred:** Placeholder-text switching solves the immediate clarity
+  gap cheaply; structured per-type fields touch the create form, validation,
+  and the canonical hash payload shape — a bigger, separate piece of work.
+- **Target:** Tier A polish pass.
+
 ## Tier A+
+
+### PERPANJANGAN (deadline extension) — design the procedure, then rebuild
+- **What it is:** Letting either party propose a new deadline and the
+  counterpart accept it, from DISEPAKATI/DIBAYAR_DIKLAIM/DIKONFIRMASI_TERIMA,
+  per `data-model.md`'s Extension section. State-machine wiring for this
+  existed in `lib/db/transitions.ts` (PERPANJANGAN_PROPOSED/PERPANJANGAN_ACCEPTED
+  events) but was removed — it was written before the actual procedure was
+  thought through (how many extensions are allowed, what happens to an
+  in-flight breach timer, whether one party can unilaterally extend past a
+  point, how it interacts with the daily deadline sweep) and had never been
+  wired to any UI or Server Action.
+- **Why deferred:** Important enough that it shouldn't be re-added piecemeal
+  the way it first went in. Needs a real design pass — same discipline as any
+  other schema/state-machine change — before touching code again.
+- **Target:** Tier A+. `data-model.md`/`copy-id.md` still describe it as
+  locked spec (the Extension section, and the PERPANJANGAN record line in §7)
+  even though the code no longer implements it — worth a look when this gets
+  designed, to confirm the existing spec still holds or needs revising too.
 
 ### Two-leg loan model (pencairan + pengembalian)
 - **What it is:** Split loan agreements into two separate legs (disbursement
@@ -71,6 +99,16 @@ deferred, and the milestone it's tied to.
 - **Why deferred:** Only useful once there's enough recorded history to be
   worth querying.
 - **Target:** Gated on corpus-density milestone (~50-100rb identifiers).
+
+### Real bank account-holder name lookup
+- **What it is:** Verify the actual registered name behind a rekening_tujuan
+  via a vendor lookup (Xendit Name Validator, ~Rp300/hit, or Flip/OY!
+  equivalents), shown alongside the account-history check.
+- **Why deferred:** Per-call cost only makes sense once check-page usage
+  volume justifies it; not wired for the Phase 0.5 informational check or the
+  Phase 3 gated version.
+- **Target:** Post-launch, once check-page traffic justifies the per-call
+  cost.
 
 ## When a paying use case demands it
 

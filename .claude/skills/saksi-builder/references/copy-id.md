@@ -34,10 +34,10 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 ## 3. Attestations (4 individual checkboxes at record creation, both parties; not bundleable)
 
-1. `Saya berusia 18 tahun ke atas dan cakap hukum untuk membuat kesepakatan ini.`
-2. `Nomor HP dan rekening yang saya masukkan adalah milik saya sendiri.`
-3. `Saya setuju data pengenal saya (nomor HP, nomor rekening) diproses untuk mencatat kesepakatan dan menyusun riwayat kesepakatan saya (selesai, dibatalkan, diperpanjang, maupun tidak terpenuhi).`
-4. `Saya memahami SAKSI hanya mencatat kesepakatan, tidak menahan dana, tidak menjamin pihak lain, dan tidak menjamin pengembalian dana.`
+1. `Saya berusia 18 tahun ke atas.`
+2. `Nomor HP dan rekening yang saya masukkan milik saya sendiri.`
+3. `Saya setuju data saya diproses untuk pencatatan dan pencocokan riwayat kesepakatan.`
+4. `Saya paham SAKSI hanya mencatat, tidak menahan dana atau menjamin pihak lain.`
 
 **Bundled T&C line (single checkbox):** `Saya menyetujui Syarat & Ketentuan SAKSI, termasuk publikasi catatan wanprestasi, proses hak jawab, dan larangan bukti palsu.`
 
@@ -89,7 +89,7 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 ## 11. Landing tagline (landing page subheading + meta description — must be identical)
 
-> Catat kesepakatan. Bukan rekening bersama, bukan jaminan pihak lain.
+> Percaya itu baik. Tercatat lebih baik.
 
 ## 12. Deal state UI (join flow)
 
@@ -152,3 +152,12 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 | Jual-beli | PENJUAL / PEMBELI | `Konfirmasi barang diterima` |
 | Pinjam-meminjam | PEMBERI_PINJAMAN / PEMINJAM | `Konfirmasi uang sudah dikembalikan` |
 | Sewa-menyewa | PEMILIK / PENYEWA | `Konfirmasi sudah menempati` |
+
+## 15. Description-field placeholder (buat form, by proposer role)
+
+| Role | Placeholder |
+|---|---|
+| PENJUAL / PEMBELI (Jual-beli) | `Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."` |
+| PEMBERI_PINJAMAN / PEMINJAM (Pinjam-meminjam) | `Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."` |
+| PEMILIK / PENYEWA (Sewa-menyewa) | `Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."` |
+| LAINNYA / belum dipilih | `Contoh: "Jelaskan kesepakatan secara singkat dan jelas."` |

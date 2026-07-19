@@ -19,12 +19,6 @@ export default function Home() {
           >
             Buat Kesepakatan
           </Link>
-          <span
-            aria-disabled="true"
-            className="flex h-12 cursor-not-allowed items-center justify-center rounded-lg border border-zinc-200 px-6 text-sm font-medium text-zinc-400 pointer-events-none opacity-50"
-          >
-            Cek rekening atau nomor HP (segera hadir)
-          </span>
         </div>
       </main>
 

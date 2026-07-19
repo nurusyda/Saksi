@@ -7,6 +7,15 @@ const HASH_PLACEHOLDER = '[diisi otomatis saat publikasi]';
 // Versi/Berlaku sejak/Hash dokumen lines, intro paragraph) is metadata
 // about the document, not terms, and is excluded from the hash.
 const BODY_MARKER = '\n## 1.';
+const VERSION_RE = /\*\*Versi:\s*([^*]+)\*\*/;
+
+function extractVersion(raw: string, filename: string): string {
+  const match = raw.match(VERSION_RE);
+  if (!match) {
+    throw new Error(`${filename}: version line not found (expected "**Versi: ...**")`);
+  }
+  return match[1].trim();
+}
 
 function loadLegalDoc(filename: string) {
   const raw = readFileSync(
@@ -17,15 +26,17 @@ function loadLegalDoc(filename: string) {
   if (bodyStart === -1) {
     throw new Error(`${filename}: could not find body marker "${BODY_MARKER}"`);
   }
+  const version = extractVersion(raw, filename);
   const body = raw.slice(bodyStart + 1);
   const hash = createHash('sha256').update(body).digest('hex');
-  return { hash, content: raw.replace(HASH_PLACEHOLDER, hash) };
+  return { hash, version, content: raw.replace(HASH_PLACEHOLDER, hash) };
 }
 
 const syarat = loadLegalDoc('syarat-ketentuan.md');
 const privasi = loadLegalDoc('privasi-retensi.md');
 
 export const SYARAT_KETENTUAN_HASH = syarat.hash;
+export const SYARAT_KETENTUAN_VERSION = syarat.version;
 export const PRIVASI_RETENSI_HASH = privasi.hash;
 export const syaratKetentuanContent = syarat.content;
 export const privasiRetensiContent = privasi.content;
