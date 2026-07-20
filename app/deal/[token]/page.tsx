@@ -5,13 +5,12 @@ import { DealStatus } from '@/lib/db/transitions';
 import { DealLinkCard } from './DealLinkCard';
 import { DealProgressStepper } from './DealProgressStepper';
 import { JoinDealForm } from './JoinDealForm';
-import { AcceptDealForm } from './AcceptDealForm';
 import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
 import { TidakDipenuhiPanel } from './TidakDipenuhiPanel';
 import { SelesaiPanel } from './SelesaiPanel';
-import { joinDeal, acceptDeal } from './actions';
+import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
 import { formatRp, formatDate } from '@/lib/format';
 import { maskRekening } from '@/lib/db/accountHistory';
@@ -86,7 +85,6 @@ export default async function DealPage({
   const partySession = await getPartySession(token);
 
   const boundJoinDeal = joinDeal.bind(null, token);
-  const boundAcceptDeal = acceptDeal.bind(null, token);
 
   return (
     <div className="min-h-screen bg-white px-4 py-10">
@@ -163,19 +161,17 @@ export default async function DealPage({
           </>
         )}
 
+        {/* 2026-07-20: DIAJUKAN is no longer a resting state in the normal
+            flow — join_deal_with_event (migration 0025) now finalizes
+            DISEPAKATI atomically inside the same transaction as
+            COUNTERPART_JOINED, folding the old separate accept step away
+            entirely (attestations already happened at create/join, so it
+            collected no new consent). Left as a defensive fallback only,
+            in case any pre-migration row is still sitting in this status. */}
         {deal.status === DealStatus.DIAJUKAN && (
-          <>
-            <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-              {STATUS_DIAJUKAN}
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 p-5">
-              <p className="mb-4 text-sm font-semibold text-zinc-900">
-                {JOIN_FORM_HEADING}
-              </p>
-              <AcceptDealForm action={boundAcceptDeal} />
-            </div>
-          </>
+          <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+            {STATUS_DIAJUKAN}
+          </div>
         )}
 
         {deal.status === DealStatus.DISEPAKATI && (

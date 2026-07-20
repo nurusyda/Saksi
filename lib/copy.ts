@@ -184,11 +184,11 @@ export const ERROR_SELF_JOIN =
 export const ERROR_DEAL_NOT_FOUND = 'Kesepakatan tidak ditemukan.';
 export const ERROR_DEAL_CLOSED = 'Kesepakatan ini sudah tidak dapat dimasuki.';
 
-// copy-id.md §12 — accept step (DIAJUKAN -> DISEPAKATI)
-export const ACCEPT_BUTTON_LABEL = 'Setuju';
-
-export const STATUS_ALREADY_ACCEPTED =
-  'Anda sudah menyetujui. Menunggu persetujuan pihak lain.';
+// copy-id.md §12's accept step (DIAJUKAN -> DISEPAKATI) — ACCEPT_BUTTON_LABEL,
+// STATUS_ALREADY_ACCEPTED, ERROR_ACCEPT_FAILED — retired 2026-07-20: folded
+// into joinDeal (migration 0025), no separate accept action exists anymore.
+// Not reused for anything else; noted here rather than silently dropped,
+// same treatment BARANG_TIDAK_SESUAI_GATE_BANNER's retirement got.
 
 export const ERROR_PHONE_NOT_IN_DEAL =
   'Nomor ini tidak terdaftar pada kesepakatan ini.';
@@ -196,14 +196,11 @@ export const ERROR_PHONE_NOT_IN_DEAL =
 export const STATUS_DISEPAKATI_PLACEHOLDER =
   'Kesepakatan telah disetujui kedua pihak.';
 
-// Not in copy-id.md — accept-screen phone-guess rate limit (distinct from
-// ERROR_RATE_LIMIT, which is specifically about the daily deal-creation cap;
-// reusing that wording here would misstate what limit was actually hit).
+// Originally scoped to the accept-screen phone-guess rate limit; since
+// widened (checkIdentifyRateLimit) into the shared limiter every
+// identifyPartyByPhone call site in paymentActions.ts/breachActions.ts uses
+// — comment corrected 2026-07-20, string itself unchanged and still live.
 export const ERROR_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Coba lagi nanti.';
-
-// record_party_acceptance RPC failed for a real reason (network/DB error) —
-// distinct from the RPC succeeding but affecting 0 rows (STATUS_ALREADY_ACCEPTED).
-export const ERROR_ACCEPT_FAILED = 'Gagal menyetujui. Coba lagi.';
 
 // Cross-file duplicated UI chrome (JoinDealForm.tsx + AcceptDealForm.tsx) —
 // not legally adjacent copy, but Law 3 still applies to identical strings
@@ -491,14 +488,13 @@ export function formatDeadlineNudgeMessage(itemDesc: string, dealUrl: string): s
 // formatDeadlineNudgeMessage, each of these is tied to exactly one transition,
 // so each names the specific next action instead of staying state-agnostic.
 // Sender identity matches §9/§9a: SAKSI (saksi.app).
-export function formatCounterpartJoinedMessage(itemDesc: string, dealUrl: string): string {
-  return `Kesepakatan SAKSI Anda ("${itemDesc}") sudah dibuka pihak lain. Buka ${dealUrl} untuk menyetujui.`;
-}
-
-export function formatPartyAcceptedMessage(itemDesc: string, dealUrl: string): string {
-  return `Pihak lain telah menyetujui kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk menyetujui.`;
-}
-
+//
+// formatCounterpartJoinedMessage/formatPartyAcceptedMessage retired
+// 2026-07-20: both described a "come accept" step that no longer exists
+// (joinDeal fires ACCEPTED automatically — see migration 0025). Firing
+// either today would be an actively false message, not just an unused one,
+// so they're removed rather than left dormant. formatDisepakatiMessage below
+// now fires directly from joinDeal instead of only after a manual accept.
 export function formatDisepakatiMessage(itemDesc: string, dealUrl: string): string {
   return `Kesepakatan SAKSI Anda ("${itemDesc}") telah disetujui kedua pihak. Buka ${dealUrl} untuk melakukan pembayaran.`;
 }
@@ -567,3 +563,61 @@ export const PROGRESS_STEP_LABELS: readonly string[] = [
   'Diterima',
   'Selesai',
 ];
+
+// ============================================================
+// Full transaction ledger + reputation-gaming signals (build step 5) — not
+// in copy-id.md, pending review (same discipline as every other new
+// user-facing string: drafted here, flagged, needs a locking pass before
+// treated as final). Design confirmed in data-model.md's section of the
+// same name (2026-07-20) — these are that design's exact drafted strings,
+// not invented at implementation time.
+// ============================================================
+
+// ROADMAP.md's own note: this link text is a suggestion, not legal-adjacent
+// locked copy, same category as other low-stakes UI chrome approved inline.
+export const LEDGER_DETAIL_LINK_LABEL = 'Lihat detail lengkap';
+export const LEDGER_EMPTY_STATE = 'Belum ada riwayat lengkap untuk ditampilkan.';
+export const ERROR_LEDGER_UNAVAILABLE = 'Riwayat lengkap tidak dapat dimuat saat ini. Coba lagi.';
+
+// Per-row bucket labels — same words formatAccountHistoryFull already uses
+// for the aggregate line, kept identical rather than reworded per-row.
+export const LEDGER_BUCKET_LABELS: Record<
+  'SELESAI' | 'DIBATALKAN_BERSAMA' | 'TIDAK_DILANJUTKAN' | 'KEDALUWARSA' | 'DIKEMBALIKAN_PENUH' | 'DIKEMBALIKAN_SEBAGIAN' | 'TIDAK_DIPENUHI' | 'KLAIM_BERBEDA_AKTIF',
+  string
+> = {
+  SELESAI: 'selesai',
+  DIBATALKAN_BERSAMA: 'dibatalkan bersama',
+  TIDAK_DILANJUTKAN: 'tidak dilanjutkan',
+  KEDALUWARSA: 'kedaluwarsa',
+  DIKEMBALIKAN_PENUH: 'dikembalikan penuh',
+  DIKEMBALIKAN_SEBAGIAN: 'dikembalikan sebagian',
+  TIDAK_DIPENUHI: 'tidak dipenuhi',
+  KLAIM_BERBEDA_AKTIF: 'klaim berbeda aktif',
+};
+
+// Signal 5 — pair-completion rate limit block (confirmFulfillment).
+// Deliberately states the limit is systemic, not an accusation about this
+// specific pair, and that the deal record itself is untouched — only the
+// confirmation action is paused. Recourse channel: sapa@saksi.app is the
+// only support contact anywhere in this product (see the two legal docs'
+// footers) — reused here rather than inventing a new one, and stated
+// honestly as manual (no admin override tooling exists in this app yet).
+export const ERROR_PAIR_COMPLETION_LIMIT =
+  'Konfirmasi ditunda sementara: terlalu banyak kesepakatan selesai dengan pihak yang sama dalam waktu singkat. Ini batas otomatis untuk semua pengguna, bukan penilaian atas kesepakatan Anda. Kesepakatan ini tetap tercatat apa adanya. Butuh bantuan lebih cepat? Hubungi sapa@saksi.app.';
+
+// counterpartHashFragment: a short prefix of the other party's phone_hash
+// (see lib/format.ts's shortHashFragment), not a masked phone number —
+// phone_hash is a SHA-256 hex string with no human-readable structure to
+// partially redact the way a real phone/rekening is masked. A short,
+// consistent fragment lets a viewer spot "same person across rows" without
+// printing the full 64-char hash as noise.
+export function formatLedgerRow(
+  bucket: keyof typeof LEDGER_BUCKET_LABELS,
+  dateLabel: string,
+  itemDesc: string,
+  amountLabel: string,
+  counterpartHashFragment: string | null,
+): string {
+  const base = `${itemDesc} · ${amountLabel} · ${LEDGER_BUCKET_LABELS[bucket]} · ${dateLabel}`;
+  return counterpartHashFragment ? `${base} · pihak ${counterpartHashFragment}` : base;
+}

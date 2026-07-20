@@ -45,6 +45,12 @@ Bagian ini adalah inti dari SAKSI. Bacalah dengan saksama.
 5. Catatan yang dipublikasikan menyatakan **apa yang tercatat dan diklaim**, bukan penilaian moral atas seseorang. Kalimat pada catatan disusun agar tetap benar pada setiap kemungkinan keadaan, termasuk jika di kemudian hari terbukti pelapor keliru.
 6. **Dengan menyetujui kesepakatan di SAKSI, kedua pihak menyetujui bahwa catatan sebagaimana dijelaskan di atas dapat dipublikasikan jika kesepakatan tidak terpenuhi.** Persetujuan ini adalah dasar hukum pemrosesan dan publikasi tersebut, dan dicatat beserta versi dokumen ini pada saat Anda menyetujuinya.
 
+## 4A. Riwayat lengkap rekening dan nomor HP
+
+1. Selain catatan kesepakatan tidak terpenuhi (Bagian 4), SAKSI juga menampilkan riwayat lengkap sebuah nomor rekening atau nomor HP kepada siapa pun yang memeriksanya di SAKSI, mencakup kesepakatan yang selesai maupun yang tidak, tanggal, dan nomor HP pihak lain yang tercatat bertransaksi dengan rekening tersebut (dalam bentuk sidik jari nomor HP, bukan nomor HP itu sendiri, kecuali pada tingkatan layanan yang menampilkannya sebagaimana diatur pada Bagian 4).
+2. Riwayat ini ditampilkan sebagai catatan peristiwa, bukan penilaian: SAKSI tidak menyimpulkan bahwa suatu pola berarti kecurangan, hanya menampilkan pola tersebut sebagai angka.
+3. **Dengan menyetujui kesepakatan di SAKSI, kedua pihak menyetujui bahwa riwayat kesepakatan mereka — baik yang selesai maupun yang tidak — dapat ditampilkan sebagai bagian dari riwayat lengkap rekening atau nomor HP yang digunakan, sebagaimana dijelaskan di atas.** Persetujuan ini adalah dasar hukum pemrosesan dan publikasi tersebut, dicatat beserta versi dokumen ini pada saat Anda menyetujuinya, dan berlaku terpisah dari persetujuan Bagian 4 mengenai catatan tidak terpenuhi.
+
 ## 5. Hak jawab dan klaim berbeda
 
 1. Pihak terlapor dapat menanggapi laporan dalam 14 hari sejak pemberitahuan.

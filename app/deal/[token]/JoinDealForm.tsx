@@ -7,6 +7,7 @@ import { ATTESTATIONS, PHONE_FIELD_LABEL, PHONE_FORMAT_HINT, PENDING_SAVE_LABEL 
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
+import { usePersistedPhone } from '@/lib/usePersistedPhone';
 
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
   const { pending } = useFormStatus();
@@ -39,6 +40,11 @@ export function JoinDealForm({
   );
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
+  // Written to sessionStorage on change — with the accept step folded away
+  // (2026-07-20), joining now finalizes DISEPAKATI immediately, so this is
+  // the counterpart's only phone entry before every later screen; it has to
+  // populate the same store IdentifyPartyGate reads to skip re-asking.
+  const [phone, setPhone] = usePersistedPhone();
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
 
   const fe = state.fieldErrors ?? {};
@@ -65,6 +71,8 @@ export function JoinDealForm({
           type="tel"
           inputMode="tel"
           autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
         />
         {fe.counterpart_phone && (

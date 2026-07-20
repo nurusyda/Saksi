@@ -14,11 +14,15 @@ export interface WaMessage {
   // copy-id.md §9b) — one per state transition, fired to whichever party
   // must act next. DEADLINE_NUDGE remains the only one the deadline-sweep
   // cron sends; the rest are sent inline from the transition actions
-  // themselves (joinDeal, acceptDeal, submitBukti, confirmReceipt).
+  // themselves (joinDeal, submitBukti, confirmReceipt).
+  //
+  // COUNTERPART_JOINED/PARTY_ACCEPTED retired 2026-07-20 (see
+  // formatCounterpartJoinedMessage's retirement note in lib/copy.ts): both
+  // described a "come accept" step joinDeal no longer has — it fires
+  // DISEPAKATI directly now, so DISEPAKATI below covers what used to be two
+  // separate pings in one.
   template:
     | 'DEADLINE_NUDGE'
-    | 'COUNTERPART_JOINED'
-    | 'PARTY_ACCEPTED'
     | 'DISEPAKATI'
     | 'BUKTI_UPLOADED'
     | 'RECEIPT_CONFIRMED'

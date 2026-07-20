@@ -8,12 +8,14 @@ import {
   getDealAccountHistory,
   getRekeningForPayer,
   submitBukti,
+  getDealLedger,
   type AccountHistoryDisplay,
   type RekeningForPayer,
   type SubmitBuktiState,
 } from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
 import { formatRp } from '@/lib/format';
+import { LedgerDetail } from '@/components/LedgerDetail';
 import {
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
@@ -156,6 +158,12 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
           {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
           {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
         </p>
+
+        {history.status === 'found' && history.ledgerEnabled && (
+          <div className="mb-3">
+            <LedgerDetail onFetch={() => getDealLedger(deal.token, phone)} />
+          </div>
+        )}
 
         <button
           type="button"

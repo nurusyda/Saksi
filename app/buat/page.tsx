@@ -2,11 +2,13 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { createDeal, checkAccountHistory, type CreateDealState, type AccountHistoryDisplay } from './actions';
+import { createDeal, checkAccountHistory, getRekeningLedgerAction, type CreateDealState, type AccountHistoryDisplay } from './actions';
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
+import { LedgerDetail } from '@/components/LedgerDetail';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import { getTomorrowWib } from '@/lib/format';
+import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import {
   ATTESTATIONS,
   ITEM_TITLE_LABEL,
@@ -95,6 +97,11 @@ export default function BuatPage() {
   const [rekening, setRekening] = useState('');
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
   const [minDeadline, setMinDeadline] = useState<string | undefined>(undefined);
+  // Written to sessionStorage on change, same as IdentifyPartyGate's phone
+  // field — with the accept step folded away (2026-07-20), this is the only
+  // place the proposer's phone is ever typed, so it has to populate the
+  // same store IdentifyPartyGate reads to skip re-asking on later screens.
+  const [proposerPhone, setProposerPhone] = usePersistedPhone();
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
 
   // Computed client-side (not inline at render) so the WIB "tomorrow" the
@@ -162,6 +169,8 @@ export default function BuatPage() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              value={proposerPhone}
+              onChange={(e) => setProposerPhone(e.target.value)}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
             />
             <FieldError msg={fe.proposer_phone} />
@@ -336,6 +345,10 @@ export default function BuatPage() {
                   {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
                   {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
                 </p>
+              )}
+
+              {history.status === 'found' && history.ledgerEnabled && (
+                <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
               )}
             </>
           )}

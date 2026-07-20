@@ -8,8 +8,10 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
+import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
+import { getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
 import { getTodayWib } from '@/lib/format';
 import {
   ATTESTATIONS,
@@ -226,11 +228,26 @@ export async function createDeal(
   const cookieStore = await cookies();
   cookieStore.set(`saksi_proposer_${token}`, '1', { maxAge: 86400, path: '/', sameSite: 'lax', secure: true });
 
+  // 2026-07-20 design (data-model.md): with the accept step folded away,
+  // this is now the proposer's only round trip before DISEPAKATI — set
+  // their party session here (mirrors joinDeal doing the same for the
+  // counterpart) so IdentifyPartyGate can skip re-asking their phone on
+  // every subsequent status screen, same as it already does today once a
+  // party has identified themselves once.
+  await setPartySession(token, 'proposer');
+
   redirect(`/deal/${token}`);
 }
 
 export type AccountHistoryDisplay =
-  | { status: 'found'; selesaiCount: number; tidakDipenuhiCount: number; sinceLabel: string; rekeningMasked: string }
+  | {
+      status: 'found';
+      selesaiCount: number;
+      tidakDipenuhiCount: number;
+      sinceLabel: string;
+      rekeningMasked: string;
+      ledgerEnabled: boolean;
+    }
   | { status: 'empty' }
   | { status: 'error' }
   | { status: 'idle' };
@@ -252,5 +269,13 @@ export async function checkAccountHistory(
     tidakDipenuhiCount: result.history.tidakDipenuhiCount,
     sinceLabel: result.history.sinceLabel,
     rekeningMasked: maskRekening(rekening),
+    ledgerEnabled: isLedgerDetailEnabled(),
   };
+}
+
+// B6/ledger design pass — client already holds bank+rekening locally (its
+// own form fields), so this just wraps getRekeningLedger directly, same
+// shape as checkAccountHistory above.
+export async function getRekeningLedgerAction(bank: string, rekening: string): Promise<LedgerResult> {
+  return getRekeningLedger(bank, rekening);
 }

@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { lookupAccount, type CekState } from './actions';
+import { lookupAccount, getRekeningLedgerAction, getPhoneLedgerAction, type CekState } from './actions';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
+import { LedgerDetail } from '@/components/LedgerDetail';
 import {
   CEK_PAGE_HEADING,
   CEK_REKENING_TAB_LABEL,
@@ -46,6 +47,8 @@ export function CekForm() {
   const [mode, setMode] = useState<'rekening' | 'phone'>('rekening');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
+  const [rekening, setRekening] = useState('');
+  const [phone, setPhone] = useState('');
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
 
   return (
@@ -55,7 +58,10 @@ export function CekForm() {
       <div className="flex gap-2 rounded-lg border border-zinc-200 p-1">
         <button
           type="button"
-          onClick={() => setMode('rekening')}
+          onClick={() => {
+            setMode('rekening');
+            setPhone('');
+          }}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
             mode === 'rekening' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-50'
           }`}
@@ -64,7 +70,10 @@ export function CekForm() {
         </button>
         <button
           type="button"
-          onClick={() => setMode('phone')}
+          onClick={() => {
+            setMode('phone');
+            setRekening('');
+          }}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
             mode === 'phone' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-50'
           }`}
@@ -116,6 +125,8 @@ export function CekForm() {
                 name="rekening"
                 type="text"
                 inputMode="numeric"
+                value={rekening}
+                onChange={(e) => setRekening(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
               />
             </div>
@@ -131,6 +142,8 @@ export function CekForm() {
               name="phone"
               type="tel"
               inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
             />
           </div>
@@ -140,7 +153,14 @@ export function CekForm() {
       </form>
 
       {state.status === 'found' && (
-        <p className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">{state.line}</p>
+        <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+          <p>{state.line}</p>
+          {state.ledgerEnabled && (
+            <LedgerDetail
+              onFetch={() => (mode === 'rekening' ? getRekeningLedgerAction(effectiveBank, rekening) : getPhoneLedgerAction(phone))}
+            />
+          )}
+        </div>
       )}
       {state.status === 'empty' && (
         <p className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">

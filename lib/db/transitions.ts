@@ -21,12 +21,14 @@ export const DealEventName = {
   // Counterpart joins or declines via link
   COUNTERPART_JOINED: 'COUNTERPART_JOINED',
   COUNTERPART_DECLINED: 'COUNTERPART_DECLINED',      // → hard delete, no status transition
-  // Both parties complete attestations and accept
+  // Both parties' consent, fired automatically the instant the counterpart
+  // joins (2026-07-20: folded into COUNTERPART_JOINED's own transaction, see
+  // migration 0025 and app/deal/[token]/actions.ts's joinDeal) — attestations
+  // already happened at create/join, so there is no separate manual accept
+  // step anymore. PROPOSER_ACCEPTED/COUNTERPART_ACCEPTED (the old individual
+  // per-party consent events this replaced) are retired, not reused for
+  // anything else.
   ACCEPTED: 'ACCEPTED',
-  // Individual party consent toward ACCEPTED (self-transition; ACCEPTED itself
-  // fires once both of these exist for a deal)
-  PROPOSER_ACCEPTED: 'PROPOSER_ACCEPTED',
-  COUNTERPART_ACCEPTED: 'COUNTERPART_ACCEPTED',
   // Payer uploads bukti transfer (attested)
   BUKTI_UPLOADED: 'BUKTI_UPLOADED',
   // Payee confirms receipt in-app
@@ -99,15 +101,16 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     // auto-delete by pg_cron after 7 days — not a named transition
   ],
   [DealStatus.DIAJUKAN]: [
-    // ACCEPTED here validates only the abstract graph edge (DIAJUKAN -> DISEPAKATI).
-    // It does NOT check proposer_accepted/counterpart_accepted — that gate lives
-    // in finalize_deal_acceptance()'s guarded UPDATE (the sole authority allowed
-    // to actually fire this transition). Do not call assertTransition(DIAJUKAN,
-    // ACCEPTED) and write the event/status yourself outside that RPC.
+    // 2026-07-20: fired automatically inside join_deal_with_event's own
+    // transaction (migration 0025), immediately after COUNTERPART_JOINED —
+    // not a separate manual step anymore. The gate that used to live in
+    // finalize_deal_acceptance()'s guarded UPDATE now lives in
+    // join_deal_with_event's single WHERE status = 'DRAF' guard instead; DIAJUKAN
+    // is no longer a resting state joinDeal's callers can observe in the
+    // normal path. Do not call assertTransition(DIAJUKAN, ACCEPTED) and write
+    // the event/status yourself outside that RPC.
     { event: DealEventName.ACCEPTED, next: DealStatus.DISEPAKATI },
-    { event: DealEventName.PROPOSER_ACCEPTED, next: DealStatus.DIAJUKAN },
-    { event: DealEventName.COUNTERPART_ACCEPTED, next: DealStatus.DIAJUKAN },
-    { event: DealEventName.COUNTERPART_DECLINED, next: null }, // hard delete
+    { event: DealEventName.COUNTERPART_DECLINED, next: null }, // hard delete, unused today (no UI wires it)
   ],
   [DealStatus.DISEPAKATI]: [
     { event: DealEventName.BUKTI_UPLOADED, next: DealStatus.DIBAYAR_DIKLAIM },
@@ -156,7 +159,7 @@ export class InvalidTransitionError extends Error {
 /**
  * Validate and return the next status for a given transition.
  * Returns null when the transition means "delete the deal record" (COUNTERPART_DECLINED).
- * Returns the current status for self-transitions (REFUND_UPLOADED, PROPOSER_ACCEPTED, COUNTERPART_ACCEPTED).
+ * Returns the current status for self-transitions (REFUND_UPLOADED, NUDGE_SENT).
  * Throws InvalidTransitionError on illegal transitions.
  */
 export function assertTransition(current: DealStatus, event: DealEventName): DealStatus | null {

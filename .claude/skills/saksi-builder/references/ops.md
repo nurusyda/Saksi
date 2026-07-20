@@ -9,6 +9,7 @@
 - **OCR**: Gemini API (key exists, held locally). NOT Claude API.
 - **OTP**: built (build step 4, migration 0020) — `lib/otp.ts`, scoped to the breach-report filing call sites (`sendBreachReportOtp`/`sendDeadlineLapseOtp` in `breachActions.ts`). 6-digit, 5-minute expiry, hashed, single-use, 3 sends/phone/hour. Not yet a generic multi-purpose OTP module — LIMA_RIBU/BERMETERAI OTP (build step 6) is a different, not-yet-built call site; widen `otp_codes`' shape then rather than assuming it already covers it. The WA send channel is live: the dedicated prepaid number is registered with Fonnte, `FONNTE_API_KEY` is live in `.env.local`. `lib/wa/send.ts` is a real Fonnte HTTP client as of 2026-07-20 (deadline-sweep nudges), including body-level response parsing (Fonnte returns HTTP 200 even on a rejected send) — no longer a logging-only stub. Fonnte remains flagged as a pre-launch swap candidate; Meta Cloud API is the longer-term target.
 - **Flag publication**: built (build step 4 final phase, migration 0023) but gated behind `FLAGS_PUBLICATION_ENABLED` — do NOT set to `'true'` in Vercel until GATE 1 (lawyer review) clears. See `.claude/skills/saksi-builder/references/ops.md`'s env var table below and `app/api/cron/deadline-sweep/route.ts`'s `runFlagPublishBranch`.
+- **Full transaction ledger + reputation-gaming signals**: built (per the design pass in `data-model.md`, confirmed 2026-07-20) but gated behind `LEDGER_DETAIL_ENABLED` — do NOT set to `'true'` until GATE 1 clears AND the §4A T&C clause (drafted in that same design pass) is actually applied to `content/legal/syarat-ketentuan.md`. No new migration — `lib/db/ledger.ts` is pure read-time aggregation over existing tables.
 - **Midtrans**: sandbox account exists; keys not yet retrieved. Not needed until build step 6. Never propose manual/personal QRIS collection as an interim — rejected decision.
 
 ## Environment variable names (use exactly these)
@@ -24,6 +25,11 @@ CRON_SECRET=                      # server-only; verifies Vercel Cron -> /api/cr
 FLAGS_PUBLICATION_ENABLED=        # server-only; unset/anything but 'true' = publication sweep branch
                                    # is a no-op. Gates GATE 1 (lawyer review) -- do NOT set to 'true'
                                    # until that review has cleared. See migration 0023.
+LEDGER_DETAIL_ENABLED=            # server-only; unset/anything but 'true' = the "Lihat detail lengkap"
+                                   # expand never renders and lib/db/ledger.ts's fetch functions
+                                   # short-circuit to {status:'disabled'}. Gates GATE 1 + the §4A T&C
+                                   # clause (data-model.md's ledger design pass) -- do NOT set to 'true'
+                                   # until both clear.
 ```
 
 Local: `.env.local` (already gitignored by create-next-app defaults — verify before first commit that adds it). Production: Vercel → Settings → Environment Variables; adding a var requires a redeploy to take effect.

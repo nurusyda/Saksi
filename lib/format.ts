@@ -19,6 +19,16 @@ export function formatDate(iso: string): string {
   });
 }
 
+// Display-time truncation of a phone_hash for the ledger's per-row "same
+// person" indicator (lib/db/ledger.ts) — not treated as masking, since
+// phone_hash is a SHA-256 hex string with no human-readable structure to
+// partially redact the way a real phone/rekening is. Lives here, not in
+// ledger.ts, so client components can import it without pulling in that
+// module's server-only supabaseServer dependency.
+export function shortHashFragment(hash: string): string {
+  return hash.slice(0, 8);
+}
+
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('id-ID', {
     day: 'numeric',

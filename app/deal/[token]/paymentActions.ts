@@ -12,6 +12,7 @@ import { setPartySession } from '@/lib/db/partySession';
 import { uploadBuktiImage } from '@/lib/db/storage';
 import { checkBuktiConsistency } from '@/lib/ocr/gemini';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
+import { checkPairCompletionLimit, getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
 import { sendWaMessage } from '@/lib/wa/send';
 import {
   ERROR_DEAL_NOT_FOUND,
@@ -26,6 +27,7 @@ import {
   ERROR_CONFIRM_FAILED,
   ERROR_WRONG_PARTY_PEMBELI_ONLY,
   ERROR_WRONG_PARTY_PENJUAL_ONLY,
+  ERROR_PAIR_COMPLETION_LIMIT,
   formatBuktiUploadedMessage,
   formatReceiptConfirmedMessage,
   formatPaymentNotReceivedMessage,
@@ -108,9 +110,10 @@ export async function identifyParty(
     .single();
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
 
-  // Rate limit — same pattern and posture as acceptDeal's accept_attempts
-  // (0010): the match/no-match response is otherwise a phone-enumeration
-  // oracle for anyone holding this deal's token. See migration 0017.
+  // Rate limit — the match/no-match response is otherwise a phone-enumeration
+  // oracle for anyone holding this deal's token. See migration 0017. (Accept
+  // no longer exists as a separate step, per migration 0025 — its own
+  // accept_attempts limiter, migration 0010, was dropped along with it.)
   if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
 
   const rawPhone = (formData.get('phone') as string | null)?.trim() ?? '';
@@ -140,7 +143,14 @@ export async function identifyParty(
 // ============================================================
 
 export type AccountHistoryDisplay =
-  | { status: 'found'; selesaiCount: number; tidakDipenuhiCount: number; sinceLabel: string; rekeningMasked: string }
+  | {
+      status: 'found';
+      selesaiCount: number;
+      tidakDipenuhiCount: number;
+      sinceLabel: string;
+      rekeningMasked: string;
+      ledgerEnabled: boolean;
+    }
   | { status: 'empty' }
   | { status: 'error' }
   | { status: 'idle' };
@@ -163,7 +173,47 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
     tidakDipenuhiCount: result.history.tidakDipenuhiCount,
     sinceLabel: result.history.sinceLabel,
     rekeningMasked: maskRekening(deal.rekening_tujuan),
+    ledgerEnabled: isLedgerDetailEnabled(),
   };
+}
+
+// ============================================================
+// getDealLedger — B6/ledger design pass. Resolves this deal's own
+// bank+rekening server-side and delegates to getRekeningLedger, same
+// PII-boundary reasoning as getRekeningForPayer below: the client (
+// DisepakatiPanel) never holds the raw rekening, only a token, so the
+// ledger fetch has to be by-token too rather than the client re-submitting
+// a rekening it was never given.
+//
+// Blocker found by monster_check: the first version of this function took
+// only a token and returned the full ledger with no identity check at all —
+// unlike every other action in this file, which re-verifies the caller's
+// phone before returning anything rekening-adjacent. A ledger is strictly
+// more sensitive than the aggregate count (per-deal amounts/descriptions,
+// tier-gated counterpart phone_hash fragments across potentially many other
+// people's deals with this same rekening), so it gets at least the same
+// payer-only gate getRekeningForPayer already enforces, not less.
+// ============================================================
+
+export async function getDealLedger(token: string, phone: string): Promise<LedgerResult> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
+  if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'empty' };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { status: 'error' };
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { status: 'error' };
+  }
+  if (!whichParty) return { status: 'error' };
+
+  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  if (whichParty !== payerSlot) return { status: 'error' };
+
+  return getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
 }
 
 // ============================================================
@@ -605,6 +655,26 @@ export async function confirmFulfillment(
     assertTransition(DealStatus.DIKONFIRMASI_TERIMA, DealEventName.FULFILLMENT_CONFIRMED);
   } catch {
     return { error: ERROR_DEAL_CLOSED };
+  }
+
+  // Signal 5 (data-model.md's ledger design pass, confirmed 2026-07-20) —
+  // pair-completion circuit breaker: reject this SELESAI transition if it
+  // would be the 6th between this exact (proposer, counterpart) pair within
+  // 30 days. Checked once here, not inside the retry loop below: this is a
+  // pre-condition on the transition itself, same posture as the role/status
+  // checks above it, not a race the retry loop needs to re-arbitrate.
+  // counterpart_id is guaranteed non-null at DIKONFIRMASI_TERIMA (both
+  // parties have long since joined/accepted to reach this status).
+  //
+  // Gated behind isLedgerDetailEnabled(), same flag as the rest of this
+  // feature — found by monster_check's copy-lock finding, indirectly: this
+  // check was live in production unconditionally, meaning a real party
+  // could already hit ERROR_PAIR_COMPLETION_LIMIT (unreviewed copy) even
+  // though the design doc's gating discussion was about the ledger's *read*
+  // side only. Signal 5 is part of the same feature and the same rollout
+  // decision, not a separately-always-on mechanism.
+  if (isLedgerDetailEnabled() && !(await checkPairCompletionLimit(db, deal.proposer_id, deal.counterpart_id as string))) {
+    return { error: ERROR_PAIR_COMPLETION_LIMIT };
   }
 
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';

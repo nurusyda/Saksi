@@ -150,7 +150,7 @@ Fired once per transition, to whichever party must act next:
 
 **Phone format hint (used verbatim in both join & accept forms):** `Format: 08xx atau +628xx`
 
-**DIAJUKAN status line (shown after both parties joined, awaiting acceptance):**
+**DIAJUKAN status line (defensive fallback only as of 2026-07-20 — see below; kept for any pre-migration row still sitting in this status):**
 > Kedua pihak tercatat. Menunggu persetujuan kedua pihak.
 
 **Self-join error (counterpart phone matches proposer phone):**
@@ -162,30 +162,12 @@ Fired once per transition, to whichever party must act next:
 **Join technical failure (RPC failed for a non-race reason — network/DB error; distinct from "already closed" race):**
 > Gagal bergabung. Coba lagi.
 
-**Accept step (DIAJUKAN, phone re-entry to identify which party — reuses the join
-form heading above, no separate instruction line since there are no checkboxes on
-this screen):**
-
-**Accept button label:**
-`Setuju`
-
-**Already-accepted status line (this party already has their flag set):**
-> Anda sudah menyetujui. Menunggu persetujuan pihak lain.
-
-**Wrong-phone error (phone matches neither the proposer nor the counterpart):**
+**Wrong-phone error (phone matches neither the proposer nor the counterpart — shared by every post-join identity check, not accept-specific):**
 > Nomor ini tidak terdaftar pada kesepakatan ini.
 
-**DISEPAKATI placeholder (shown once both parties have accepted; replaced by the
-real DISEPAKATI screen in a later slice):**
-> Kesepakatan telah disetujui kedua pihak.
+**Retired 2026-07-20 (migration 0025 — see data-model.md's "Accept step folded into join"):** the separate DIAJUKAN accept screen and its four strings (accept button `Setuju`, already-accepted status line, accept technical-failure message, and the accept-step framing of the too-many-attempts message) no longer apply — `joinDeal` fires `ACCEPTED` automatically, atomically, with no separate phone re-entry or button. Not reused for anything else; noted here rather than silently dropped, same treatment every other retirement in this file gets. `ERROR_TOO_MANY_ATTEMPTS` itself (`Terlalu banyak percobaan. Coba lagi nanti.`) is still live — it was already shared by every `identifyPartyByPhone` call site before this change, not accept-exclusive.
 
-**Accept technical failure (RPC failed for a real reason — network/DB error;
-distinct from the RPC succeeding with 0 rows affected, which is the
-already-accepted state above, not an error):**
-> Gagal menyetujui. Coba lagi.
-
-**Too-many-attempts (phone-guess rate limit on the accept step):**
-> Terlalu banyak percobaan. Coba lagi nanti.
+**DISEPAKATI placeholder — superseded before this change too:** the real DISEPAKATI screen (`DisepakatiPanel.tsx`) already replaced this placeholder in an earlier slice; left here only as a historical note, not live copy.
 
 ## 13. Role labels and pairings
 
