@@ -60,11 +60,19 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - LIMA_RIBU — `Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).`
 - BERMETERAI — `Rp50.000/pihak · Identitas terverifikasi (e-KYC) + meterai elektronik + berkas bukti siap diajukan.`
 - Shared footer: `Tingkatan menunjukkan kekuatan verifikasi identitas kedua pihak, bukan keamanan kesepakatan. Mengajukan dan melihat laporan selalu gratis di semua tingkatan.`
-- Notify-me checkbox label (paid-tier disabled cards, shipped Phase 0.6; also reused on jenis-transaksi disabled cards, §6a): `Beri tahu saat tersedia.`
+- Notify-me checkbox label (paid-tier disabled cards, shipped Phase 0.6): `Beri tahu saat tersedia.`
 
-## 6a. Deal-type gating (create flow)
+## 6a. Deal-type gating (create flow) — REMOVED 2026-07-20
 
-- Unavailable deal-type label (disabled role cards, same visual pattern as non-selectable tier cards): `Belum tersedia`
+The jenis-transaksi (deal-type) selector — a static "Jual-beli" card plus two
+disabled "Segera hadir" cards for Pinjam-meminjam/Sewa-menyewa — was removed
+from the create form entirely (UX audit, 2026-07-20). It offered no real
+choice (only Jual-beli was ever functional) and added a full section of
+visual clutter ahead of the fields that matter. Backend/schema/state machine
+are unaffected — deal type is still fully implied by `proposer_role`, which
+the server still validates. If Pinjam-meminjam/Sewa-menyewa ship later, this
+section should be redesigned rather than restored as-is; the `Belum tersedia`
+label and interest-capture checkboxes it used are gone with it.
 
 ## 7. Extension & exit-state record lines (public record wording)
 
@@ -212,14 +220,31 @@ already-accepted state above, not an error):**
 | Pinjam-meminjam | PEMBERI_PINJAMAN / PEMINJAM | `Konfirmasi uang sudah dikembalikan` |
 | Sewa-menyewa | PEMILIK / PENYEWA | `Konfirmasi sudah menempati` |
 
-## 15. Description-field placeholder (buat form, by proposer role)
+## 15. Item title + detail (buat form) — supersedes the single free-text description, locked 2026-07-20
 
-| Role | Placeholder |
-|---|---|
-| PENJUAL / PEMBELI (Jual-beli) | `Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."` |
-| PEMBERI_PINJAMAN / PEMINJAM (Pinjam-meminjam) | `Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."` |
-| PEMILIK / PENYEWA (Sewa-menyewa) | `Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."` |
-| LAINNYA / belum dipilih | `Contoh: "Jelaskan kesepakatan secara singkat dan jelas."` |
+The single `Deskripsi kesepakatan` textarea (and its role-keyed placeholder
+table) is replaced by two fields, for the only role pair the create form
+actually reaches (Jual-beli — PENJUAL/PEMBELI; deal-type gating unchanged,
+see §6a). Composed server-side into the same `item_desc` column as before
+(period join, never an em dash): title alone if detail is blank, otherwise
+`"${title}. ${detail}"`.
+
+- Title field label: `Barang/jasa apa?`
+- Title placeholder (required, max 80 chars): `Contoh: iPhone 13 128GB hitam`
+- Detail field label: `Detail tambahan (opsional)`
+- Detail placeholder (optional, max 400 chars): `Contoh: Kondisi baru, termasuk box dan charger, dikirim setelah lunas.`
+
+Rationale: a category dropdown was considered and rejected — it would
+discard exactly the specificity the breach flow depends on (§16's
+`BARANG_TIDAK_SESUAI_PROMPT` asks which part of *this description* wasn't
+met; "Elektronik x1" gives a claimant nothing to point at). A single-textarea
+fill-in-the-blank template (`Jual ..., banyaknya ...`) was also tried and
+rejected — same box, same 500-char requirement, only the ghost text changed,
+so the "blank paragraph" problem was unchanged. The title/detail split is a
+structural fix: the title is a one-line input (reads as "name the thing," not
+"write a description") and the detail box is genuinely optional and
+skippable, matching the pattern established marketplace apps (Facebook
+Marketplace, Carousell, OLX) already use for exactly this problem.
 
 ## 16. Section C — payment lifecycle (DISEPAKATI → SELESAI, jual-beli; locked 2026-07-20)
 

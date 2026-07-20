@@ -9,7 +9,10 @@ import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import { getTomorrowWib } from '@/lib/format';
 import {
   ATTESTATIONS,
-  ITEM_DESC_PLACEHOLDER,
+  ITEM_TITLE_LABEL,
+  ITEM_TITLE_PLACEHOLDER,
+  ITEM_DETAIL_LABEL,
+  ITEM_DETAIL_PLACEHOLDER,
   ROLE_LABELS,
   ROLE_PAIR,
   ROLE_PAIR_HELPER_PREFIX,
@@ -24,23 +27,18 @@ import {
   PHONE_FIELD_LABEL,
   PHONE_FORMAT_HINT,
   NOTIFY_ME_LABEL,
-  DEAL_TYPE_LABELS,
   PENDING_SAVE_LABEL,
 } from '@/lib/copy';
 
 // Deal-type gating: only jual-beli is selectable for now. Backend/schema/
 // state machine keep supporting all role pairs — see actions.ts for the
-// matching server-side rejection.
+// matching server-side rejection. The jenis-transaksi selector itself (Section
+// B) was removed from this form entirely per the UX audit (2026-07-20) — it
+// offered no real choice (only jual-beli was ever functional) and just added
+// visual clutter ahead of the fields that do matter.
 const SELECTABLE_ROLES = [
   { value: 'PENJUAL', label: ROLE_LABELS.PENJUAL },
   { value: 'PEMBELI', label: ROLE_LABELS.PEMBELI },
-];
-
-// Section B — jenis transaksi selector. Only jual-beli is functional;
-// pinjam-meminjam/sewa-menyewa render disabled with an interest checkbox.
-const UNAVAILABLE_DEAL_TYPES = [
-  { key: 'PINJAM_MEMINJAM', label: DEAL_TYPE_LABELS.PINJAM_MEMINJAM, fieldName: 'interest_pinjam_meminjam' },
-  { key: 'SEWA_MENYEWA', label: DEAL_TYPE_LABELS.SEWA_MENYEWA, fieldName: 'interest_sewa_menyewa' },
 ];
 
 // Locked tier descriptions include a "${price} · " prefix (copy-id.md §6).
@@ -90,7 +88,8 @@ export default function BuatPage() {
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
-  const [itemDesc, setItemDesc] = useState('');
+  const [itemTitle, setItemTitle] = useState('');
+  const [itemDetail, setItemDetail] = useState('');
   const [nominalDisplay, setNominalDisplay] = useState('');
   const [rawNominal, setRawNominal] = useState('');
   const [rekening, setRekening] = useState('');
@@ -151,31 +150,6 @@ export default function BuatPage() {
         )}
 
         <form action={formAction} className="flex flex-col gap-6">
-          {/* Jenis transaksi (Section B) — Jual-beli is the only functional
-              type; the other two are visible but disabled with a
-              notify-me checkbox. Not a DB field: deal type is fully implied
-              by proposer_role (validated server-side in actions.ts), so this
-              selector carries no name and posts nothing on its own. */}
-          <fieldset>
-            <legend className="text-sm font-medium text-zinc-700">Jenis transaksi</legend>
-            <div className="mt-2 flex flex-col gap-2">
-              <div className="flex cursor-default items-center gap-2 rounded-lg border border-blue-600 bg-blue-50 px-3 py-2 text-sm">
-                <span className="font-medium text-blue-900">{DEAL_TYPE_LABELS.JUAL_BELI}</span>
-              </div>
-              {UNAVAILABLE_DEAL_TYPES.map((d) => (
-                <div key={d.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                  <label className="flex items-center gap-1 text-zinc-500">
-                    <input type="checkbox" name={d.fieldName} className="shrink-0" />
-                    <span className="font-medium">{d.label}</span>
-                  </label>
-                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                    {NOTIFY_ME_LABEL}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </fieldset>
-
           {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-zinc-700" htmlFor="proposer_phone">
@@ -225,25 +199,50 @@ export default function BuatPage() {
             <FieldError msg={fe.proposer_role} />
           </fieldset>
 
-          {/* Item desc */}
+          {/* Item title + optional detail — replaces the old single free-text
+              description (UX audit, 2026-07-20). A short required title reads
+              as "name the thing", not "compose a paragraph"; the detail box
+              is where specifics like condition/inclusions go, only if the
+              seller bothers. Composed server-side into item_desc, the single
+              DB column this has always been (see actions.ts). */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="item_desc">
-              Deskripsi kesepakatan
+            <label className="block text-sm font-medium text-zinc-700" htmlFor="item_title">
+              {ITEM_TITLE_LABEL}
             </label>
-            <textarea
-              id="item_desc"
-              name="item_desc"
-              rows={3}
-              maxLength={500}
-              value={itemDesc}
-              onChange={(e) => setItemDesc(e.target.value)}
-              placeholder={ITEM_DESC_PLACEHOLDER[selectedRole] ?? ITEM_DESC_PLACEHOLDER.LAINNYA}
+            <input
+              id="item_title"
+              name="item_title"
+              type="text"
+              maxLength={80}
+              value={itemTitle}
+              onChange={(e) => setItemTitle(e.target.value)}
+              placeholder={ITEM_TITLE_PLACEHOLDER}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
             />
             <p className="mt-1 text-right text-xs text-zinc-400">
-              {itemDesc.length}/500
+              {itemTitle.length}/80
             </p>
-            <FieldError msg={fe.item_desc} />
+            <FieldError msg={fe.item_title} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-700" htmlFor="item_detail">
+              {ITEM_DETAIL_LABEL}
+            </label>
+            <textarea
+              id="item_detail"
+              name="item_detail"
+              rows={2}
+              maxLength={400}
+              value={itemDetail}
+              onChange={(e) => setItemDetail(e.target.value)}
+              placeholder={ITEM_DETAIL_PLACEHOLDER}
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+            />
+            <p className="mt-1 text-right text-xs text-zinc-400">
+              {itemDetail.length}/400
+            </p>
+            <FieldError msg={fe.item_detail} />
           </div>
 
           {/* Amount */}

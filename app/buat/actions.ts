@@ -28,9 +28,13 @@ export type CreateDealState = {
 // "Notify me" checkboxes (feature_interest, migration 0012, extended by
 // 0016 to also cover the paid-tier checkboxes below — those shipped in
 // Phase 0.6 with no backend at all). Purpose-limited signup for
-// not-yet-available deal types/tiers; never merged into marketing consent,
-// never blocks deal creation.
-type FeatureInterest = 'pinjam_meminjam' | 'sewa_menyewa' | 'tier_lima_ribu' | 'tier_bermeterai';
+// not-yet-available tiers; never merged into marketing consent, never
+// blocks deal creation. The jenis-transaksi (deal-type) interest checkboxes
+// this used to also capture (pinjam_meminjam/sewa_menyewa) were removed
+// along with that whole section of the form (UX audit, 2026-07-20) — the
+// feature_interest table and its existing rows are untouched, this just
+// stops writing those two values going forward.
+type FeatureInterest = 'tier_lima_ribu' | 'tier_bermeterai';
 
 async function captureFeatureInterest(
   db: ReturnType<typeof supabaseServer>,
@@ -38,8 +42,6 @@ async function captureFeatureInterest(
   formData: FormData,
 ): Promise<void> {
   const features: FeatureInterest[] = [];
-  if (formData.get('interest_pinjam_meminjam') === 'on') features.push('pinjam_meminjam');
-  if (formData.get('interest_sewa_menyewa') === 'on') features.push('sewa_menyewa');
   if (formData.get('interest_tier_lima_ribu') === 'on') features.push('tier_lima_ribu');
   if (formData.get('interest_tier_bermeterai') === 'on') features.push('tier_bermeterai');
   if (features.length === 0) return;
@@ -59,7 +61,8 @@ export async function createDeal(
 ): Promise<CreateDealState> {
   const rawPhone = (formData.get('proposer_phone') as string | null)?.trim() ?? '';
   const proposerRole = (formData.get('proposer_role') as string | null) ?? '';
-  const itemDesc = (formData.get('item_desc') as string | null)?.trim() ?? '';
+  const itemTitle = (formData.get('item_title') as string | null)?.trim() ?? '';
+  const itemDetail = (formData.get('item_detail') as string | null)?.trim() ?? '';
   const amountRaw = (formData.get('amount_idr') as string | null) ?? '';
   const rekeningTujuanRaw = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
   const rekeningBankRaw = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
@@ -88,8 +91,15 @@ export async function createDeal(
   const validRoles = ['PENJUAL', 'PEMBELI'];
   if (!validRoles.includes(proposerRole)) fieldErrors.proposer_role = 'Pilih peran Anda.';
 
-  if (itemDesc.length < 5) fieldErrors.item_desc = 'Deskripsi terlalu singkat.';
-  else if (itemDesc.length > 500) fieldErrors.item_desc = 'Deskripsi maksimal 500 karakter.';
+  if (itemTitle.length < 2) fieldErrors.item_title = 'Wajib diisi.';
+  else if (itemTitle.length > 80) fieldErrors.item_title = 'Maksimal 80 karakter.';
+  if (itemDetail.length > 400) fieldErrors.item_detail = 'Maksimal 400 karakter.';
+
+  // Composed into the single item_desc column this has always been — title
+  // and detail are a UI-level split (2026-07-20 UX audit), not a schema
+  // change. Period join, never an em dash, matching the no-em-dash rule for
+  // customer-facing copy; omitted entirely when detail is blank.
+  const itemDesc = itemDetail ? `${itemTitle}. ${itemDetail}` : itemTitle;
 
   const amountIdr = Number(amountRaw);
   if (!Number.isFinite(amountIdr) || !Number.isInteger(amountIdr) || amountIdr < 1)
@@ -132,9 +142,8 @@ export async function createDeal(
 
   if (partyErr || !party) return { error: ERROR_PARTY_SAVE_FAILED };
 
-  // Section B — jenis-transaksi "notify me" checkboxes. Best-effort: a
-  // failure here must never block deal creation, so errors are logged, not
-  // returned.
+  // Paid-tier "notify me" checkboxes. Best-effort: a failure here must never
+  // block deal creation, so errors are logged, not returned.
   await captureFeatureInterest(db, pHash, formData);
 
   // Rate limit: max 20 deals created per party per UTC day.

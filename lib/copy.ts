@@ -12,19 +12,16 @@ export const ATTESTATIONS: readonly string[] = [
 export const TC_LABEL =
   'Saya menyetujui Syarat & Ketentuan SAKSI: publikasi kesepakatan tidak terpenuhi, hak menjawab dalam 14 hari jika dilaporkan, dan larangan bukti palsu.';
 
-// copy-id.md §15 — description-field placeholder by proposer role.
-// PENJUAL/PEMBELI shortened 2026-07-20: direct shorthand replaces the
-// long-form "Contoh: …" examples so the input reads as an instruction
-// rather than a sample. Other roles unchanged (not yet selectable).
-export const ITEM_DESC_PLACEHOLDER: Record<string, string> = {
-  PENJUAL: 'Jual ………………………, banyaknya ………',
-  PEMBELI: 'Beli ………………………, banyaknya ………',
-  PEMBERI_PINJAMAN: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
-  PEMINJAM: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
-  PEMILIK: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
-  PENYEWA: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
-  LAINNYA: 'Contoh: "Jelaskan kesepakatan secara singkat dan jelas."',
-};
+// copy-id.md §15 — item title + optional detail (supersedes the old single
+// free-text description field, 2026-07-20 UX-audit pass). Role-keyed
+// placeholders removed along with it: only PENJUAL/PEMBELI ever reached this
+// form (deal-type gating), so a flat pair of strings replaces the dormant
+// per-role dict rather than keeping four unreachable entries around.
+export const ITEM_TITLE_LABEL = 'Barang/jasa apa?';
+export const ITEM_TITLE_PLACEHOLDER = 'Contoh: iPhone 13 128GB hitam';
+export const ITEM_DETAIL_LABEL = 'Detail tambahan (opsional)';
+export const ITEM_DETAIL_PLACEHOLDER =
+  'Contoh: Kondisi baru, termasuk box dan charger, dikirim setelah lunas.';
 
 // copy-id.md §13 — role labels (cross-file: buat/page.tsx + deal/[token]/page.tsx)
 export const ROLE_LABELS: Record<string, string> = {
@@ -74,24 +71,8 @@ export const TIER_BERMETERAI_DESC =
 export const TIER_FOOTER =
   'Tingkatan menunjukkan verifikasi identitas, bukan keamanan kesepakatan. Laporan selalu gratis di semua tingkatan.';
 
-// copy-id.md §6a — disabled deal-type role cards (create flow gating)
-export const BELUM_TERSEDIA_LABEL = 'Belum tersedia';
-
-// copy-id.md §6 — pre-existing shipped copy (Phase 0.6), was hardcoded only
-// in the paid-tier disabled cards; centralized here since it's now also used
-// on the jenis-transaksi disabled cards (Section B).
+// copy-id.md §6 — paid-tier disabled cards' notify-me checkbox label
 export const NOTIFY_ME_LABEL = 'Beri tahu saat tersedia.';
-
-// copy-id.md §14 — deal-type names, extracted from the existing confirmation-
-// label table rather than re-typed, for the jenis-transaksi selector.
-export const DEAL_TYPE_LABELS: Record<'JUAL_BELI' | 'PINJAM_MEMINJAM' | 'SEWA_MENYEWA', string> = {
-  JUAL_BELI: 'Jual-beli',
-  PINJAM_MEMINJAM: 'Pinjam-meminjam',
-  SEWA_MENYEWA: 'Sewa-menyewa',
-};
-
-// copy-id.md §6a — deal-type selector "coming soon" badge (locked 2026-07-20)
-export const SEGERA_HADIR_LABEL = 'Segera hadir';
 
 // copy-id.md §8 — canonical domain line for badge/share card/footer
 export const CANONICAL_DOMAIN =
