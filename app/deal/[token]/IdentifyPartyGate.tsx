@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, type ReactNode } from 'react';
+import { useActionState, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { IdentifyState } from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
@@ -43,8 +43,20 @@ const initialState: IdentifyState = {};
  * already wrote, never server-sent. If that's empty (cleared storage, a
  * different tab) the form below renders regardless of the cookie, which is
  * the safe degrade: re-collect the phone rather than bind an empty one into
- * a follow-up action. Once the cookie expires, this form is exactly what
- * renders again — phone re-entry remains the permanent fallback either way.
+ * a follow-up action.
+ *
+ * Auto-submit on cookie expiry (UX-audit fix pass, 2026-07-20): the
+ * party-session cookie is only 45 minutes (partySession.ts) — deliberately
+ * left short, since it's convenience-only and not a trust boundary. A real
+ * deal's states are usually hours-to-days apart, so a returning party almost
+ * always has this cookie already lapsed by the time they come back. Rather
+ * than widen that window (a trust-boundary change ruled out separately),
+ * this auto-fires `action` once with the sessionStorage phone the moment the
+ * cookie is missing but a remembered phone exists — same server-side
+ * re-verification (identifyPartyByPhone) as a manual click, just without
+ * requiring the tap. A wrong/stale phone surfaces the same error the manual
+ * form would, and the visible form is exactly what's left once that happens
+ * — phone re-entry remains the permanent fallback either way.
  */
 export function IdentifyPartyGate({
   action,
@@ -57,6 +69,30 @@ export function IdentifyPartyGate({
 }) {
   const [state, formAction] = useActionState(action, initialState);
   const [phone, setPhone] = usePersistedPhone();
+  // `attempted` is a ref, not state — it only guards the effect against
+  // firing twice and is never read during render (a ref read during render
+  // isn't safe: it doesn't trigger a re-render and can desync from what's
+  // committed). `autoSubmitting` is the render-visible counterpart, real
+  // state so reading it below is safe.
+  const attempted = useRef(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
+
+  // Cookie lapsed (no initialWhichParty) but the phone is still remembered —
+  // re-check it against the server without waiting for a manual click. Runs
+  // once; a failed guess still leaves autoSubmitting true, but the render
+  // logic below already falls through to the visible form as soon as
+  // state.error is set, so no explicit reset is needed.
+  useEffect(() => {
+    if (initialWhichParty) return;
+    if (state.whichParty) return;
+    if (!phone) return;
+    if (attempted.current) return;
+    attempted.current = true;
+    setAutoSubmitting(true);
+    const fd = new FormData();
+    fd.set('phone', phone);
+    formAction(fd);
+  }, [initialWhichParty, phone, state.whichParty, formAction]);
 
   if (state.whichParty) {
     return <>{children(state.whichParty, phone)}</>;
@@ -64,6 +100,12 @@ export function IdentifyPartyGate({
 
   if (initialWhichParty && phone) {
     return <>{children(initialWhichParty, phone)}</>;
+  }
+
+  // Auto-submit in flight — avoid flashing the phone-entry form for a
+  // re-check that's already underway.
+  if (autoSubmitting && !state.error) {
+    return <p className="text-sm text-zinc-500">Memeriksa...</p>;
   }
 
   return (

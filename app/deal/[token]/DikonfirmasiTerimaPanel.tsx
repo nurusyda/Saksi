@@ -3,10 +3,12 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
+import { WaitingStatusPoll } from './WaitingStatusPoll';
 import { identifyParty, confirmFulfillment, type ConfirmActionState } from './paymentActions';
 import { DealTimeline } from './DealTimeline';
 import { BarangTidakSesuaiModal } from './BarangTidakSesuaiModal';
 import type { WhichParty } from '@/lib/db/party';
+import { DealStatus } from '@/lib/db/transitions';
 import {
   CONFIRM_FULFILLMENT_LABEL_JUAL_BELI,
   PENDING_DEFAULT_LABEL,
@@ -34,7 +36,10 @@ function ConfirmFulfillmentButton() {
   );
 }
 
-function PembeliPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
+// Only the role-specific action, not the timeline — DikonfirmasiTerimaPanel
+// renders the timeline once, above the identity gate (see below), so these
+// two no longer each carry their own copy of it.
+function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   const [modalOpen, setModalOpen] = useState(false);
   const boundConfirmFulfillment = confirmFulfillment.bind(null, deal.token, phone);
   const initialState: ConfirmActionState = {};
@@ -42,11 +47,6 @@ function PembeliPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
-        <DealTimeline token={deal.token} />
-      </div>
-
       {state.error && (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {state.error}
@@ -77,20 +77,29 @@ function PembeliPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   );
 }
 
-function PenjualPanel({ deal }: { deal: DealSummary }) {
+function PenjualActionPanel({ token }: { token: string }) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-        {SHIP_INSTRUCTION}
-      </div>
-      <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
-        <DealTimeline token={deal.token} />
-      </div>
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+      {SHIP_INSTRUCTION}
+      <WaitingStatusPoll token={token} knownStatus={DealStatus.DIKONFIRMASI_TERIMA} />
     </div>
   );
 }
 
+// UX-audit fix pass (2026-07-20): the timeline (getDealTimeline takes only
+// the token, no phone — no PII in event/actor/created_at) used to render
+// separately inside each of PembeliPanel/PenjualPanel, meaning a visitor
+// waiting on IdentifyPartyGate to resolve saw a blank phone-only screen
+// first, then a full swap to timeline+action once identified. Since the
+// timeline needs no identity to show safely, it's hoisted above the gate
+// here and rendered unconditionally — the page is now the same one screen
+// throughout: timeline always visible, the role-specific action area fills
+// in below it once identity resolves (immediately, on a valid party-session
+// or a remembered phone — see IdentifyPartyGate's auto-submit). Deliberately
+// NOT applied to the DIBAYAR_DIKLAIM bukti-review screen: the bukti
+// image/OCR verdict there *is* PII gated by identity (getBuktiForDisplay),
+// so revealing it before identify resolves would defeat the gate rather
+// than just skip an empty screen.
 export function DikonfirmasiTerimaPanel({
   deal,
   initialWhichParty,
@@ -102,14 +111,21 @@ export function DikonfirmasiTerimaPanel({
   const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
 
   return (
-    <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
-      {(whichParty, phone) =>
-        whichParty === payerSlot ? (
-          <PembeliPanel deal={deal} phone={phone} />
-        ) : (
-          <PenjualPanel deal={deal} />
-        )
-      }
-    </IdentifyPartyGate>
+    <div className="flex flex-col gap-6">
+      <div className="rounded-xl border border-zinc-200 p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
+        <DealTimeline token={deal.token} />
+      </div>
+
+      <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
+        {(whichParty, phone) =>
+          whichParty === payerSlot ? (
+            <PembeliActionPanel deal={deal} phone={phone} />
+          ) : (
+            <PenjualActionPanel token={deal.token} />
+          )
+        }
+      </IdentifyPartyGate>
+    </div>
   );
 }

@@ -601,6 +601,62 @@ export async function confirmReceipt(
 // this follows suit.
 // ============================================================
 
+// ============================================================
+// getDealStatus — UX-audit fix pass (2026-07-20). Bare status string only,
+// no PII, same "service-role reads only" posture as every other read here.
+// Polled from waiting/passive panels (WaitingStatusPoll.tsx) so a party
+// doesn't have to keep manually reloading to see the other side's progress.
+// Deliberately a plain polled server action rather than Supabase Realtime:
+// Realtime's postgres_changes respects RLS and the anon/authenticated roles
+// have had SELECT revoked on `deals` entirely since migration 0009 (closing
+// a PII leak of unmasked rekening_tujuan) — granting it back just to receive
+// a status field would reopen that gap. This has none of that surface: it
+// returns one enum string, nothing else, straight from the service-role
+// client, same as every other read in this file.
+//
+// Rate-limited (migration 0027, found by monster_check 2026-07-21): unlike
+// identifyParty and friends, this takes no phone, so there's no guess-and-
+// check oracle here — the limit exists purely so a caller-supplied token
+// can't be used to flood an unbounded read. Own table/threshold, not
+// checkIdentifyRateLimit's — see checkDealStatusPollRateLimit below for why.
+// ============================================================
+
+// WaitingStatusPoll.tsx polls every ~12s (5/min); up to two viewers on the
+// same deal over a 15-minute window is ~150 legitimate calls. 200 leaves
+// headroom for tab duplicates/reloads while still bounding a scripted flood
+// to a small multiple of real usage, not an unbounded one.
+async function checkDealStatusPollRateLimit(
+  db: ReturnType<typeof supabaseServer>,
+  dealId: string,
+): Promise<boolean> {
+  const ATTEMPT_WINDOW_MINUTES = 15;
+  const ATTEMPT_LIMIT = 200;
+  const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const { count: attemptCount } = await db
+    .from('deal_status_poll_attempts')
+    .select('*', { count: 'exact', head: true })
+    .eq('deal_id', dealId)
+    .gte('attempted_at', windowStart);
+  // Same accepted check-then-act race as checkIdentifyRateLimit — blast
+  // radius is small at this threshold.
+  if ((attemptCount ?? 0) >= ATTEMPT_LIMIT) return false;
+  const { error: attemptInsertErr } = await db.from('deal_status_poll_attempts').insert({ deal_id: dealId });
+  if (attemptInsertErr) console.error('deal_status_poll_attempts insert failed', attemptInsertErr);
+  return true;
+}
+
+export async function getDealStatus(token: string): Promise<string | null> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('id, status').eq('token', token).single();
+  if (!deal) return null;
+  // Rate-limited: a poll that's over the threshold just returns null, same
+  // as "deal not found" — WaitingStatusPoll already no-ops on a falsy
+  // result, so this silently skips a cycle rather than surfacing an error
+  // for what's a best-effort convenience feature, not a user-facing action.
+  if (!(await checkDealStatusPollRateLimit(db, deal.id))) return null;
+  return deal.status;
+}
+
 export interface TimelineEntry {
   event: string;
   actor: string;

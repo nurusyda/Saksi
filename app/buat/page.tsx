@@ -30,6 +30,7 @@ import {
   PHONE_FORMAT_HINT,
   NOTIFY_ME_LABEL,
   PENDING_SAVE_LABEL,
+  RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
 // Deal-type gating: only jual-beli is selectable for now. Backend/schema/
@@ -67,6 +68,28 @@ function SubmitButton({ allChecked }: { allChecked: boolean }) {
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
   return <p className="mt-1 text-xs text-red-600">{msg}</p>;
+}
+
+// UX-audit fix pass (2026-07-20): the form was a single flat scroll of 8
+// field-groups with no visual chunking — the heaviest single screen in the
+// app. Grouped into labeled sections here (layout only, no field/validation
+// change). Section labels reuse text already shipped elsewhere in the app
+// rather than inventing new copy: "Peran Anda" was already this form's own
+// role-fieldset legend (promoted here, de-duped below), "Ringkasan
+// Kesepakatan" is the exact heading already used for the same item+amount
+// facts on the deal page and payment screen (page.tsx, DisepakatiPanel.tsx).
+// "Pembayaran" is new — a single common noun, not a claim or legal-adjacent
+// string, flagged for confirmation same as any other new label. The Tier
+// and Pernyataan fieldsets keep their own existing legends unwrapped below —
+// already self-labeled and visually distinct, an umbrella label there would
+// be redundant.
+function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-6 border-t border-zinc-100 pt-6 first:border-0 first:pt-0">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{label}</p>
+      {children}
+    </div>
+  );
 }
 
 // Format a raw numeric string with Indonesian thousand-separator (dots).
@@ -151,226 +174,232 @@ export default function BuatPage() {
         )}
 
         <form action={formAction} className="flex flex-col gap-6">
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="proposer_phone">
-              {PHONE_FIELD_LABEL}
-            </label>
-            <p className="mb-1 text-xs text-zinc-500">{PHONE_FORMAT_HINT}</p>
-            <input
-              id="proposer_phone"
-              name="proposer_phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              value={proposerPhone}
-              onChange={(e) => setProposerPhone(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-            />
-            <FieldError msg={fe.proposer_phone} />
-          </div>
-
-          {/* Role */}
-          <fieldset>
-            <legend className="text-sm font-medium text-zinc-700">Peran Anda</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {SELECTABLE_ROLES.map((r) => (
-                <label
-                  key={r.value}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
-                >
-                  <input
-                    type="radio"
-                    name="proposer_role"
-                    value={r.value}
-                    onChange={() => setSelectedRole(r.value)}
-                    className="sr-only"
-                  />
-                  {r.label}
-                </label>
-              ))}
+          <FormSection label="Peran Anda">
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="proposer_phone">
+                {PHONE_FIELD_LABEL}
+              </label>
+              <p className="mb-1 text-xs text-zinc-500">{PHONE_FORMAT_HINT}</p>
+              <input
+                id="proposer_phone"
+                name="proposer_phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={proposerPhone}
+                onChange={(e) => setProposerPhone(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              />
+              <FieldError msg={fe.proposer_phone} />
             </div>
-            {(() => {
-              const pairedKey = selectedRole ? ROLE_PAIR[selectedRole] : undefined;
-              if (!pairedKey) return null;
-              return (
-                <p className="mt-2 text-xs text-zinc-500">
-                  {ROLE_PAIR_HELPER_PREFIX} {ROLE_LABELS[pairedKey]}
-                </p>
-              );
-            })()}
-            <FieldError msg={fe.proposer_role} />
-          </fieldset>
 
-          {/* Item title + optional detail — replaces the old single free-text
-              description (UX audit, 2026-07-20). A short required title reads
-              as "name the thing", not "compose a paragraph"; the detail box
-              is where specifics like condition/inclusions go, only if the
-              seller bothers. Composed server-side into item_desc, the single
-              DB column this has always been (see actions.ts). */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="item_title">
-              {ITEM_TITLE_LABEL}
-            </label>
-            <input
-              id="item_title"
-              name="item_title"
-              type="text"
-              maxLength={80}
-              value={itemTitle}
-              onChange={(e) => setItemTitle(e.target.value)}
-              placeholder={ITEM_TITLE_PLACEHOLDER}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
-            />
-            <p className="mt-1 text-right text-xs text-zinc-400">
-              {itemTitle.length}/80
-            </p>
-            <FieldError msg={fe.item_title} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="item_detail">
-              {ITEM_DETAIL_LABEL}
-            </label>
-            <textarea
-              id="item_detail"
-              name="item_detail"
-              rows={2}
-              maxLength={400}
-              value={itemDetail}
-              onChange={(e) => setItemDetail(e.target.value)}
-              placeholder={ITEM_DETAIL_PLACEHOLDER}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
-            />
-            <p className="mt-1 text-right text-xs text-zinc-400">
-              {itemDetail.length}/400
-            </p>
-            <FieldError msg={fe.item_detail} />
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="amount_display">
-              Nominal (Rp)
-            </label>
-            <input
-              id="amount_display"
-              type="text"
-              inputMode="numeric"
-              value={nominalDisplay}
-              placeholder={NOMINAL_PLACEHOLDER}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, '');
-                setRawNominal(raw);
-                setNominalDisplay(formatNominal(raw));
-              }}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-            />
-            <input type="hidden" name="amount_idr" value={rawNominal} />
-            <FieldError msg={fe.amount_idr} />
-          </div>
-
-          {/* Rekening (C1) — only Penjual has a destination account to offer
-              at create time. When proposer is Pembeli, the seller supplies
-              this later when joining (see JoinDealForm.tsx, C2). */}
-          {selectedRole === 'PENJUAL' && (
-            <>
-              {/* Stacks below `sm` (640px): found via actual viewport testing
-                  (2026-07-20) that at 320px the label "Nomor rekening tujuan
-                  pembayaran" wraps to two lines while "Bank"'s doesn't,
-                  leaving the two inputs visibly misaligned in a cramped
-                  1:2 side-by-side split. Side-by-side from sm: up, where
-                  there's room for both labels on one line each. */}
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="sm:flex-1">
-                  <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
-                    Bank
-                  </label>
-                  <select
-                    id="rekening_bank_select"
-                    value={bank}
-                    onChange={(e) => setBank(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-                  >
-                    <option value="">Pilih bank</option>
-                    {BANK_OPTIONS.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                    <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
-                  </select>
-                  {bank === BANK_OTHER_VALUE && (
-                    <input
-                      type="text"
-                      value={customBank}
-                      onChange={(e) => setCustomBank(e.target.value)}
-                      placeholder="Nama bank"
-                      className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
-                    />
-                  )}
-                  <input type="hidden" name="rekening_bank" value={effectiveBank} />
-                  <FieldError msg={fe.rekening_bank} />
-                </div>
-                <div className="sm:flex-[2]">
+            {/* Role — legend removed, de-duped against this section's own
+                "Peran Anda" header just above. */}
+            <fieldset>
+              <div className="flex flex-wrap gap-2">
+                {SELECTABLE_ROLES.map((r) => (
                   <label
-                    className="block text-sm font-medium text-zinc-700"
-                    htmlFor="rekening_tujuan"
+                    key={r.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
                   >
-                    Nomor rekening tujuan pembayaran
+                    <input
+                      type="radio"
+                      name="proposer_role"
+                      value={r.value}
+                      onChange={() => setSelectedRole(r.value)}
+                      className="sr-only"
+                    />
+                    {r.label}
                   </label>
-                  <input
-                    id="rekening_tujuan"
-                    name="rekening_tujuan"
-                    type="text"
-                    inputMode="numeric"
-                    value={rekening}
-                    onChange={(e) => setRekening(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-                  />
-                  <FieldError msg={fe.rekening_tujuan} />
-                </div>
+                ))}
               </div>
+              {(() => {
+                const pairedKey = selectedRole ? ROLE_PAIR[selectedRole] : undefined;
+                if (!pairedKey) return null;
+                return (
+                  <p className="mt-2 text-xs text-zinc-500">
+                    {ROLE_PAIR_HELPER_PREFIX} {ROLE_LABELS[pairedKey]}
+                  </p>
+                );
+              })()}
+              <FieldError msg={fe.proposer_role} />
+            </fieldset>
+          </FormSection>
 
-              {history.status !== 'idle' && (
-                <p className="-mt-3 text-xs text-zinc-500">
-                  {history.status === 'found' &&
-                    formatAccountHistory(
-                      effectiveBank,
-                      history.rekeningMasked,
-                      history.selesaiCount,
-                      history.tidakDipenuhiCount,
-                      history.sinceLabel,
+          <FormSection label={RINGKASAN_KESEPAKATAN_HEADING}>
+            {/* Item title + optional detail — replaces the old single free-text
+                description (UX audit, 2026-07-20). A short required title reads
+                as "name the thing", not "compose a paragraph"; the detail box
+                is where specifics like condition/inclusions go, only if the
+                seller bothers. Composed server-side into item_desc, the single
+                DB column this has always been (see actions.ts). */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="item_title">
+                {ITEM_TITLE_LABEL}
+              </label>
+              <input
+                id="item_title"
+                name="item_title"
+                type="text"
+                maxLength={80}
+                value={itemTitle}
+                onChange={(e) => setItemTitle(e.target.value)}
+                placeholder={ITEM_TITLE_PLACEHOLDER}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+              />
+              <p className="mt-1 text-right text-xs text-zinc-400">
+                {itemTitle.length}/80
+              </p>
+              <FieldError msg={fe.item_title} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="item_detail">
+                {ITEM_DETAIL_LABEL}
+              </label>
+              <textarea
+                id="item_detail"
+                name="item_detail"
+                rows={2}
+                maxLength={400}
+                value={itemDetail}
+                onChange={(e) => setItemDetail(e.target.value)}
+                placeholder={ITEM_DETAIL_PLACEHOLDER}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+              />
+              <p className="mt-1 text-right text-xs text-zinc-400">
+                {itemDetail.length}/400
+              </p>
+              <FieldError msg={fe.item_detail} />
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="amount_display">
+                Nominal (Rp)
+              </label>
+              <input
+                id="amount_display"
+                type="text"
+                inputMode="numeric"
+                value={nominalDisplay}
+                placeholder={NOMINAL_PLACEHOLDER}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, '');
+                  setRawNominal(raw);
+                  setNominalDisplay(formatNominal(raw));
+                }}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              />
+              <input type="hidden" name="amount_idr" value={rawNominal} />
+              <FieldError msg={fe.amount_idr} />
+            </div>
+          </FormSection>
+
+          <FormSection label="Pembayaran">
+            {/* Rekening (C1) — only Penjual has a destination account to offer
+                at create time. When proposer is Pembeli, the seller supplies
+                this later when joining (see JoinDealForm.tsx, C2). */}
+            {selectedRole === 'PENJUAL' && (
+              <>
+                {/* Stacks below `sm` (640px): found via actual viewport testing
+                    (2026-07-20) that at 320px the label "Nomor rekening tujuan
+                    pembayaran" wraps to two lines while "Bank"'s doesn't,
+                    leaving the two inputs visibly misaligned in a cramped
+                    1:2 side-by-side split. Side-by-side from sm: up, where
+                    there's room for both labels on one line each. */}
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="sm:flex-1">
+                    <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
+                      Bank
+                    </label>
+                    <select
+                      id="rekening_bank_select"
+                      value={bank}
+                      onChange={(e) => setBank(e.target.value)}
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+                    >
+                      <option value="">Pilih bank</option>
+                      {BANK_OPTIONS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                      <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
+                    </select>
+                    {bank === BANK_OTHER_VALUE && (
+                      <input
+                        type="text"
+                        value={customBank}
+                        onChange={(e) => setCustomBank(e.target.value)}
+                        placeholder="Nama bank"
+                        className="mt-2 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
+                      />
                     )}
-                  {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-                  {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
-                </p>
-              )}
+                    <input type="hidden" name="rekening_bank" value={effectiveBank} />
+                    <FieldError msg={fe.rekening_bank} />
+                  </div>
+                  <div className="sm:flex-[2]">
+                    <label
+                      className="block text-sm font-medium text-zinc-700"
+                      htmlFor="rekening_tujuan"
+                    >
+                      Nomor rekening tujuan pembayaran
+                    </label>
+                    <input
+                      id="rekening_tujuan"
+                      name="rekening_tujuan"
+                      type="text"
+                      inputMode="numeric"
+                      value={rekening}
+                      onChange={(e) => setRekening(e.target.value)}
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+                    />
+                    <FieldError msg={fe.rekening_tujuan} />
+                  </div>
+                </div>
 
-              {history.status === 'found' && history.ledgerEnabled && (
-                <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
-              )}
-            </>
-          )}
+                {history.status !== 'idle' && (
+                  <p className="-mt-3 text-xs text-zinc-500">
+                    {history.status === 'found' &&
+                      formatAccountHistory(
+                        effectiveBank,
+                        history.rekeningMasked,
+                        history.selesaiCount,
+                        history.tidakDipenuhiCount,
+                        history.sinceLabel,
+                      )}
+                    {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+                    {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+                  </p>
+                )}
 
-          {/* Deadline */}
-          <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
-              Batas waktu pembayaran
-            </label>
-            {/* DRAFT — not yet in copy-id.md. Review wording after seeing in context. */}
-            <p className="text-xs text-zinc-500">
-              Tanggal terakhir pembayaran atau pemenuhan kesepakatan harus terjadi.
-            </p>
-            <input
-              id="deadline"
-              name="deadline"
-              type="date"
-              min={minDeadline}
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-            />
-            <FieldError msg={fe.deadline} />
-          </div>
+                {history.status === 'found' && history.ledgerEnabled && (
+                  <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
+                )}
+              </>
+            )}
+
+            {/* Deadline */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
+                Batas waktu pembayaran
+              </label>
+              {/* DRAFT — not yet in copy-id.md. Review wording after seeing in context. */}
+              <p className="text-xs text-zinc-500">
+                Tanggal terakhir pembayaran atau pemenuhan kesepakatan harus terjadi.
+              </p>
+              <input
+                id="deadline"
+                name="deadline"
+                type="date"
+                min={minDeadline}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
+              />
+              <FieldError msg={fe.deadline} />
+            </div>
+          </FormSection>
 
           {/* Tier */}
           <fieldset>
@@ -392,30 +421,39 @@ export default function BuatPage() {
                   <p className="text-zinc-500">{TIER_GRATIS_DESC}</p>
                 </div>
               </label>
-              {/* Paid tiers — compact disabled cards */}
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                <div className="flex items-center gap-1.5">
-                  <label className="flex items-center gap-1 text-zinc-500">
-                    <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                    <span className="font-medium">{TIER_LABELS.LIMA_RIBU}</span>
-                  </label>
-                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                    {NOTIFY_ME_LABEL}
-                  </span>
+              {/* Paid tiers — merged into one shared card (UX-audit fix pass,
+                  2026-07-20): two separately bordered/shadowed boxes took
+                  more vertical space than two not-yet-available options
+                  need. Both checkboxes and their `name` attributes are
+                  otherwise untouched — they're the app's pre-launch
+                  per-tier willingness-to-pay signal (feature_interest,
+                  migrations 0012/0016), measured separately on purpose, not
+                  decoration to prune. */}
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 text-xs shadow-sm shadow-zinc-200/50">
+                <div className="px-2 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex items-center gap-1 text-zinc-500">
+                      <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
+                      <span className="font-medium">{TIER_LABELS.LIMA_RIBU}</span>
+                    </label>
+                    <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                      {NOTIFY_ME_LABEL}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
                 </div>
-                <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                <div className="flex items-center gap-1.5">
-                  <label className="flex items-center gap-1 text-zinc-500">
-                    <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                    <span className="font-medium">{TIER_LABELS.BERMETERAI}</span>
-                  </label>
-                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                    {NOTIFY_ME_LABEL}
-                  </span>
+                <div className="border-t border-zinc-200 px-2 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex items-center gap-1 text-zinc-500">
+                      <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
+                      <span className="font-medium">{TIER_LABELS.BERMETERAI}</span>
+                    </label>
+                    <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                      {NOTIFY_ME_LABEL}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
                 </div>
-                <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">

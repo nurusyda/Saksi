@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
+import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
   getBuktiForDisplay,
@@ -200,6 +202,11 @@ function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
         {WAITING_FOR_RECEIPT_CONFIRMATION}
+        {/* Paused while the report modal is open — that modal holds an
+            in-progress form (DeadlineLapseReportModal), and an unannounced
+            router.refresh() mid-typing would be worse than the manual-reload
+            friction this component exists to remove. */}
+        {!modalOpen && <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DIBAYAR_DIKLAIM} />}
       </div>
 
       {deadlinePassed && (

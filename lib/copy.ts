@@ -220,6 +220,12 @@ export const PENDING_SAVE_LABEL = 'Mencatat...';
 // PENDING_DEFAULT_LABEL above.
 export const RIWAYAT_HEADING = 'Riwayat';
 
+// Cross-file duplicated "ringkasan kesepakatan" (deal summary) card heading —
+// found by monster_check (2026-07-21): independently typed in
+// app/deal/[token]/page.tsx, DisepakatiPanel.tsx, and app/buat/page.tsx (the
+// last one added by this pass), same Law 3 category as RIWAYAT_HEADING above.
+export const RINGKASAN_KESEPAKATAN_HEADING = 'Ringkasan Kesepakatan';
+
 // Validation errors — not in copy-id.md; in copy.ts because both action files use them
 export const ERROR_PHONE_INVALID =
   'Nomor HP tidak valid. Gunakan format 08xx atau +628xx.';

@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
+import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
   getDealAccountHistory,
@@ -26,6 +28,7 @@ import {
   BUKTI_ATTESTATION,
   WAITING_FOR_PAYMENT_PROOF,
   ERROR_REKENING_LOAD_FAILED,
+  RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -133,7 +136,7 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Ringkasan Kesepakatan
+          {RINGKASAN_KESEPAKATAN_HEADING}
         </p>
         <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
         <p className="text-sm text-zinc-600">{formatRp(deal.amount_idr)}</p>
@@ -231,6 +234,7 @@ export function DisepakatiPanel({
         ) : (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
             {WAITING_FOR_PAYMENT_PROOF}
+            <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DISEPAKATI} />
           </div>
         )
       }

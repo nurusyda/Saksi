@@ -15,6 +15,7 @@ import { TidakDilanjutkanPanel } from './TidakDilanjutkanPanel';
 import { KedaluwarsaPanel } from './KedaluwarsaPanel';
 import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
 import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
+import { WaitingStatusPoll } from './WaitingStatusPoll';
 import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
 import { formatRp, formatDate } from '@/lib/format';
@@ -27,6 +28,7 @@ import {
   ROLE_PAIR,
   COUNTERPART_FALLBACK_LABEL,
   TIER_LABELS,
+  RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
 export default async function DealPage({
@@ -119,7 +121,7 @@ export default async function DealPage({
         {/* Deal summary card */}
         <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Ringkasan Kesepakatan
+            {RINGKASAN_KESEPAKATAN_HEADING}
           </p>
           <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
           <div className="mt-3 flex flex-col gap-1 text-sm text-zinc-600">
@@ -180,6 +182,7 @@ export default async function DealPage({
             {isProposer ? (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
                 Menunggu pihak lain membuka link dan bergabung. Bagikan link di bawah ke pihak penerima.
+                <WaitingStatusPoll token={token} knownStatus={DealStatus.DRAF} />
               </div>
             ) : (
               <div className="rounded-xl border border-zinc-200 p-5">
