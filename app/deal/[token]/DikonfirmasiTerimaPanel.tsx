@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { LiveIndicator } from './LiveIndicator';
 import { identifyParty, confirmFulfillment, type ConfirmActionState } from './paymentActions';
 import { DealTimeline } from './DealTimeline';
 import { BarangTidakSesuaiModal } from './BarangTidakSesuaiModal';
@@ -80,7 +81,8 @@ function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string 
 function PenjualActionPanel({ token }: { token: string }) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-      {SHIP_INSTRUCTION}
+      <LiveIndicator />
+      <p>{SHIP_INSTRUCTION}</p>
       <WaitingStatusPoll token={token} knownStatus={DealStatus.DIKONFIRMASI_TERIMA} />
     </div>
   );

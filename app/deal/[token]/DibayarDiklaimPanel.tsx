@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { LiveIndicator } from './LiveIndicator';
 import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
@@ -201,7 +202,8 @@ function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-        {WAITING_FOR_RECEIPT_CONFIRMATION}
+        <LiveIndicator />
+        <p>{WAITING_FOR_RECEIPT_CONFIRMATION}</p>
         {/* Paused while the report modal is open — that modal holds an
             in-progress form (DeadlineLapseReportModal), and an unannounced
             router.refresh() mid-typing would be worse than the manual-reload

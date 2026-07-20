@@ -16,6 +16,7 @@ import { KedaluwarsaPanel } from './KedaluwarsaPanel';
 import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
 import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { LiveIndicator } from './LiveIndicator';
 import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
 import { formatRp, formatDate } from '@/lib/format';
@@ -181,7 +182,8 @@ export default async function DealPage({
           <>
             {isProposer ? (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-                Menunggu pihak lain membuka link dan bergabung. Bagikan link di bawah ke pihak penerima.
+                <LiveIndicator />
+                <p>Menunggu pihak lain membuka link dan bergabung. Bagikan link di bawah ke pihak penerima.</p>
                 <WaitingStatusPoll token={token} knownStatus={DealStatus.DRAF} />
               </div>
             ) : (

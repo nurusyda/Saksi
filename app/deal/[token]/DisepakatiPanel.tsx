@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
+import { LiveIndicator } from './LiveIndicator';
 import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
@@ -134,14 +135,6 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          {RINGKASAN_KESEPAKATAN_HEADING}
-        </p>
-        <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
-        <p className="text-sm text-zinc-600">{formatRp(deal.amount_idr)}</p>
-      </div>
-
       <div className="rounded-xl border border-zinc-200 p-5">
         <p className="mb-1 text-sm font-medium text-zinc-700">Rekening tujuan</p>
         <p className="mb-3 text-base font-medium text-zinc-900">
@@ -227,17 +220,32 @@ export function DisepakatiPanel({
   const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
 
   return (
-    <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
-      {(whichParty, phone) =>
-        whichParty === payerSlot ? (
-          <PaymentForm deal={deal} phone={phone} />
-        ) : (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-            {WAITING_FOR_PAYMENT_PROOF}
-            <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DISEPAKATI} />
-          </div>
-        )
-      }
-    </IdentifyPartyGate>
+    <div className="flex flex-col gap-6">
+      {/* Ringkasan Kesepakatan is public deal info, not PII (unlike rekening
+          and bukti below) — hoisted above the gate, same reasoning as
+          DikonfirmasiTerimaPanel's timeline hoist, so this screen isn't
+          blank while identity resolves. */}
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          {RINGKASAN_KESEPAKATAN_HEADING}
+        </p>
+        <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
+        <p className="text-sm text-zinc-600">{formatRp(deal.amount_idr)}</p>
+      </div>
+
+      <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
+        {(whichParty, phone) =>
+          whichParty === payerSlot ? (
+            <PaymentForm deal={deal} phone={phone} />
+          ) : (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+              <LiveIndicator />
+              <p>{WAITING_FOR_PAYMENT_PROOF}</p>
+              <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DISEPAKATI} />
+            </div>
+          )
+        }
+      </IdentifyPartyGate>
+    </div>
   );
 }
