@@ -88,6 +88,14 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 > Kode verifikasi SAKSI Anda: [kode]. Berlaku 5 menit. Jangan bagikan kepada siapa pun, termasuk pihak yang mengaku dari SAKSI.
 
+## 9a. Deadline nudge (WA notification)
+
+*Sender identity: same as §9 — `SAKSI (saksi.app)`.*
+
+> Kesepakatan SAKSI Anda ("[deskripsi]") telah melewati batas waktu. Buka [url] untuk melihat status dan tindakan yang diperlukan.
+
+*Message is state-agnostic by design: does not name the specific action (differs by DIBAYAR_DIKLAIM vs DIKONFIRMASI_TERIMA) and does not preview day-counts for what happens next, so the text can't drift out of sync with the sweep's grace-period numbers.*
+
 ## 10. Meterai mock label (demo only)
 
 > Simulasi meterai elektronik. Integrasi distributor resmi Peruri pada rilis produksi. Dokumen ini belum bermeterai.

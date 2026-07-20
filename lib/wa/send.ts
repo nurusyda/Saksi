@@ -1,10 +1,10 @@
-// WhatsApp send interface stub — logs intent only, matching
-// lib/db/anchor.ts's existing stub pattern for OpenTimestamps. The number is
-// registered and FONNTE_API_KEY is live in env (see ops.md, updated
-// 2026-07-20) — a real client is buildable whenever that upgrade is
-// prioritized; this just hasn't been wired to Fonnte yet. The OTP
-// verification *flow* itself (a separate, unbuilt feature) is still
-// deferred until build step 4 regardless of this stub's status.
+// WhatsApp send via Fonnte — wired 2026-07-20. Fonnte is flagged as a
+// pre-launch swap candidate (Meta Cloud API is the longer-term target —
+// see ops.md), but it's the live channel for the deadline-sweep nudges
+// right now. The OTP verification *flow* itself (a separate, unbuilt
+// feature) is still deferred until build step 4 regardless of this client.
+
+const FONNTE_API_URL = 'https://api.fonnte.com/send';
 
 export interface WaMessage {
   toPhoneE164: string;
@@ -12,9 +12,7 @@ export interface WaMessage {
   params: Record<string, string>;
 }
 
-// Same first+last masking style as maskRekening (lib/db/accountHistory.ts) —
-// found by monster_check: the raw phone number was going straight into
-// console.log, and this stub is shipping code that runs in production logs.
+// Same first+last masking style as maskRekening (lib/db/accountHistory.ts).
 function maskPhone(phoneE164: string): string {
   if (phoneE164.length <= 6) return phoneE164;
   const first = phoneE164.slice(0, 4);
@@ -22,13 +20,58 @@ function maskPhone(phoneE164: string): string {
   return `${first}${'•'.repeat(phoneE164.length - 6)}${last}`;
 }
 
+/** Strip the + from E.164 so Fonnte receives 628xx, not +628xx. */
+function e164ToFonnteTarget(phoneE164: string): string {
+  return phoneE164.replace(/^\+/, '');
+}
+
 export async function sendWaMessage(msg: WaMessage): Promise<{ sent: boolean }> {
-  // Deliberately not logging msg.params: it carries the rendered message
-  // text, which for DEADLINE_NUDGE includes item_desc — free-text user
-  // input that could incidentally contain PII the user typed in, even
-  // though item_desc itself isn't categorically PII (it's already public
-  // via deals_public). Template name + masked phone is enough to debug the
-  // stub without aggregating message content into server logs.
-  console.log(`[wa] STUB send ${msg.template} to ${maskPhone(msg.toPhoneE164)}`);
-  return { sent: false };
+  const apiKey = process.env.FONNTE_API_KEY;
+  if (!apiKey) {
+    console.error('[wa] FONNTE_API_KEY not set');
+    return { sent: false };
+  }
+
+  const target = e164ToFonnteTarget(msg.toPhoneE164);
+  const message = msg.params.message ?? '';
+
+  // Never log message content: free-text item_desc in DEADLINE_NUDGE could
+  // incidentally contain PII the user typed in, even though item_desc isn't
+  // categorically PII (it's public via deals_public).
+  const masked = maskPhone(msg.toPhoneE164);
+  console.log(`[wa] send ${msg.template} to ${masked}`);
+
+  try {
+    const controller = new AbortController();
+    // Short timeout: the sweep loop awaits each send sequentially, and a hung
+    // request would stall every later candidate. Fonnte typically responds in
+    // under 2s; 10s is generous without letting one bad request eat the run.
+    const timer = setTimeout(() => controller.abort(), 10_000);
+
+    const resp = await fetch(FONNTE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ target, message, countryCode: '62' }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!resp.ok) {
+      // Log status only, not the Fonnte response body (may contain the
+      // message text echoed back).
+      console.error(`[wa] Fonnte API ${resp.status} for ${masked}`);
+      return { sent: false };
+    }
+
+    console.log(`[wa] sent ${msg.template} to ${masked}`);
+    return { sent: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[wa] send failed for ${masked}: ${reason}`);
+    return { sent: false };
+  }
 }
