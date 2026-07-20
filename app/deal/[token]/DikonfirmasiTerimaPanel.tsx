@@ -12,6 +12,7 @@ import {
   PENDING_DEFAULT_LABEL,
   SHIP_INSTRUCTION,
   BARANG_TIDAK_SESUAI_BUTTON,
+  RIWAYAT_HEADING,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -42,7 +43,7 @@ function PembeliPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Riwayat</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
         <DealTimeline token={deal.token} />
       </div>
 
@@ -65,7 +66,12 @@ function PembeliPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
       </button>
 
       {modalOpen && (
-        <BarangTidakSesuaiModal itemDesc={deal.item_desc} onClose={() => setModalOpen(false)} />
+        <BarangTidakSesuaiModal
+          token={deal.token}
+          phone={phone}
+          itemDesc={deal.item_desc}
+          onClose={() => setModalOpen(false)}
+        />
       )}
     </div>
   );
@@ -78,19 +84,25 @@ function PenjualPanel({ deal }: { deal: DealSummary }) {
         {SHIP_INSTRUCTION}
       </div>
       <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Riwayat</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
         <DealTimeline token={deal.token} />
       </div>
     </div>
   );
 }
 
-export function DikonfirmasiTerimaPanel({ deal }: { deal: DealSummary }) {
+export function DikonfirmasiTerimaPanel({
+  deal,
+  initialWhichParty,
+}: {
+  deal: DealSummary;
+  initialWhichParty?: WhichParty | null;
+}) {
   const boundIdentify = identifyParty.bind(null, deal.token);
   const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
 
   return (
-    <IdentifyPartyGate action={boundIdentify}>
+    <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
       {(whichParty, phone) =>
         whichParty === payerSlot ? (
           <PembeliPanel deal={deal} phone={phone} />

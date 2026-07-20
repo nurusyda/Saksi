@@ -3,15 +3,25 @@
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
-import { identifyParty, getBuktiForDisplay, confirmReceipt, type BuktiDisplay, type ConfirmActionState } from './paymentActions';
+import {
+  identifyParty,
+  getBuktiForDisplay,
+  confirmReceipt,
+  notifyPaymentNotReceived,
+  type BuktiDisplay,
+  type ConfirmActionState,
+  type NotifyNotReceivedState,
+} from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
 import {
   formatOcrVerdictLabel,
   PENDING_DEFAULT_LABEL,
   CONFIRM_RECEIPT_LABEL,
   PAYMENT_NOT_RECEIVED_LABEL,
+  PAYMENT_NOT_RECEIVED_ACK,
   OCR_AUTHENTICITY_DISCLAIMER,
   WAITING_FOR_RECEIPT_CONFIRMATION,
+  ERROR_BUKTI_LOAD_FAILED,
 } from '@/lib/copy';
 
 // TIDAK_KONSISTEN interpolates the actual mismatched field names (copy-id.md
@@ -60,18 +70,42 @@ function ConfirmReceiptButton() {
   );
 }
 
+function NotReceivedButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {pending ? PENDING_DEFAULT_LABEL : PAYMENT_NOT_RECEIVED_LABEL}
+    </button>
+  );
+}
+
 function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
-  const [bukti, setBukti] = useState<BuktiDisplay | null | 'loading'>('loading');
-  // C4 — "Dana belum masuk" is Option A: no state change, no notification,
-  // no RPC call. Purely a local acknowledgment so the Penjual isn't left
-  // wondering whether the tap registered.
-  const [notReceivedAck, setNotReceivedAck] = useState(false);
+  const [bukti, setBukti] = useState<BuktiDisplay | null | 'loading' | 'error'>('loading');
+
+  const boundNotifyNotReceived = notifyPaymentNotReceived.bind(null, deal.token, phone);
+  const notifyInitialState: NotifyNotReceivedState = {};
+  const [notifyState, notifyFormAction] = useActionState(boundNotifyNotReceived, notifyInitialState);
 
   useEffect(() => {
     let ignore = false;
-    getBuktiForDisplay(deal.token, phone).then((r) => {
-      if (!ignore) setBukti(r);
-    });
+    getBuktiForDisplay(deal.token, phone)
+      .then((r) => {
+        if (!ignore) setBukti(r);
+      })
+      .catch(() => {
+        // Bug found by user report: an earlier version had no error state
+        // here, so a transient fetch failure (server action network error,
+        // etc.) left the Penjual staring at "Memuat bukti..." forever, with
+        // both "Konfirmasi uang diterima" and "Dana belum masuk" hidden
+        // behind the loading early-return with no escape route. Same class
+        // of bug DisepakatiPanel's PaymentForm already guards against for
+        // rekening/history loads.
+        if (!ignore) setBukti('error');
+      });
     return () => {
       ignore = true;
     };
@@ -81,6 +115,13 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
   const initialState: ConfirmActionState = {};
   const [state, formAction] = useActionState(boundConfirmReceipt, initialState);
 
+  if (bukti === 'error') {
+    return (
+      <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {ERROR_BUKTI_LOAD_FAILED}
+      </p>
+    );
+  }
   if (bukti === 'loading') {
     return <p className="text-sm text-zinc-500">Memuat bukti...</p>;
   }
@@ -125,26 +166,31 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
         <ConfirmReceiptButton />
       </form>
 
-      <button
-        type="button"
-        onClick={() => setNotReceivedAck(true)}
-        className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-      >
-        {PAYMENT_NOT_RECEIVED_LABEL}
-      </button>
-      {notReceivedAck && (
-        <p className="text-xs text-zinc-500">Dicatat. Kesepakatan tetap berjalan; periksa kembali secara berkala.</p>
+      <form action={notifyFormAction}>
+        <NotReceivedButton />
+      </form>
+      {notifyState.error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {notifyState.error}
+        </p>
       )}
+      {notifyState.sent && <p className="text-xs text-zinc-500">{PAYMENT_NOT_RECEIVED_ACK}</p>}
     </div>
   );
 }
 
-export function DibayarDiklaimPanel({ deal }: { deal: DealSummary }) {
+export function DibayarDiklaimPanel({
+  deal,
+  initialWhichParty,
+}: {
+  deal: DealSummary;
+  initialWhichParty?: WhichParty | null;
+}) {
   const boundIdentify = identifyParty.bind(null, deal.token);
   const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
 
   return (
-    <IdentifyPartyGate action={boundIdentify}>
+    <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
       {(whichParty, phone) =>
         whichParty === payeeSlot ? (
           <PenjualReviewPanel deal={deal} phone={phone} />

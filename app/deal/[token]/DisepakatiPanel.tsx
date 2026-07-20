@@ -205,12 +205,18 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
   );
 }
 
-export function DisepakatiPanel({ deal }: { deal: DealSummary }) {
+export function DisepakatiPanel({
+  deal,
+  initialWhichParty,
+}: {
+  deal: DealSummary;
+  initialWhichParty?: WhichParty | null;
+}) {
   const boundIdentify = identifyParty.bind(null, deal.token);
   const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
 
   return (
-    <IdentifyPartyGate action={boundIdentify}>
+    <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
       {(whichParty, phone) =>
         whichParty === payerSlot ? (
           <PaymentForm deal={deal} phone={phone} />

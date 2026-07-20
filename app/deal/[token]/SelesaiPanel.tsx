@@ -1,5 +1,5 @@
 import { DealTimeline } from './DealTimeline';
-import { SELESAI_CLOSING_LINE } from '@/lib/copy';
+import { SELESAI_CLOSING_LINE, RIWAYAT_HEADING } from '@/lib/copy';
 
 // C7 — minimal, both sides identical, no action buttons, so no phone gate:
 // nothing here depends on which party is looking (deal_events carries no
@@ -16,7 +16,7 @@ export function SelesaiPanel({ token }: { token: string }) {
         <p className="mt-3 text-sm text-zinc-700">{SELESAI_CLOSING_LINE}</p>
       </div>
       <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Riwayat</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">{RIWAYAT_HEADING}</p>
         <DealTimeline token={token} />
       </div>
     </div>

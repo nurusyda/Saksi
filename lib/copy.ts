@@ -158,6 +158,12 @@ export const PHONE_FORMAT_HINT = 'Format: 08xx atau +628xx';
 export const PENDING_DEFAULT_LABEL = 'Memproses...';
 export const PENDING_SAVE_LABEL = 'Mencatat...';
 
+// Cross-file duplicated "riwayat" (history) card heading — found by
+// monster_check: 'Riwayat' was independently typed in DikonfirmasiTerimaPanel
+// (x2), SelesaiPanel, and TidakDipenuhiPanel (x2), same Law 3 category as
+// PENDING_DEFAULT_LABEL above.
+export const RIWAYAT_HEADING = 'Riwayat';
+
 // Validation errors — not in copy-id.md; in copy.ts because both action files use them
 export const ERROR_PHONE_INVALID =
   'Nomor HP tidak valid. Gunakan format 08xx atau +628xx.';
@@ -226,6 +232,7 @@ export const CONFIRM_FULFILLMENT_LABEL_JUAL_BELI = 'Konfirmasi barang diterima';
 export const ERROR_BUKTI_ATTESTATION_REQUIRED = 'Centang pernyataan bukti sebelum mengunggah.';
 export const ERROR_BUKTI_FILE_REQUIRED = 'Pilih file bukti transfer.';
 export const ERROR_BUKTI_UPLOAD_FAILED = 'Gagal mengunggah bukti. Coba lagi.';
+export const ERROR_BUKTI_LOAD_FAILED = 'Gagal memuat bukti. Muat ulang halaman.';
 export const ERROR_BUKTI_SAVE_FAILED = 'Gagal mencatat bukti. Coba lagi.';
 export const ERROR_CONFIRM_FAILED = 'Gagal mengonfirmasi. Coba lagi.';
 export const ERROR_WRONG_PARTY_PEMBELI_ONLY = 'Hanya pihak pembeli yang dapat melakukan ini.';
@@ -242,6 +249,15 @@ export const ERROR_WRONG_PARTY_PENJUAL_ONLY = 'Hanya pihak penjual yang dapat me
 // C4 — Penjual's DIBAYAR_DIKLAIM page
 export const CONFIRM_RECEIPT_LABEL = 'Konfirmasi uang diterima';
 export const PAYMENT_NOT_RECEIVED_LABEL = 'Dana belum masuk';
+// Not in copy-id.md (added with the WA-nudge wiring) — must not say
+// "dicatat"/"tercatat" here: unlike the rest of C4, this tap writes nothing
+// to deal_events. Only a best-effort notification goes out.
+export const PAYMENT_NOT_RECEIVED_ACK =
+  'Notifikasi terkirim ke pembeli. Kesepakatan tetap berjalan; periksa kembali secara berkala.';
+// Bug found by monster_check: PAYMENT_NOT_RECEIVED_ACK above was previously
+// shown unconditionally, even when the WA send failed. This is the honest
+// counterpart for that case.
+export const ERROR_NOTIFY_SEND_FAILED = 'Gagal mengirim notifikasi. Coba lagi.';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 
@@ -250,7 +266,7 @@ export const SHIP_INSTRUCTION =
   'Uang telah dikonfirmasi diterima. Kirim barang sesuai kesepakatan.';
 export const BARANG_TIDAK_SESUAI_BUTTON = 'Barang tidak sesuai kesepakatan';
 
-// C6 — "barang tidak sesuai" stub (submit always disabled, no RPC call)
+// C6 — "barang tidak sesuai" report filing (copy-id.md §16, locked)
 export const BARANG_TIDAK_SESUAI_PROMPT =
   'Bagian mana dari keterangan di atas yang tidak dipenuhi?';
 export const BARANG_TIDAK_SESUAI_CONSEQUENCES: readonly string[] = [
@@ -260,9 +276,41 @@ export const BARANG_TIDAK_SESUAI_CONSEQUENCES: readonly string[] = [
   'SAKSI tidak menengahi dan tidak mengembalikan dana.',
   'Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini.',
 ];
-export const BARANG_TIDAK_SESUAI_GATE_BANNER =
-  'Fitur pelaporan memerlukan verifikasi nomor HP (OTP), belum tersedia. Kami akan memberi tahu saat siap.';
+// BARANG_TIDAK_SESUAI_GATE_BANNER retired (build step 4, 2026-07-20): it
+// announced the OTP gate as "belum tersedia" — no longer true now that the
+// OTP-gated filing below is wired up. Same treatment §6a gave the retired
+// jenis-transaksi selector: noted here rather than silently dropped. If a
+// future stub needs a similar "coming soon" banner, write a new one instead
+// of reviving this text, since it's specific to this now-shipped gate.
 export const BARANG_TIDAK_SESUAI_SUBMIT_LABEL = 'Kirim Laporan';
+
+// Not in copy-id.md — build step 4's OTP step and post-submit copy, drafted
+// in the same register (state-dependent, no forbidden words) for this pass.
+// Flagged for review rather than treated as locked.
+export const OTP_STEP_HEADING = 'Verifikasi nomor HP Anda untuk melanjutkan laporan.';
+export const OTP_SEND_BUTTON_LABEL = 'Kirim kode verifikasi';
+export const OTP_RESEND_BUTTON_LABEL = 'Kirim ulang kode';
+export const OTP_CODE_FIELD_LABEL = 'Kode verifikasi';
+export const OTP_CODE_FORMAT_HINT = '6 digit, berlaku 5 menit';
+export const OTP_VERIFY_BUTTON_LABEL = 'Verifikasi';
+export const ERROR_OTP_SEND_FAILED = 'Gagal mengirim kode. Coba lagi.';
+export const ERROR_OTP_SEND_RATE_LIMITED = 'Terlalu banyak permintaan kode. Coba lagi dalam satu jam.';
+export const ERROR_OTP_INVALID = 'Kode salah atau sudah kedaluwarsa.';
+export const ERROR_OTP_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Minta kode baru.';
+export const ERROR_REPORT_FILE_FAILED = 'Gagal mencatat laporan. Coba lagi.';
+
+// Not in copy-id.md — TIDAK_DIPENUHI/SENGKETA screens (build step 4
+// follow-on), same drafting caveat as immediately above.
+export const TIDAK_DIPENUHI_REPORTER_WAITING =
+  'Laporan Anda tercatat. Menunggu tanggapan pihak penjual (14 hari sejak laporan diajukan).';
+export const TIDAK_DIPENUHI_FLAGGED_HEADING =
+  'Laporan diterima: barang/jasa dianggap tidak sesuai kesepakatan.';
+export const TIDAK_DIPENUHI_FIELD_NOTE_LABEL = 'Bagian yang dianggap tidak sesuai (klaim pelapor):';
+export const HAK_JAWAB_NOTE_LABEL = 'Catatan tanggapan Anda (opsional)';
+export const HAK_JAWAB_SUBMIT_LABEL = 'Kirim Tanggapan';
+export const ERROR_HAK_JAWAB_WINDOW_CLOSED = 'Jendela 14 hari untuk menanggapi telah berakhir.';
+export const ERROR_HAK_JAWAB_FAILED = 'Gagal mencatat tanggapan. Coba lagi.';
+export const SENGKETA_STATUS_LINE = 'Status: klaim berbeda.';
 
 // C7 — SELESAI, minimal placeholder pending a real design pass
 export const SELESAI_CLOSING_LINE = 'Kesepakatan selesai. Tercatat di SAKSI.';
@@ -279,6 +327,10 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   BUKTI_UPLOADED: 'Bukti transfer diunggah',
   RECEIPT_CONFIRMED: 'Penerimaan dana dikonfirmasi',
   FULFILLMENT_CONFIRMED: 'Barang/pemenuhan dikonfirmasi',
+  // Build step 4 additions — not in copy-id.md's table (predates the breach
+  // path), same fallback-to-raw-name contract as every other unmapped event.
+  TENGGAT_LEWAT: 'Laporan diajukan: barang/jasa tidak sesuai',
+  HAK_JAWAB_FILED: 'Tanggapan pihak terlapor diajukan',
 };
 
 // copy-id.md §16 — minimal fill-ins for the non-Section-C-defined side of
@@ -319,6 +371,34 @@ export function formatBuktiUploadedMessage(itemDesc: string, dealUrl: string): s
 
 export function formatReceiptConfirmedMessage(itemDesc: string, dealUrl: string): string {
   return `Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi barang diterima.`;
+}
+
+// Not in copy-id.md §9b (added later, same house style) — fired by the
+// Penjual's "Dana belum masuk" tap on C4. Deliberately NOT a claim: no
+// deal_events row, no state change, same as every string above it. This is
+// the only consequence of that tap — a nudge to the payer to double-check
+// their own transfer, addressed to a plausible bank-delay explanation, not
+// an accusation.
+export function formatPaymentNotReceivedMessage(itemDesc: string, dealUrl: string): string {
+  return `Penjual belum menerima dana untuk kesepakatan SAKSI Anda ("${itemDesc}"). Periksa kembali transfer Anda. Buka ${dealUrl} untuk melihat status.`;
+}
+
+// copy-id.md §9 — OTP message, locked. First real call site: breach-report
+// filing (build step 4). Sender identity: SAKSI (saksi.app), same as every
+// WA message above.
+export function formatOtpMessage(code: string): string {
+  return `Kode verifikasi SAKSI Anda: ${code}. Berlaku 5 menit. Jangan bagikan kepada siapa pun, termasuk pihak yang mengaku dari SAKSI.`;
+}
+
+// Not in copy-id.md — build step 4 (breach path) turn-taking notifications,
+// same house style as §9b. Fired by fileBarangTidakSesuaiReport (to the
+// flagged party) and respondHakJawab (to the reporter).
+export function formatBarangTidakSesuaiFiledMessage(itemDesc: string, dealUrl: string): string {
+  return `Laporan diajukan untuk kesepakatan SAKSI Anda ("${itemDesc}"). Anda memiliki 14 hari untuk menanggapi. Buka ${dealUrl} untuk melihat detail.`;
+}
+
+export function formatHakJawabFiledMessage(itemDesc: string, dealUrl: string): string {
+  return `Pihak penjual telah menanggapi laporan pada kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk melihat tanggapannya.`;
 }
 
 // ============================================================

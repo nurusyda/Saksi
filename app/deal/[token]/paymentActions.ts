@@ -8,6 +8,7 @@ import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
+import { setPartySession } from '@/lib/db/partySession';
 import { uploadBuktiImage } from '@/lib/db/storage';
 import { checkBuktiConsistency } from '@/lib/ocr/gemini';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
@@ -27,20 +28,27 @@ import {
   ERROR_WRONG_PARTY_PENJUAL_ONLY,
   formatBuktiUploadedMessage,
   formatReceiptConfirmedMessage,
+  formatPaymentNotReceivedMessage,
+  ERROR_NOTIFY_SEND_FAILED,
 } from '@/lib/copy';
 
 // Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
 // copy-id.md §9b) — same contract as actions.ts's notifyTurn: never blocks
-// or fails the transition it's attached to.
+// or fails the transition it's attached to. Returns whether the send
+// actually succeeded — most call sites fire this with `void` and ignore the
+// result (the transition itself doesn't depend on it), but notifyTurn
+// itself must not swallow the result, since notifyPaymentNotReceived's
+// caller needs it to avoid a false "sent" claim (see that function).
 async function notifyTurn(
   db: ReturnType<typeof supabaseServer>,
   partyId: string | null,
-  template: 'BUKTI_UPLOADED' | 'RECEIPT_CONFIRMED',
+  template: 'BUKTI_UPLOADED' | 'RECEIPT_CONFIRMED' | 'PAYMENT_NOT_RECEIVED',
   message: string,
-): Promise<void> {
+): Promise<boolean> {
   const phone = await getPartyPhone(db, partyId);
-  if (!phone) return;
-  void sendWaMessage({ toPhoneE164: phone, template, params: { message } });
+  if (!phone) return false;
+  const { sent } = await sendWaMessage({ toPhoneE164: phone, template, params: { message } });
+  return sent;
 }
 
 const RETRY_LIMIT = 3;
@@ -52,7 +60,10 @@ const RETRY_LIMIT = 3;
 // actions built to fix the props-leak (getRekeningForPayer,
 // getBuktiForDisplay) shipped as their own unprotected phone-guess oracles.
 // Centralizing it here so a fourth call site can't repeat the omission.
-async function checkIdentifyRateLimit(
+// Exported so breachActions.ts (build step 4) can reuse the exact same
+// shared limiter rather than adding a fifth unprotected phone-guess oracle —
+// this is the "fourth call site" this comment already anticipated.
+export async function checkIdentifyRateLimit(
   db: ReturnType<typeof supabaseServer>,
   dealId: string,
 ): Promise<boolean> {
@@ -110,6 +121,12 @@ export async function identifyParty(
     return { error: ERROR_PHONE_INVALID };
   }
   if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  // Remember this identification for a short window so the next status
+  // screen this party lands on (same deal, same browser) can skip asking
+  // for the phone again — see partySession.ts for why this doesn't weaken
+  // the re-verify-on-every-mutation model.
+  await setPartySession(token, whichParty);
 
   return { whichParty };
 }
@@ -370,6 +387,62 @@ export async function getBuktiForDisplay(token: string, phone: string): Promise<
     ocrResult: bukti.ocr_result,
     ocrVerdict: bukti.ocr_verdict,
   };
+}
+
+// ============================================================
+// notifyPaymentNotReceived — C4's "Dana belum masuk". Deliberately NOT the
+// start of a claim: no deal_events row, no status change, no RPC beyond the
+// shared identify rate-limit. The only effect is a best-effort WA nudge to
+// the payer, addressed to a plausible bank-delay explanation. The real
+// mechanism for "funds genuinely never arrived" stays the deadline-lapse +
+// OTP-gated breach pipeline (data-model.md) — this tap doesn't shortcut into
+// that pipeline early.
+// ============================================================
+
+export type NotifyNotReceivedState = { sent?: boolean; error?: string };
+
+export async function notifyPaymentNotReceived(
+  token: string,
+  phone: string,
+  _prev: NotifyNotReceivedState,
+  _formData: FormData,
+): Promise<NotifyNotReceivedState> {
+  const db = supabaseServer();
+
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
+  if (whichParty !== payeeSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+
+  const payerSlot: WhichParty = payeeSlot === 'proposer' ? 'counterpart' : 'proposer';
+  const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+
+  // Bug found by monster_check: this previously fired notifyTurn with `void`
+  // and unconditionally returned { sent: true } — so PAYMENT_NOT_RECEIVED_ACK
+  // ("Notifikasi terkirim ke pembeli...") displayed even when the WA send
+  // actually failed (Fonnte down, invalid number, etc.), a false claim. This
+  // is the one call site where the UI makes an explicit delivery claim, so
+  // unlike the other notifyTurn calls in this file, it must be awaited.
+  const sent = await notifyTurn(
+    db,
+    payerPartyId,
+    'PAYMENT_NOT_RECEIVED',
+    formatPaymentNotReceivedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+  );
+
+  return sent ? { sent: true } : { error: ERROR_NOTIFY_SEND_FAILED };
 }
 
 // ============================================================

@@ -9,8 +9,10 @@ import { AcceptDealForm } from './AcceptDealForm';
 import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
+import { TidakDipenuhiPanel } from './TidakDipenuhiPanel';
 import { SelesaiPanel } from './SelesaiPanel';
 import { joinDeal, acceptDeal } from './actions';
+import { getPartySession } from '@/lib/db/partySession';
 import { formatRp, formatDate } from '@/lib/format';
 import { maskRekening } from '@/lib/db/accountHistory';
 import {
@@ -45,6 +47,8 @@ export default async function DealPage({
       DealStatus.DISEPAKATI,
       DealStatus.DIBAYAR_DIKLAIM,
       DealStatus.DIKONFIRMASI_TERIMA,
+      DealStatus.TIDAK_DIPENUHI,
+      DealStatus.SENGKETA,
       DealStatus.SELESAI,
     ].includes(deal.status)
   ) {
@@ -74,6 +78,12 @@ export default async function DealPage({
   // cookies, and a miss harmlessly shows the join form anyway.
   const cookieStore = await cookies();
   const isProposer = cookieStore.get(`saksi_proposer_${token}`)?.value === '1';
+
+  // Short-lived party-session cookie (see partySession.ts) — lets whichever
+  // party already identified themselves on this deal (via accept or an
+  // earlier IdentifyPartyGate submission) skip re-typing their phone on the
+  // next status screen, within the same browser and a ~45-minute window.
+  const partySession = await getPartySession(token);
 
   const boundJoinDeal = joinDeal.bind(null, token);
   const boundAcceptDeal = acceptDeal.bind(null, token);
@@ -176,16 +186,28 @@ export default async function DealPage({
               amount_idr: Number(deal.amount_idr),
               proposer_role: deal.proposer_role,
             }}
+            initialWhichParty={partySession}
           />
         )}
 
         {deal.status === DealStatus.DIBAYAR_DIKLAIM && (
-          <DibayarDiklaimPanel deal={{ token, proposer_role: deal.proposer_role }} />
+          <DibayarDiklaimPanel
+            deal={{ token, proposer_role: deal.proposer_role }}
+            initialWhichParty={partySession}
+          />
         )}
 
         {deal.status === DealStatus.DIKONFIRMASI_TERIMA && (
           <DikonfirmasiTerimaPanel
             deal={{ token, item_desc: deal.item_desc, proposer_role: deal.proposer_role }}
+            initialWhichParty={partySession}
+          />
+        )}
+
+        {(deal.status === DealStatus.TIDAK_DIPENUHI || deal.status === DealStatus.SENGKETA) && (
+          <TidakDipenuhiPanel
+            deal={{ token, item_desc: deal.item_desc, proposer_role: deal.proposer_role, status: deal.status }}
+            initialWhichParty={partySession}
           />
         )}
 

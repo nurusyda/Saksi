@@ -19,7 +19,13 @@ export interface WaMessage {
     | 'PARTY_ACCEPTED'
     | 'DISEPAKATI'
     | 'BUKTI_UPLOADED'
-    | 'RECEIPT_CONFIRMED';
+    | 'RECEIPT_CONFIRMED'
+    | 'PAYMENT_NOT_RECEIVED'
+    // Build step 4 (breach path) — copy-id.md §9's AUTHENTICATION-category
+    // OTP message, and the two report-filing turn-taking nudges.
+    | 'OTP_BREACH_REPORT'
+    | 'BARANG_TIDAK_SESUAI_FILED'
+    | 'HAK_JAWAB_FILED';
   params: Record<string, string>;
 }
 

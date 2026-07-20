@@ -28,12 +28,31 @@ const initialState: IdentifyState = {};
  * purely a UI decision about which read-only view to render; every mutating
  * action re-derives whichParty from the phone independently, never trusts
  * `whichParty` as passed down here.
+ *
+ * `initialWhichParty`, when present, comes from the short-lived party-session
+ * cookie read server-side in page.tsx (see partySession.ts) — set the last
+ * time this same party identified themselves on this deal (accept, or a
+ * prior visit to one of these screens), within the last ~45 minutes. It
+ * lets a party who just accepted or just viewed another status screen skip
+ * re-typing a phone they already entered moments ago. It carries ONLY the
+ * whichParty role label, never a phone (monster_check BLOCKER, fixed
+ * 2026-07-20 — Next.js serializes RSC props into the client payload, so the
+ * phone must never be one of them, even the viewer's own). The phone used
+ * to render this skip path comes from usePersistedPhone() instead — the
+ * same client-side sessionStorage value the preceding accept/identify form
+ * already wrote, never server-sent. If that's empty (cleared storage, a
+ * different tab) the form below renders regardless of the cookie, which is
+ * the safe degrade: re-collect the phone rather than bind an empty one into
+ * a follow-up action. Once the cookie expires, this form is exactly what
+ * renders again — phone re-entry remains the permanent fallback either way.
  */
 export function IdentifyPartyGate({
   action,
+  initialWhichParty,
   children,
 }: {
   action: (prev: IdentifyState, formData: FormData) => Promise<IdentifyState>;
+  initialWhichParty?: WhichParty | null;
   children: (whichParty: WhichParty, phone: string) => ReactNode;
 }) {
   const [state, formAction] = useActionState(action, initialState);
@@ -41,6 +60,10 @@ export function IdentifyPartyGate({
 
   if (state.whichParty) {
     return <>{children(state.whichParty, phone)}</>;
+  }
+
+  if (initialWhichParty && phone) {
+    return <>{children(initialWhichParty, phone)}</>;
   }
 
   return (

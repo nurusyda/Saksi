@@ -7,6 +7,7 @@ import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/li
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
+import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { sendWaMessage } from '@/lib/wa/send';
 import {
@@ -255,6 +256,12 @@ export async function acceptDeal(
   }
 
   if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  // Remember this identification so that when this party lands on the
+  // DISEPAKATI screen right after accepting (same deal, same browser), they
+  // aren't asked to re-type the phone they just entered here — see
+  // partySession.ts.
+  await setPartySession(token, whichParty);
 
   const flagColumn = whichParty === 'proposer' ? 'proposer_accepted' : 'counterpart_accepted';
   const eventName =
