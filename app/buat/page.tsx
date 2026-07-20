@@ -281,8 +281,14 @@ export default function BuatPage() {
               this later when joining (see JoinDealForm.tsx, C2). */}
           {selectedRole === 'PENJUAL' && (
             <>
-              <div className="flex gap-3">
-                <div className="flex-1">
+              {/* Stacks below `sm` (640px): found via actual viewport testing
+                  (2026-07-20) that at 320px the label "Nomor rekening tujuan
+                  pembayaran" wraps to two lines while "Bank"'s doesn't,
+                  leaving the two inputs visibly misaligned in a cramped
+                  1:2 side-by-side split. Side-by-side from sm: up, where
+                  there's room for both labels on one line each. */}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="sm:flex-1">
                   <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
                     Bank
                   </label>
@@ -312,7 +318,7 @@ export default function BuatPage() {
                   <input type="hidden" name="rekening_bank" value={effectiveBank} />
                   <FieldError msg={fe.rekening_bank} />
                 </div>
-                <div className="flex-[2]">
+                <div className="sm:flex-[2]">
                   <label
                     className="block text-sm font-medium text-zinc-700"
                     htmlFor="rekening_tujuan"

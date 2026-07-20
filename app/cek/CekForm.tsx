@@ -86,8 +86,12 @@ export function CekForm() {
         <input type="hidden" name="mode" value={mode} />
 
         {mode === 'rekening' ? (
-          <div className="flex gap-3">
-            <div className="flex-1">
+          // Stacks below `sm` (640px) — same fix as the identical
+          // bank+rekening fields in app/buat/page.tsx and JoinDealForm.tsx
+          // (label-wrap misalignment at 320px, found via viewport testing
+          // 2026-07-20).
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="sm:flex-1">
               <label className="block text-sm font-medium text-zinc-700" htmlFor="cek_bank_select">
                 {CEK_BANK_FIELD_LABEL}
               </label>
@@ -116,7 +120,7 @@ export function CekForm() {
               )}
               <input type="hidden" name="bank" value={effectiveBank} />
             </div>
-            <div className="flex-[2]">
+            <div className="sm:flex-[2]">
               <label className="block text-sm font-medium text-zinc-700" htmlFor="cek_rekening">
                 {CEK_REKENING_FIELD_LABEL}
               </label>

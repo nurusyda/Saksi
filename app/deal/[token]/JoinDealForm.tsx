@@ -81,8 +81,11 @@ export function JoinDealForm({
       </div>
 
       {needsRekening && (
-        <div className="flex gap-3">
-          <div className="flex-1">
+        // Stacks below `sm` (640px) — see app/buat/page.tsx's identical
+        // fields for why (label-wrap misalignment at 320px, found via
+        // viewport testing 2026-07-20).
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="sm:flex-1">
             <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_bank_select">
               Bank
             </label>
@@ -112,7 +115,7 @@ export function JoinDealForm({
             <input type="hidden" name="rekening_bank" value={effectiveBank} />
             {fe.rekening_bank && <p className="mt-1 text-xs text-red-600">{fe.rekening_bank}</p>}
           </div>
-          <div className="flex-[2]">
+          <div className="sm:flex-[2]">
             <label className="block text-sm font-medium text-zinc-700" htmlFor="rekening_tujuan">
               Nomor rekening tujuan pembayaran
             </label>
