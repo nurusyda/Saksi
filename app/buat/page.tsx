@@ -166,9 +166,11 @@ export default function BuatPage() {
                 <div key={d.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
                   <label className="flex items-center gap-1 text-zinc-500">
                     <input type="checkbox" name={d.fieldName} className="shrink-0" />
-                    {NOTIFY_ME_LABEL}
+                    <span className="font-medium">{d.label}</span>
                   </label>
-                  <span className="font-medium text-zinc-500">{d.label}</span>
+                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                    {NOTIFY_ME_LABEL}
+                  </span>
                 </div>
               ))}
             </div>
@@ -383,9 +385,11 @@ export default function BuatPage() {
                 <div className="flex items-center gap-1.5">
                   <label className="flex items-center gap-1 text-zinc-500">
                     <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                    {NOTIFY_ME_LABEL}
+                    <span className="font-medium">{TIER_LABELS.LIMA_RIBU}</span>
                   </label>
-                  <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
+                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                    {NOTIFY_ME_LABEL}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
               </div>
@@ -393,9 +397,11 @@ export default function BuatPage() {
                 <div className="flex items-center gap-1.5">
                   <label className="flex items-center gap-1 text-zinc-500">
                     <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                    {NOTIFY_ME_LABEL}
+                    <span className="font-medium">{TIER_LABELS.BERMETERAI}</span>
                   </label>
-                  <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
+                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                    {NOTIFY_ME_LABEL}
+                  </span>
                 </div>
                 <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
               </div>
