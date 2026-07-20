@@ -7,7 +7,7 @@
 - **Supabase**: project `saksi-mvp`, region **ap-southeast-1 (Singapore)**, free plan. Free plan has NO backups and pauses after 7 days of inactivity — both are mitigated by the backup Action below, which is a week-one requirement, not optional.
 - **Domain/DNS/email**: saksi.app registered at Squarespace; DNS stays at Squarespace (nameservers NOT moved to Vercel — moving them would break email). Email sapa@saksi.app is live; never propose DNS changes beyond single records, and never touch MX records.
 - **OCR**: Gemini API (key exists, held locally). NOT Claude API.
-- **OTP**: deferred until build step 4. A dedicated prepaid number exists, not yet registered with any provider. Fonnte is the fast path (flagged as pre-launch swap candidate); Meta Cloud API is the target. Do not build OTP earlier than the breach path needs it.
+- **OTP**: the verification *flow itself* is still deferred until build step 4 — do not build OTP earlier than the breach path needs it. The WA send channel is no longer unregistered, though: the dedicated prepaid number is registered with Fonnte, `FONNTE_API_KEY` is live in `.env.local` (added 2026-07-20, same night as `CRON_SECRET`). `lib/wa/send.ts` is still a logging-only stub as of Phase 6 (deadline-sweep nudges) — a real key now exists to wire it to, that upgrade just hasn't been done. Fonnte remains flagged as a pre-launch swap candidate; Meta Cloud API is the longer-term target.
 - **Midtrans**: sandbox account exists; keys not yet retrieved. Not needed until build step 6. Never propose manual/personal QRIS collection as an interim — rejected decision.
 
 ## Environment variable names (use exactly these)
@@ -19,6 +19,7 @@ SUPABASE_SERVICE_ROLE_KEY=        # server-only; never NEXT_PUBLIC_, never in cl
 GEMINI_API_KEY=                   # server-only
 MIDTRANS_SERVER_KEY=              # server-only, sandbox first
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=
+CRON_SECRET=                      # server-only; verifies Vercel Cron -> /api/cron/deadline-sweep
 ```
 
 Local: `.env.local` (already gitignored by create-next-app defaults — verify before first commit that adds it). Production: Vercel → Settings → Environment Variables; adding a var requires a redeploy to take effect.

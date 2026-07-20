@@ -304,3 +304,16 @@ export const WAITING_FOR_PAYMENT_PROOF =
   'Menunggu pihak pembeli mengunggah bukti transfer.';
 export const WAITING_FOR_RECEIPT_CONFIRMATION =
   'Menunggu konfirmasi penerimaan dari pihak penjual.';
+
+// ============================================================
+// DRAFT — Phase 6 deadline sweep (2026-07-20). NOT in copy-id.md, NOT locked.
+// WA utility-template nudge sent by the sweep at T+2 days past deadline.
+// Deliberately state-agnostic (doesn't name the specific action needed,
+// since that differs by DIBAYAR_DIKLAIM vs DIKONFIRMASI_TERIMA) and doesn't
+// preview day-counts for what happens next, so the message text can't drift
+// out of sync with the sweep's actual grace-period numbers. Sender identity
+// matches the OTP template (copy-id.md §9): "SAKSI (saksi.app)".
+// ============================================================
+export function formatDeadlineNudgeMessage(itemDesc: string, dealUrl: string): string {
+  return `Kesepakatan SAKSI Anda ("${itemDesc}") telah melewati batas waktu. Buka ${dealUrl} untuk melihat status dan tindakan yang diperlukan.`;
+}

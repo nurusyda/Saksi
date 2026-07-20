@@ -29,3 +29,15 @@ export function formatDateTime(iso: string): string {
     timeZone: 'Asia/Jakarta',
   });
 }
+
+// Extracted from app/buat/actions.ts's deadline validation (SESSION_LOG.md
+// Session 3: "Deadline timezone — new Date(deadline) compared against
+// server local time — off by one day for WIB users on a UTC server").
+// `deals.deadline` is a naive `date` column, entered and validated as a WIB
+// calendar date — never compare it against Postgres's current_date/now()
+// directly (session timezone isn't guaranteed to be WIB); compute "today in
+// WIB" here instead and pass it in as an explicit parameter.
+export function getTodayWib(): string {
+  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+  return new Date(Date.now() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+}

@@ -42,14 +42,32 @@ export const DealEventName = {
   REFUND_CONFIRMED: 'REFUND_CONFIRMED',
   // Buyer/lender confirms a partial refund received (mirrors REFUND_CONFIRMED)
   REFUND_CONFIRMED_PARTIAL: 'REFUND_CONFIRMED_PARTIAL',
-  // System: deadline passed in an eligible status
+  // System: deadline passed in an eligible status. Corrected 2026-07-20 (an
+  // earlier version of this comment claimed DIKONFIRMASI_TERIMA was
+  // deadline-driven and exempt from report-gating — wrong; verified against
+  // content/legal/syarat-ketentuan.md §4.1, "pihak yang dirugikan *dapat*
+  // mengajukan laporan" (the wronged party *may* file — optional, never
+  // automatic). This is gated on an actual breach report being filed, for
+  // BOTH DIBAYAR_DIKLAIM and DIKONFIRMASI_TERIMA — a feature that doesn't
+  // exist yet (Section C6 is a stub). The deadline sweep (Phase 6) never
+  // fires this event for either state; that wiring belongs entirely to the
+  // future report-filing RPC. See migration 0018's header comment.
   TENGGAT_LEWAT: 'TENGGAT_LEWAT',
   // Flagged party files hak jawab within 14-day window
   HAK_JAWAB_FILED: 'HAK_JAWAB_FILED',
   // 14-day hak jawab + 14-day sengketa silence elapsed
   SENGKETA_KADALUARSA: 'SENGKETA_KADALUARSA',
-  // System: 30 days of silence after a payment claim, no laporan ever filed
+  // System: 30+ days of silence past deadline with no laporan ever filed —
+  // quiet, no-blame terminal outcome. Reachable from both DIBAYAR_DIKLAIM
+  // and DIKONFIRMASI_TERIMA (unified in the sweep, migration 0018); the two
+  // source states stay distinguishable via whether RECEIPT_CONFIRMED
+  // precedes this event in deal_events, without needing a second status.
   KEDALUWARSA_LAPSED: 'KEDALUWARSA_LAPSED',
+  // System: deadline sweep's WA reminder (T+2 days past deadline, DIBAYAR_DIKLAIM
+  // or DIKONFIRMASI_TERIMA, once only). Self-transition — status unchanged.
+  // Targets exactly one party (whichever is expected to act next), not both
+  // — see runNudgeBranch in app/api/cron/deadline-sweep/route.ts.
+  NUDGE_SENT: 'NUDGE_SENT',
 } as const;
 export type DealEventName = (typeof DealEventName)[keyof typeof DealEventName];
 
@@ -84,10 +102,15 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.REFUND_CONFIRMED_PARTIAL, next: DealStatus.DIKEMBALIKAN_SEBAGIAN },
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
     { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
+    { event: DealEventName.NUDGE_SENT, next: DealStatus.DIBAYAR_DIKLAIM }, // self
   ],
   [DealStatus.DIKONFIRMASI_TERIMA]: [
     { event: DealEventName.FULFILLMENT_CONFIRMED, next: DealStatus.SELESAI },
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
+    // New 2026-07-20: mirrors the DIBAYAR_DIKLAIM KEDALUWARSA_LAPSED edge —
+    // unified quiet terminal outcome, sweep-driven, no report ever filed.
+    { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
+    { event: DealEventName.NUDGE_SENT, next: DealStatus.DIKONFIRMASI_TERIMA }, // self
   ],
   [DealStatus.SELESAI]: [],
   [DealStatus.DIBATALKAN_BERSAMA]: [],

@@ -9,6 +9,7 @@ import { DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
+import { getTodayWib } from '@/lib/format';
 import {
   ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
@@ -104,10 +105,8 @@ export async function createDeal(
 
   if (!deadline) {
     fieldErrors.deadline = 'Batas waktu wajib diisi.';
-  } else {
-    const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
-    const todayWib = new Date(Date.now() + WIB_OFFSET_MS).toISOString().slice(0, 10);
-    if (deadline <= todayWib) fieldErrors.deadline = 'Batas waktu harus di masa depan.';
+  } else if (deadline <= getTodayWib()) {
+    fieldErrors.deadline = 'Batas waktu harus di masa depan.';
   }
 
   // Only GRATIS is selectable in the UI (paid tiers have no radio input at all,
