@@ -17,8 +17,8 @@ export const TC_LABEL =
 // long-form "Contoh: …" examples so the input reads as an instruction
 // rather than a sample. Other roles unchanged (not yet selectable).
 export const ITEM_DESC_PLACEHOLDER: Record<string, string> = {
-  PENJUAL: 'jual apa, berapa banyak',
-  PEMBELI: 'beli apa, berapa banyak',
+  PENJUAL: 'Jual ………, banyaknya ………',
+  PEMBELI: 'Beli ………, banyaknya ………',
   PEMBERI_PINJAMAN: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
   PEMINJAM: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
   PEMILIK: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
