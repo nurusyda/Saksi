@@ -72,7 +72,7 @@ export const TIER_BERMETERAI_DESC =
 
 // copy-id.md §6 — shared footer below tier cards
 export const TIER_FOOTER =
-  'Tingkatan menunjukkan kekuatan verifikasi identitas kedua pihak, bukan keamanan kesepakatan. Mengajukan dan melihat laporan selalu gratis di semua tingkatan.';
+  'Tingkatan menunjukkan verifikasi identitas, bukan keamanan kesepakatan. Laporan selalu gratis di semua tingkatan.';
 
 // copy-id.md §6a — disabled deal-type role cards (create flow gating)
 export const BELUM_TERSEDIA_LABEL = 'Belum tersedia';
