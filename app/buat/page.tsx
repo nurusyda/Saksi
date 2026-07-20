@@ -37,14 +37,6 @@ const SELECTABLE_ROLES = [
   { value: 'PEMBELI', label: ROLE_LABELS.PEMBELI },
 ];
 
-// Unavailable role groups — compact "segera hadir" cards with grey shadow
-// so they read as informational, not interactive. PEMBERI_PINJAMAN/PEMINJAM
-// and PEMILIK/PENYEWA show both complementary roles in one card.
-const UNAVAILABLE_ROLE_GROUPS = [
-  { key: 'PINJAM_MEMINJAM', label: `${ROLE_LABELS.PEMBERI_PINJAMAN} / ${ROLE_LABELS.PEMINJAM}` },
-  { key: 'SEWA_MENYEWA', label: `${ROLE_LABELS.PEMILIK} / ${ROLE_LABELS.PENYEWA}` },
-];
-
 // Section B — jenis transaksi selector. Only jual-beli is functional;
 // pinjam-meminjam/sewa-menyewa render disabled with an interest checkbox.
 const UNAVAILABLE_DEAL_TYPES = [
@@ -78,6 +70,17 @@ function FieldError({ msg }: { msg?: string }) {
   return <p className="mt-1 text-xs text-red-600">{msg}</p>;
 }
 
+// Format a raw numeric string with Indonesian thousand-separator (dots).
+// Only formats the display; the hidden input submits the raw digits.
+function formatNominal(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('id-ID');
+}
+
+// Locale-aware placeholder: "1.000.000" instead of "1000000"
+const NOMINAL_PLACEHOLDER = (1000000).toLocaleString('id-ID');
+
 const initialState: CreateDealState = {};
 
 export default function BuatPage() {
@@ -88,6 +91,9 @@ export default function BuatPage() {
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
+  const [itemDesc, setItemDesc] = useState('');
+  const [nominalDisplay, setNominalDisplay] = useState('');
+  const [rawNominal, setRawNominal] = useState('');
   const [rekening, setRekening] = useState('');
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
   const [minDeadline, setMinDeadline] = useState<string | undefined>(undefined);
@@ -217,15 +223,6 @@ export default function BuatPage() {
                 </p>
               );
             })()}
-            <div className="mt-2 flex flex-col gap-1.5">
-              {UNAVAILABLE_ROLE_GROUPS.map((g) => (
-                <div key={g.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                  <span className="font-medium text-zinc-500">{g.label}</span>
-                  <span className="text-zinc-400">·</span>
-                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
-                </div>
-              ))}
-            </div>
             <FieldError msg={fe.proposer_role} />
           </fieldset>
 
@@ -239,25 +236,36 @@ export default function BuatPage() {
               name="item_desc"
               rows={3}
               maxLength={500}
+              value={itemDesc}
+              onChange={(e) => setItemDesc(e.target.value)}
               placeholder={ITEM_DESC_PLACEHOLDER[selectedRole] ?? ITEM_DESC_PLACEHOLDER.LAINNYA}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
             />
+            <p className="mt-1 text-right text-xs text-zinc-400">
+              {itemDesc.length}/500
+            </p>
             <FieldError msg={fe.item_desc} />
           </div>
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700" htmlFor="amount_idr">
+            <label className="block text-sm font-medium text-zinc-700" htmlFor="amount_display">
               Nominal (Rp)
             </label>
             <input
-              id="amount_idr"
-              name="amount_idr"
-              type="number"
-              min={1}
-              step={1}
+              id="amount_display"
+              type="text"
+              inputMode="numeric"
+              value={nominalDisplay}
+              placeholder={NOMINAL_PLACEHOLDER}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, '');
+                setRawNominal(raw);
+                setNominalDisplay(formatNominal(raw));
+              }}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
             />
+            <input type="hidden" name="amount_idr" value={rawNominal} />
             <FieldError msg={fe.amount_idr} />
           </div>
 
@@ -337,10 +345,10 @@ export default function BuatPage() {
           {/* Deadline */}
           <div>
             <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
-              Batas waktu
+              Batas waktu pembayaran
             </label>
             <p className="text-xs text-zinc-500">
-              Tanggal terakhir kesepakatan harus dipenuhi. Setelah lewat, pihak terkait akan diingatkan. Kesepakatan yang tidak ada tindak lanjut dapat berakhir kedaluwarsa.
+              Tanggal terakhir pembeli harus membayar. Jika lewat, penjual akan diingatkan. Tanpa pembayaran, kesepakatan dapat berakhir kedaluwarsa.
             </p>
             <input
               id="deadline"
