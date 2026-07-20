@@ -27,3 +27,8 @@ create policy "service role full access on deal_status_poll_attempts"
   to service_role
   using (true)
   with check (true);
+
+-- Same class of bug as migration 0025/0026 (join_deal_with_event): an RLS
+-- policy alone does not grant table-level privileges, so without this line
+-- service_role could still not SELECT/INSERT here despite the policy above.
+grant select, insert on deal_status_poll_attempts to service_role;
