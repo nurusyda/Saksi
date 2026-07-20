@@ -52,6 +52,14 @@ const UNAVAILABLE_DEAL_TYPES = [
   { key: 'SEWA_MENYEWA', label: DEAL_TYPE_LABELS.SEWA_MENYEWA, fieldName: 'interest_sewa_menyewa' },
 ];
 
+// Locked tier descriptions include a "${price} · " prefix (copy-id.md §6).
+// The card header already shows the price; strip the prefix so the
+// description body shows only the value-proposition text.
+function stripPricePrefix(desc: string): string {
+  const idx = desc.indexOf(' · ');
+  return idx === -1 ? desc : desc.slice(idx + 3);
+}
+
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
   const { pending } = useFormStatus();
   return (
@@ -368,26 +376,28 @@ export default function BuatPage() {
               <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
                 <div className="flex items-center gap-1.5">
                   <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
-                  <span className="text-zinc-400">·</span>
-                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
-                  <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
-                    <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                    {NOTIFY_ME_LABEL}
-                  </label>
+                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                    {SEGERA_HADIR_LABEL}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-zinc-400">{TIER_LIMA_RIBU_DESC}</p>
+                <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
+                <label className="mt-1 flex items-center gap-1 text-zinc-500">
+                  <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
+                  {NOTIFY_ME_LABEL}
+                </label>
               </div>
               <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
                 <div className="flex items-center gap-1.5">
                   <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
-                  <span className="text-zinc-400">·</span>
-                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
-                  <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
-                    <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                    {NOTIFY_ME_LABEL}
-                  </label>
+                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
+                    {SEGERA_HADIR_LABEL}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-zinc-400">{TIER_BERMETERAI_DESC}</p>
+                <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
+                <label className="mt-1 flex items-center gap-1 text-zinc-500">
+                  <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
+                  {NOTIFY_ME_LABEL}
+                </label>
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
