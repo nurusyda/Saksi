@@ -12,10 +12,13 @@ export const ATTESTATIONS: readonly string[] = [
 export const TC_LABEL =
   'Saya menyetujui Syarat & Ketentuan SAKSI: publikasi kesepakatan tidak terpenuhi, hak menjawab dalam 14 hari jika dilaporkan, dan larangan bukti palsu.';
 
-// copy-id.md §15 — description-field placeholder by proposer role
+// copy-id.md §15 — description-field placeholder by proposer role.
+// PENJUAL/PEMBELI shortened 2026-07-20: direct shorthand replaces the
+// long-form "Contoh: …" examples so the input reads as an instruction
+// rather than a sample. Other roles unchanged (not yet selectable).
 export const ITEM_DESC_PLACEHOLDER: Record<string, string> = {
-  PENJUAL: 'Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."',
-  PEMBELI: 'Contoh: "Preorder album [nama grup], termasuk photocard, dikirim setelah rilis."',
+  PENJUAL: 'jual apa, berapa banyak',
+  PEMBELI: 'beli apa, berapa banyak',
   PEMBERI_PINJAMAN: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
   PEMINJAM: 'Contoh: "Pinjaman Rp2.000.000, dikembalikan dalam 30 hari."',
   PEMILIK: 'Contoh: "Sewa kos bulan Agustus, masuk tanggal 1."',
