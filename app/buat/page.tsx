@@ -332,7 +332,7 @@ export default function BuatPage() {
               Batas waktu
             </label>
             <p className="text-xs text-zinc-500">
-              Tanggal terakhir kesepakatan harus dipenuhi. Kesepakatan yang tidak ada tindak lanjut dapat berakhir kedaluwarsa.
+              Tanggal terakhir kesepakatan harus dipenuhi. Setelah lewat, pihak terkait akan diingatkan. Kesepakatan yang tidak ada tindak lanjut dapat berakhir kedaluwarsa.
             </p>
             <input
               id="deadline"

@@ -30,12 +30,21 @@ committed file (checked `ROADMAP.md`, `SESSION_LOG.md`, `data-model.md`) when Ph
 6 work started; it only existed in an earlier conversation. The decision tree below
 was reconstructed and re-confirmed directly before Phase 6 was built.
 
-**Not done:** Phase 6's WA nudge copy and 7-day grace-period number are still
-DRAFT pending review (flagged in `lib/copy.ts`); per-deal-type confirmation labels
-beyond jual-beli (pinjam-meminjam/sewa-menyewa aren't selectable yet — Section B
-gating); the real Fonnte/Meta WA client (`lib/wa/send.ts` is a logging stub);
-`CRON_SECRET` needs to be generated and added to `.env.local` + Vercel project
-settings before the sweep can actually run.
+**Not done:** per-deal-type confirmation labels beyond jual-beli
+(pinjam-meminjam/sewa-menyewa aren't selectable yet — Section B gating);
+pinjam-meminjam's nudge targeting (flagged, not designed, see Phase 6 below).
+
+**Phase 6 update (2026-07-20, later session):** WA nudge copy is locked
+(`copy-id.md` §9a) and `lib/wa/send.ts` is a real Fonnte client, not a stub —
+both landed same-day as the items above. Separately, migration `0018`'s 4
+sweep functions (`get_nudge_candidates`, `get_kedaluwarsa_candidates`,
+`sweep_nudge_with_event`, `sweep_kedaluwarsa_with_event`) turned out to be
+missing their `service_role` EXECUTE grant — this Supabase project runs under
+the new cloud default where new functions aren't auto-exposed to any Data API
+role without an explicit GRANT, so even the cron route's service-role client
+got `42501`. Fixed via migration `0019` (grant to `service_role` only; `anon`
+stays revoked, matching `0018`'s own boundary) and verified with a direct RPC
+probe against both keys.
 
 ---
 
@@ -99,12 +108,14 @@ settings before the sweep can actually run.
       KEDALUWARSA_LAPSED (30 days past deadline, no report ever filed,
       reachable from either state). See migration 0018's header comment.
 - [x] Migration for NUDGE_SENT event (migration 0018 + `lib/db/transitions.ts`)
-- [x] `lib/wa/send.ts` interface stub (not the real Fonnte/Meta client) —
-      `FONNTE_API_KEY` is now live in env (see ops.md), so a real client is
-      buildable whenever that upgrade is prioritized; not done yet
+- [x] `lib/wa/send.ts` — real Fonnte HTTP client, not a stub (`FONNTE_API_KEY`
+      live in env; see ops.md)
 - [x] `CRON_SECRET` generated and set in `.env.local` + Vercel project settings
-- [ ] WA nudge message copy: wording approved, not yet locked into
-      copy-id.md — still a distinct, separate action pending
+- [x] WA nudge message copy locked into `copy-id.md` §9a
+- [x] Migration `0019` — grants `service_role` EXECUTE on 0018's 4 functions,
+      closing a gap where even the cron route's service-role client got
+      `42501` (new-project Data API default doesn't auto-expose new
+      functions). `anon`/`authenticated` deliberately stay revoked.
 - [ ] Pinjam-meminjam's nudge targeting and its `DIKONFIRMASI_TERIMA`
       confirmation-label overlap with `RECEIPT_CONFIRMED` — flagged, not
       designed (see the comment above `nudgeTargetSlot` in
