@@ -25,7 +25,6 @@ import {
   PHONE_FORMAT_HINT,
   NOTIFY_ME_LABEL,
   DEAL_TYPE_LABELS,
-  SEGERA_HADIR_LABEL,
   PENDING_SAVE_LABEL,
 } from '@/lib/copy';
 
@@ -165,13 +164,11 @@ export default function BuatPage() {
               </div>
               {UNAVAILABLE_DEAL_TYPES.map((d) => (
                 <div key={d.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                  <span className="font-medium text-zinc-500">{d.label}</span>
-                  <span className="text-zinc-400">·</span>
-                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
-                  <label className="ml-auto flex items-center gap-1 text-zinc-500">
+                  <label className="flex items-center gap-1 text-zinc-500">
                     <input type="checkbox" name={d.fieldName} className="shrink-0" />
                     {NOTIFY_ME_LABEL}
                   </label>
+                  <span className="font-medium text-zinc-500">{d.label}</span>
                 </div>
               ))}
             </div>
@@ -201,7 +198,7 @@ export default function BuatPage() {
               {SELECTABLE_ROLES.map((r) => (
                 <label
                   key={r.value}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50"
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
                 >
                   <input
                     type="radio"
@@ -347,8 +344,9 @@ export default function BuatPage() {
             <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
               Batas waktu pembayaran
             </label>
+            {/* DRAFT — not yet in copy-id.md. Review wording after seeing in context. */}
             <p className="text-xs text-zinc-500">
-              Tanggal terakhir pembeli harus membayar. Jika lewat, penjual akan diingatkan. Tanpa pembayaran, kesepakatan dapat berakhir kedaluwarsa.
+              Tanggal terakhir pembayaran atau pemenuhan kesepakatan harus terjadi.
             </p>
             <input
               id="deadline"
@@ -380,32 +378,26 @@ export default function BuatPage() {
                   <p className="text-zinc-500">{TIER_GRATIS_DESC}</p>
                 </div>
               </label>
-              {/* Paid tiers — compact "segera hadir" cards */}
+              {/* Paid tiers — compact disabled cards */}
               <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
                 <div className="flex items-center gap-1.5">
+                  <label className="flex items-center gap-1 text-zinc-500">
+                    <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
+                    {NOTIFY_ME_LABEL}
+                  </label>
                   <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
-                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                    {SEGERA_HADIR_LABEL}
-                  </span>
                 </div>
                 <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
-                <label className="mt-1 flex items-center gap-1 text-zinc-500">
-                  <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                  {NOTIFY_ME_LABEL}
-                </label>
               </div>
               <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
                 <div className="flex items-center gap-1.5">
+                  <label className="flex items-center gap-1 text-zinc-500">
+                    <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
+                    {NOTIFY_ME_LABEL}
+                  </label>
                   <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
-                  <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                    {SEGERA_HADIR_LABEL}
-                  </span>
                 </div>
                 <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
-                <label className="mt-1 flex items-center gap-1 text-zinc-500">
-                  <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                  {NOTIFY_ME_LABEL}
-                </label>
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
