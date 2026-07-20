@@ -200,7 +200,13 @@ export async function createDeal(
     })
     .single();
 
-  if (dealErr || !deal) return { error: ERROR_DEAL_SAVE_FAILED };
+  if (dealErr || !deal) {
+    // Log only the Postgres error code, never the full error object — its
+    // `details` field can embed submitted values (e.g. a constraint
+    // violation quoting rekening_tujuan), which would put PII in server logs.
+    if (dealErr) console.error('create_deal_with_event failed', dealErr.code);
+    return { error: ERROR_DEAL_SAVE_FAILED };
+  }
 
   void submitAnchor(newHash);
 

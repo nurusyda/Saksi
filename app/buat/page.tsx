@@ -6,6 +6,7 @@ import { createDeal, checkAccountHistory, type CreateDealState, type AccountHist
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
+import { getTomorrowWib } from '@/lib/format';
 import {
   ATTESTATIONS,
   ITEM_DESC_PLACEHOLDER,
@@ -88,7 +89,16 @@ export default function BuatPage() {
   const [customBank, setCustomBank] = useState('');
   const [rekening, setRekening] = useState('');
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
+  const [minDeadline, setMinDeadline] = useState<string | undefined>(undefined);
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
+
+  // Computed client-side (not inline at render) so the WIB "tomorrow" the
+  // date picker enforces matches getTodayWib()'s server-side check exactly —
+  // a local-clock Date() here would drift for non-WIB browsers and could
+  // also disagree between SSR and hydration.
+  useEffect(() => {
+    setMinDeadline(getTomorrowWib());
+  }, []);
 
   useEffect(() => {
     if (!effectiveBank || !rekening) {
@@ -143,8 +153,8 @@ export default function BuatPage() {
           <fieldset>
             <legend className="text-sm font-medium text-zinc-700">Jenis transaksi</legend>
             <div className="mt-2 flex flex-col gap-2">
-              <div className="flex cursor-default items-center gap-2 rounded-lg border border-zinc-900 bg-zinc-50 px-3 py-2 text-sm">
-                <span className="font-medium text-zinc-900">{DEAL_TYPE_LABELS.JUAL_BELI}</span>
+              <div className="flex cursor-default items-center gap-2 rounded-lg border border-blue-600 bg-blue-50 px-3 py-2 text-sm">
+                <span className="font-medium text-blue-900">{DEAL_TYPE_LABELS.JUAL_BELI}</span>
               </div>
               {UNAVAILABLE_DEAL_TYPES.map((d) => (
                 <div key={d.key} className="rounded-lg border border-zinc-200 p-3 text-sm">
@@ -330,7 +340,7 @@ export default function BuatPage() {
               id="deadline"
               name="deadline"
               type="date"
-              min={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })()}
+              min={minDeadline}
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
             />
             <FieldError msg={fe.deadline} />
@@ -344,7 +354,7 @@ export default function BuatPage() {
                 t.value === 'GRATIS' ? (
                   <label
                     key={t.value}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
                   >
                     <input
                       type="radio"
@@ -354,7 +364,7 @@ export default function BuatPage() {
                       className="mt-0.5 shrink-0"
                     />
                     <div>
-                      <span className="font-medium text-zinc-900">{t.label}</span>
+                      <span className="font-medium text-blue-900">{t.label}</span>
                       <p className="text-zinc-500">{t.desc}</p>
                     </div>
                   </label>

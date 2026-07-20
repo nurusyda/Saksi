@@ -41,3 +41,12 @@ export function getTodayWib(): string {
   const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
   return new Date(Date.now() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 }
+
+// The deadline input's client-side `min` must agree with getTodayWib()'s
+// server-side check ("deadline > today in WIB"), or the calendar picker can
+// silently allow a date the server then rejects. Same WIB anchor, +1 day.
+export function getTomorrowWib(): string {
+  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  return new Date(Date.now() + WIB_OFFSET_MS + ONE_DAY_MS).toISOString().slice(0, 10);
+}
