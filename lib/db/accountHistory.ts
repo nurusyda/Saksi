@@ -1,23 +1,42 @@
 // Shared account-history lookup — used by the ungated informational check on
-// the create-deal form (Phase 0.5) and, later, the real gated forced-check
-// page (Phase 3). Server-only: queries the raw `deals` table directly (its
-// unmasked rekening_tujuan). anon/authenticated no longer have table-level
-// SELECT on `deals` at all (closed in migration 0009 — public reads must go
-// through the masked `deals_public` view), but this function still only ever
-// runs behind the service-role client. Never call this from a client
-// component; only from a Server Action.
+// the create-deal form (Phase 0.5), the gated forced-check page (Phase 3),
+// and (build step 4, B5) the public /cek page. Server-only: queries the raw
+// `deals` table directly (its unmasked rekening_tujuan). anon/authenticated
+// no longer have table-level SELECT on `deals` at all (closed in migration
+// 0009 — public reads must go through the masked `deals_public` view), but
+// this function still only ever runs behind the service-role client. Never
+// call this from a client component; only from a Server Action.
 //
 // Matches on bank + rekening_tujuan together, not rekening_tujuan alone —
 // each bank keeps its own independent account numbering, so two different
 // banks can have accounts sharing the same number. Dropping bank from the
 // match would risk attributing one account's history to an unrelated account
 // at a different bank.
+//
+// GATE 1 fix (2026-07-20): tidakDipenuhiCount/klaimBerbedaAktifCount used to
+// be counted directly off deals.status, with no awareness of
+// flags.published_at — meaning the instant a report was filed, its rung-0
+// claim was already visible here, bypassing the entire 14-day hak-jawab
+// window and the publication feature flag built in migration 0023. Both
+// existing callers (checkAccountHistory, getDealAccountHistory) only ever
+// project selesaiCount/tidakDipenuhiCount/sinceLabel out of this function's
+// return value, so fixing the gate here fixes it everywhere at once —
+// nothing downstream needed to change.
 
 import { supabaseServer } from '@/lib/supabase/server';
 
 export interface AccountHistory {
   selesaiCount: number;
+  dibatalkanBersamaCount: number;
+  tidakDilanjutkanCount: number;
+  kedaluwarsaCount: number;
+  dikembalikanPenuhCount: number;
+  dikembalikanSebagianCount: number;
+  // Published-only (flags.published_at is not null) — see the gate-fix note
+  // above. An unpublished report (still within its 14-day window, or
+  // publication not yet enabled) contributes to neither bucket.
   tidakDipenuhiCount: number;
+  klaimBerbedaAktifCount: number;
   sinceLabel: string; // e.g. "Maret 2026"
 }
 
@@ -41,32 +60,133 @@ export function maskRekening(rekening: string): string {
   return `${first}${middle}${last}`;
 }
 
-export async function getAccountHistory(
-  bank: string,
-  rekening: string,
+// Extracted from lib/wa/send.ts (was a private logging-only helper there)
+// for B5's public results display — same first-4+last-2 style, now also
+// used for a phone the visitor typed into the /cek lookup form themselves.
+// Masked even in that case: the results screen can be screenshotted/shared,
+// and no public surface in this app shows a full phone number, including
+// one shown back to the person who just typed it.
+export function maskPhone(phoneE164: string): string {
+  if (phoneE164.length <= 6) return phoneE164;
+  const first = phoneE164.slice(0, 4);
+  const last = phoneE164.slice(-2);
+  return `${first}${'•'.repeat(phoneE164.length - 6)}${last}`;
+}
+
+type DealForHistory = { id: string; status: string; created_at: string };
+
+async function buildHistoryFromDeals(
+  db: ReturnType<typeof supabaseServer>,
+  deals: DealForHistory[],
 ): Promise<AccountHistoryResult> {
-  const db = supabaseServer();
-  const { data, error } = await db
-    .from('deals')
-    .select('status, created_at')
-    .eq('rekening_bank', bank)
-    .eq('rekening_tujuan', rekening)
-    .neq('status', 'DRAF');
+  if (deals.length === 0) return { status: 'empty' };
 
-  if (error) return { status: 'error' };
-  if (!data || data.length === 0) return { status: 'empty' };
+  const selesaiCount = deals.filter((d) => d.status === 'SELESAI').length;
+  const dibatalkanBersamaCount = deals.filter((d) => d.status === 'DIBATALKAN_BERSAMA').length;
+  const tidakDilanjutkanCount = deals.filter((d) => d.status === 'TIDAK_DILANJUTKAN').length;
+  const kedaluwarsaCount = deals.filter((d) => d.status === 'KEDALUWARSA').length;
+  const dikembalikanPenuhCount = deals.filter((d) => d.status === 'DIKEMBALIKAN_PENUH').length;
+  const dikembalikanSebagianCount = deals.filter((d) => d.status === 'DIKEMBALIKAN_SEBAGIAN').length;
 
-  const selesaiCount = data.filter((d) => d.status === 'SELESAI').length;
-  const tidakDipenuhiCount = data.filter((d) => d.status === 'TIDAK_DIPENUHI').length;
-  const earliest = data.reduce(
-    (min, d) => (d.created_at < min ? d.created_at : min),
-    data[0].created_at,
-  );
+  const tidakDipenuhiIds = deals.filter((d) => d.status === 'TIDAK_DIPENUHI').map((d) => d.id);
+  let tidakDipenuhiCount = 0;
+  let klaimBerbedaAktifCount = 0;
+  if (tidakDipenuhiIds.length > 0) {
+    const { data: flags, error: flagsErr } = await db
+      .from('flags')
+      .select('deal_id, hak_jawab_status, published_at')
+      .in('deal_id', tidakDipenuhiIds);
+    if (flagsErr) return { status: 'error' };
+    // Once published, both outcomes converge on deals.status = TIDAK_DIPENUHI
+    // (migration 0023: the silent branch stays there, the disputed branch
+    // demotes SENGKETA back to it) — flags.hak_jawab_status is what actually
+    // distinguishes the two buckets at that point.
+    for (const f of flags ?? []) {
+      if (!f.published_at) continue; // unpublished; counts toward neither bucket
+      if (f.hak_jawab_status === 'KADALUARSA') tidakDipenuhiCount++;
+      else if (f.hak_jawab_status === 'DISPUTED') klaimBerbedaAktifCount++;
+    }
+  }
+
+  const earliest = deals.reduce((min, d) => (d.created_at < min ? d.created_at : min), deals[0].created_at);
   const sinceLabel = new Intl.DateTimeFormat('id-ID', {
     month: 'long',
     year: 'numeric',
     timeZone: 'Asia/Jakarta',
   }).format(new Date(earliest));
 
-  return { status: 'found', history: { selesaiCount, tidakDipenuhiCount, sinceLabel } };
+  return {
+    status: 'found',
+    history: {
+      selesaiCount,
+      dibatalkanBersamaCount,
+      tidakDilanjutkanCount,
+      kedaluwarsaCount,
+      dikembalikanPenuhCount,
+      dikembalikanSebagianCount,
+      tidakDipenuhiCount,
+      klaimBerbedaAktifCount,
+      sinceLabel,
+    },
+  };
+}
+
+export async function getAccountHistory(bank: string, rekening: string): Promise<AccountHistoryResult> {
+  const db = supabaseServer();
+  const { data, error } = await db
+    .from('deals')
+    .select('id, status, created_at')
+    .eq('rekening_bank', bank)
+    .eq('rekening_tujuan', rekening)
+    .neq('status', 'DRAF');
+
+  if (error) return { status: 'error' };
+  return buildHistoryFromDeals(db, data ?? []);
+}
+
+// B5 — public /cek lookup by phone. phoneHash is computed by the caller
+// (server action) before this is ever called; the raw phone number never
+// reaches this function or any query log. A phone can appear as either
+// proposer or counterpart across different deals, so this matches both
+// party slots via their parties.phone_hash.
+export async function getAccountHistoryByPhoneHash(phoneHash: string): Promise<AccountHistoryResult> {
+  const db = supabaseServer();
+  // Bug found by monster_check: this used to fetch a single `parties` row via
+  // .maybeSingle(), but a phone gets its own party row per deal it's in
+  // (proposer or counterpart) — any phone with more than one deal has more
+  // than one matching row, and .maybeSingle() errors the instant a second row
+  // exists. Fetch every matching row instead, so an active phone's lookup
+  // works exactly like an inactive one instead of failing loudest for the
+  // most-used numbers.
+  const { data: parties, error: partiesErr } = await db
+    .from('parties')
+    .select('id')
+    .eq('phone_hash', phoneHash);
+
+  if (partiesErr) return { status: 'error' };
+  if (!parties || parties.length === 0) return { status: 'empty' };
+
+  // Two plain .in() queries merged here, not a single .or()-with-nested-.in()
+  // filter: PostgREST's or-filter mini-language doesn't use SQL-style value
+  // quoting (unlike what monster_check's first pass suggested), so an
+  // interpolated `.or('proposer_id.in.(...),counterpart_id.in.(...)')` string
+  // would either be correct or subtly wrong depending on paren-nesting
+  // behavior that isn't worth betting on here. Two typed queries sidestep the
+  // question entirely. A party row belongs to exactly one deal/slot, so the
+  // two result sets can't overlap in practice, but dealsById still dedupes
+  // defensively rather than assuming that invariant holds forever.
+  const partyIds = parties.map((p) => p.id);
+  const [proposerDeals, counterpartDeals] = await Promise.all([
+    db.from('deals').select('id, status, created_at').in('proposer_id', partyIds).neq('status', 'DRAF'),
+    db.from('deals').select('id, status, created_at').in('counterpart_id', partyIds).neq('status', 'DRAF'),
+  ]);
+
+  if (proposerDeals.error || counterpartDeals.error) return { status: 'error' };
+
+  const dealsById = new Map<string, DealForHistory>();
+  for (const d of [...(proposerDeals.data ?? []), ...(counterpartDeals.data ?? [])]) {
+    dealsById.set(d.id, d);
+  }
+
+  return buildHistoryFromDeals(db, Array.from(dealsById.values()));
 }

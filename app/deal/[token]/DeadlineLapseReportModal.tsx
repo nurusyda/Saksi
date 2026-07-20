@@ -2,20 +2,20 @@
 
 import { useActionState, useState } from 'react';
 import {
-  sendBreachReportOtp,
-  verifyBreachReportOtpAction,
-  fileBarangTidakSesuaiReport,
+  sendDeadlineLapseOtp,
+  verifyDeadlineLapseOtpAction,
+  fileDeadlineLapseReport,
   type SendOtpState,
   type VerifyOtpState,
   type FileReportState,
 } from './breachActions';
 import { StepButton } from './StepButton';
 import {
-  BARANG_TIDAK_SESUAI_PROMPT,
+  DEADLINE_LAPSE_PROMPT,
+  DEADLINE_LAPSE_MODAL_HEADING,
+  MODAL_CLOSE_LABEL,
   BARANG_TIDAK_SESUAI_CONSEQUENCES,
   BARANG_TIDAK_SESUAI_SUBMIT_LABEL,
-  BARANG_TIDAK_SESUAI_MODAL_HEADING,
-  MODAL_CLOSE_LABEL,
   OTP_STEP_HEADING,
   OTP_SEND_BUTTON_LABEL,
   OTP_RESEND_BUTTON_LABEL,
@@ -25,17 +25,16 @@ import {
   PENDING_DEFAULT_LABEL,
 } from '@/lib/copy';
 
-// C6 — real report filing (build step 4). Three steps, all gated on the
-// reporter's own already-known phone (passed down from PembeliPanel, which
-// only renders after IdentifyPartyGate already confirmed this visitor is
-// the Pembeli — no phone re-entry needed here):
-//   1. Write the note, request an OTP code.
-//   2. Enter the code (verifyBreachReportOtpAction).
-//   3. Submit (fileBarangTidakSesuaiReport) — only reachable once verified.
-// Every step still re-verifies identity server-side independently (see
-// breachActions.ts); nothing here is trusted client state.
+// Build step 4 follow-on — the DIBAYAR_DIKLAIM "ghost seller" entry point
+// into the breach path. Mirrors BarangTidakSesuaiModal's structure exactly
+// (same three-step OTP flow, same server-verified identity at every step —
+// nothing here is trusted client state); the two differences are the
+// prompt/heading framing and that the note is optional (no goods-mismatch
+// claim to describe, so submit isn't gated on non-empty text). The
+// consequences list and submit label are reused verbatim from the C6
+// constants — their content is already state-agnostic.
 
-export function BarangTidakSesuaiModal({
+export function DeadlineLapseReportModal({
   token,
   phone,
   itemDesc,
@@ -49,15 +48,15 @@ export function BarangTidakSesuaiModal({
   const [note, setNote] = useState('');
   const [code, setCode] = useState('');
 
-  const boundSendOtp = sendBreachReportOtp.bind(null, token, phone);
+  const boundSendOtp = sendDeadlineLapseOtp.bind(null, token, phone);
   const sendInitialState: SendOtpState = {};
   const [sendState, sendFormAction] = useActionState(boundSendOtp, sendInitialState);
 
-  const boundVerifyOtp = verifyBreachReportOtpAction.bind(null, token, phone);
+  const boundVerifyOtp = verifyDeadlineLapseOtpAction.bind(null, token, phone);
   const verifyInitialState: VerifyOtpState = {};
   const [verifyState, verifyFormAction] = useActionState(boundVerifyOtp, verifyInitialState);
 
-  const boundFileReport = fileBarangTidakSesuaiReport.bind(null, token, phone);
+  const boundFileReport = fileDeadlineLapseReport.bind(null, token, phone);
   const fileInitialState: FileReportState = {};
   const [fileState, fileFormAction] = useActionState(boundFileReport, fileInitialState);
 
@@ -68,7 +67,7 @@ export function BarangTidakSesuaiModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5">
         <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 className="text-base font-semibold text-zinc-900">{BARANG_TIDAK_SESUAI_MODAL_HEADING}</h2>
+          <h2 className="text-base font-semibold text-zinc-900">{DEADLINE_LAPSE_MODAL_HEADING}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -82,7 +81,7 @@ export function BarangTidakSesuaiModal({
           {itemDesc}
         </div>
 
-        <p className="mb-2 text-sm font-medium text-zinc-700">{BARANG_TIDAK_SESUAI_PROMPT}</p>
+        <p className="mb-2 text-sm font-medium text-zinc-700">{DEADLINE_LAPSE_PROMPT}</p>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -105,15 +104,7 @@ export function BarangTidakSesuaiModal({
                 {sendState.error}
               </p>
             )}
-            {/* Bug found by monster_check: without this guard, sending the
-                OTP before typing a note locks the note field (disabled once
-                otpSent) while the final submit stays disabled on an empty
-                note — a dead end with no way out but closing the modal. */}
-            <StepButton
-              label={OTP_SEND_BUTTON_LABEL}
-              pendingLabel={PENDING_DEFAULT_LABEL}
-              disabled={!note.trim()}
-            />
+            <StepButton label={OTP_SEND_BUTTON_LABEL} pendingLabel={PENDING_DEFAULT_LABEL} />
           </form>
         )}
 
@@ -165,11 +156,7 @@ export function BarangTidakSesuaiModal({
                 {fileState.error}
               </p>
             )}
-            <StepButton
-              label={BARANG_TIDAK_SESUAI_SUBMIT_LABEL}
-              pendingLabel={PENDING_DEFAULT_LABEL}
-              disabled={!note.trim()}
-            />
+            <StepButton label={BARANG_TIDAK_SESUAI_SUBMIT_LABEL} pendingLabel={PENDING_DEFAULT_LABEL} />
           </form>
         )}
       </div>

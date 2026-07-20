@@ -121,6 +121,15 @@ Fired once per transition, to whichever party must act next:
 - **Receipt confirmed (→ DIKONFIRMASI_TERIMA), to the payer:**
   > Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("[deskripsi]"). Buka [url] untuk mengonfirmasi barang diterima.
 
+## 9c. Breach-path WA notifications (locked 2026-07-20)
+
+*Sender identity: same as §9/§9a/§9b — `SAKSI (saksi.app)`. Shipped and in production use (see `lib/copy.ts`'s `formatBreachReportFiledMessage`/`formatHakJawabFiledMessage`). Reviewed 2026-07-20: internal state names replaced with the "klaim berbeda" user-facing wording (§8's rule — never surface "sengketa"/dispute language, even in reference docs).*
+
+- **Report filed (→ TIDAK_DIPENUHI), to the flagged party — the highest-sensitivity string in this set: states the fact and the window, no accusation language, no verdict:**
+  > Laporan diajukan untuk kesepakatan SAKSI Anda ("[deskripsi]"). Anda memiliki 14 hari untuk menanggapi. Buka [url] untuk melihat detail.
+- **Hak jawab filed (status becomes "klaim berbeda"), to the original reporter:**
+  > Pihak penjual telah menanggapi laporan pada kesepakatan SAKSI Anda ("[deskripsi]"). Buka [url] untuk melihat tanggapannya.
+
 ## 10. Meterai mock label (demo only)
 
 > Simulasi meterai elektronik. Integrasi distributor resmi Peruri pada rilis produksi. Dokumen ini belum bermeterai.
@@ -262,7 +271,7 @@ Started as DRAFT in the Section C build; reviewed against this file's own forbid
 - Penjual's ship instruction: `Uang telah dikonfirmasi diterima. Kirim barang sesuai kesepakatan.`
 - "Barang tidak sesuai" entry button: `Barang tidak sesuai kesepakatan`
 
-**C6 — "Barang tidak sesuai" stub (submit is permanently disabled; no RPC call on submit attempt until OTP-gated reporting is built):**
+**C6 — "Barang tidak sesuai" report filing (live, OTP-gated — see §17 for the OTP step and modal chrome; shipped build step 4, 2026-07-20):**
 - Prompt: `Bagian mana dari keterangan di atas yang tidak dipenuhi?`
 - Consequences list:
   1. `Laporan tercatat sebagai klaim Anda, bukan putusan SAKSI.`
@@ -270,8 +279,8 @@ Started as DRAFT in the Section C build; reviewed against this file's own forbid
   3. `Laporan Anda dan tanggapan pihak lain (jika ada) sama-sama tercatat permanen di catatan rekening ini.`
   4. `SAKSI tidak menengahi dan tidak mengembalikan dana.`
   5. `Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini.` — **corrected during locking review**: the original draft said "Identitas pelapor terverifikasi... atas nama Anda," which overclaimed identity verification when only phone/OTP verification is actually performed at report-filing time (breach filing is free and phone-OTP-gated at every tier, including GRATIS, which verifies nothing else about the person — §8's rule that "terverifikasi" may only modify a fact, never a person's character, applies here).
-- Gate banner (shown while submit stays disabled): `Fitur pelaporan memerlukan verifikasi nomor HP (OTP), belum tersedia. Kami akan memberi tahu saat siap.`
-- Submit button label (disabled): `Kirim Laporan`
+- Submit button label: `Kirim Laporan`
+- **Retired**: the gate banner (`Fitur pelaporan memerlukan verifikasi nomor HP (OTP), belum tersedia...`) described the pre-OTP stub state and no longer applies now that filing is live. Not reused for a future stub — write a new banner if one is needed later.
 
 **C7 — SELESAI (minimal, both sides identical, no action buttons; pending a real design pass):**
 > Kesepakatan selesai. Tercatat di SAKSI.
@@ -288,6 +297,65 @@ Started as DRAFT in the Section C build; reviewed against this file's own forbid
 | `BUKTI_UPLOADED` | `Bukti transfer diunggah` |
 | `RECEIPT_CONFIRMED` | `Penerimaan dana dikonfirmasi` |
 | `FULFILLMENT_CONFIRMED` | `Barang/pemenuhan dikonfirmasi` |
+| `TENGGAT_LEWAT` | `Laporan diajukan: kesepakatan tidak dipenuhi` |
+| `HAK_JAWAB_FILED` | `Tanggapan pihak terlapor diajukan` |
+
+## 17. Breach-path screens (locked 2026-07-20)
+
+Backfilled per the Tier B copy-lock discipline: these strings were drafted directly in `lib/copy.ts` and shipped ahead of being added here; content unchanged from what's live in production. Reviewed 2026-07-20 against §8 (trust-washing/forbidden-words) and the fact-not-person rule — confirmed the deadline-lapse entry point (below) can only ever fire from `DIBAYAR_DIKLAIM`, i.e. after the buyer has already claimed payment, so "Kesepakatan tidak dipenuhi setelah batas waktu" never mislabels an unpaid, never-shipped deal as a breach — that case resolves to `TIDAK_DILANJUTKAN`/`KEDALUWARSA` instead, per ROADMAP.md, and is not reachable through this button at all. `SENGKETA` state name replaced with "klaim berbeda" wording throughout, same as §9c.
+
+**Modal chrome (shared by both report-filing modals):**
+- "Barang tidak sesuai" modal heading: `Barang Tidak Sesuai Kesepakatan`
+- Deadline-lapse modal heading: `Laporkan Kesepakatan Tidak Dipenuhi`
+- Close button (both modals): `Tutup`
+
+**OTP step (inside both report-filing modals, after the note/prompt, before submit):**
+- Step heading: `Verifikasi nomor HP Anda untuk melanjutkan laporan.`
+- Send-code button: `Kirim kode verifikasi`
+- Resend-code button: `Kirim ulang kode`
+- Code field label: `Kode verifikasi`
+- Code format hint: `6 digit, berlaku 5 menit`
+- Verify button: `Verifikasi`
+- Error, send failed: `Gagal mengirim kode. Coba lagi.`
+- Error, send rate-limited: `Terlalu banyak permintaan kode. Coba lagi dalam satu jam.`
+- Error, code invalid/expired: `Kode salah atau sudah kedaluwarsa.`
+- Error, too many verify attempts: `Terlalu banyak percobaan. Minta kode baru.`
+- Error, filing itself failed after verification: `Gagal mencatat laporan. Coba lagi.`
+
+**Deadline-lapse entry point (the "ghost seller" second report path — DIBAYAR_DIKLAIM, deadline passed, Penjual never confirmed receipt; mirrors C6 exactly except the claim is system-derivable, so the note is optional):**
+- Entry button: `Kesepakatan tidak dipenuhi setelah batas waktu`
+- Note prompt (optional, unlike C6's required field note): `Catatan tambahan tentang kesepakatan ini (opsional):`
+- Error, deadline not yet passed: `Batas waktu kesepakatan ini belum terlewati.`
+
+**TIDAK_DIPENUHI / klaim berbeda screens (state-agnostic — renders the same regardless of which of the two report paths above produced it):**
+- Reporter's waiting state: `Laporan Anda tercatat. Menunggu tanggapan pihak penjual (14 hari sejak laporan diajukan).`
+- Flagged party's heading: `Laporan diterima: kesepakatan dianggap tidak dipenuhi.`
+- Reporter's field-note label: `Catatan pelapor:`
+- Status line once hak jawab is filed: `Status: klaim berbeda.`
+
+**Hak jawab response form (flagged party, within the 14-day window):**
+- Response note label (optional): `Catatan tanggapan Anda (opsional)`
+- Evidence attachment label (optional — offered only as a response to being reported, never proactively): `Lampirkan bukti pendukung (opsional)`
+- Evidence attachment hint: `Jika mengunggah mutasi rekening, sertakan seluruh rentang tanggal yang diklaim, bukan potongan sebagian.`
+- Evidence view link (shown to both parties once attached): `Lihat bukti pendukung`
+- Submit button: `Kirim Tanggapan`
+- Error, window closed: `Jendela 14 hari untuk menanggapi telah berakhir.`
+- Error, response failed: `Gagal mencatat tanggapan. Coba lagi.`
+
+## 18. Public check page (`/cek`) — locked 2026-07-20
+
+Live in production, backfilled here for the record. **GATE 2 reminder:** this page stays `noindex` and unlinked from anywhere else in the app regardless of copy status — see `app/cek/page.tsx`'s header comment. Locking this copy does not authorize un-gating the page.
+
+- Page heading: `Cek rekening atau nomor HP`
+- Lookup mode tabs: `Rekening` / `Nomor HP`
+- Bank field label: `Bank`
+- Rekening field label: `Nomor rekening`
+- Phone field label: `Nomor HP` — deliberately not "Nomor HP Anda" (§12's join-flow wording): that phrasing assumes the visitor is entering their own number, which isn't true here, where the number being checked could be anyone's.
+- Submit button: `Cek riwayat`
+- Error, invalid input: `Masukkan bank dan nomor rekening, atau nomor HP yang valid.`
+- Error, rate-limited (anti-enumeration guard, not a per-user abuse limit): `Terlalu banyak permintaan. Coba lagi dalam beberapa menit.`
+- Result line format: extends §2's forced-check line to the full 8-bucket set per data-model.md's profile-page spec — `[identifier] · [N] selesai · [N] dibatalkan bersama · [N] tidak dilanjutkan · [N] kedaluwarsa · [N] dikembalikan penuh · [N] dikembalikan sebagian · [N] tidak dipenuhi · [N] klaim berbeda aktif · tercatat sejak [tgl]`
+- Empty state: reuses §2's locked line verbatim, unmodified: `Belum ada riwayat di SAKSI. Ini bukan jaminan aman. Sebagian besar rekening belum tercatat.`
 
 **Waiting-state fill-ins (the non-active-party side of each merged status page; not explicitly specced in the original build order, minimal placeholders):**
 - Penjual waiting at DISEPAKATI: `Menunggu pihak pembeli mengunggah bukti transfer.`

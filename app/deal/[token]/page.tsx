@@ -192,7 +192,7 @@ export default async function DealPage({
 
         {deal.status === DealStatus.DIBAYAR_DIKLAIM && (
           <DibayarDiklaimPanel
-            deal={{ token, proposer_role: deal.proposer_role }}
+            deal={{ token, proposer_role: deal.proposer_role, item_desc: deal.item_desc, deadline: deal.deadline }}
             initialWhichParty={partySession}
           />
         )}

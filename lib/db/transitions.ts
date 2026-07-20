@@ -47,16 +47,35 @@ export const DealEventName = {
   // deadline-driven and exempt from report-gating — wrong; verified against
   // content/legal/syarat-ketentuan.md §4.1, "pihak yang dirugikan *dapat*
   // mengajukan laporan" (the wronged party *may* file — optional, never
-  // automatic). This is gated on an actual breach report being filed, for
-  // BOTH DIBAYAR_DIKLAIM and DIKONFIRMASI_TERIMA — a feature that doesn't
-  // exist yet (Section C6 is a stub). The deadline sweep (Phase 6) never
-  // fires this event for either state; that wiring belongs entirely to the
-  // future report-filing RPC. See migration 0018's header comment.
+  // automatic). Gated on an actual breach report being filed, for BOTH
+  // DIBAYAR_DIKLAIM (breachActions.ts's fileDeadlineLapseReport, migration
+  // 0021) and DIKONFIRMASI_TERIMA (fileBarangTidakSesuaiReport, migration
+  // 0020). The deadline sweep (Phase 6) never fires this event for either
+  // state — that wiring belongs entirely to those two report-filing RPCs,
+  // by design, not because it's unbuilt. See migration 0018's header
+  // comment for the original reasoning.
   TENGGAT_LEWAT: 'TENGGAT_LEWAT',
   // Flagged party files hak jawab within 14-day window
   HAK_JAWAB_FILED: 'HAK_JAWAB_FILED',
-  // 14-day hak jawab + 14-day sengketa silence elapsed
+  // System, build step 4 (migration 0023): fires at a single T+14-day
+  // checkpoint from the original TENGGAT_LEWAT event — NOT a second
+  // sequential silence timer starting from HAK_JAWAB_FILED (an earlier
+  // version of this comment said "14-day hak jawab + 14-day sengketa
+  // silence elapsed"; corrected after resolving a conflict against
+  // copy-id.md §1's DISPUTED suffix, which is worded as permanent once a
+  // response exists — a second silence window would eventually publish a
+  // false "tidak merespons" sentence for a deal that has a real response on
+  // record). Publishes the flag with the DISPUTED wording and demotes
+  // SENGKETA back to TIDAK_DIPENUHI as the terminal resting status,
+  // regardless of how long the dispute has otherwise been sitting. See
+  // publish_flag_disputed_with_event.
   SENGKETA_KADALUARSA: 'SENGKETA_KADALUARSA',
+  // System, build step 4 (migration 0023): the MENUNGGU-branch mirror of
+  // SENGKETA_KADALUARSA above — same T+14-day-from-filing checkpoint, fired
+  // when hak_jawab_status is still MENUNGGU at that point (nobody ever
+  // responded). Self-transition on TIDAK_DIPENUHI. See
+  // publish_flag_silent_with_event.
+  FLAG_PUBLISHED: 'FLAG_PUBLISHED',
   // System: 30+ days of silence past deadline with no laporan ever filed —
   // quiet, no-blame terminal outcome. Reachable from both DIBAYAR_DIKLAIM
   // and DIKONFIRMASI_TERIMA (unified in the sweep, migration 0018); the two
@@ -120,6 +139,7 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
   [DealStatus.DIKEMBALIKAN_SEBAGIAN]: [],
   [DealStatus.TIDAK_DIPENUHI]: [
     { event: DealEventName.HAK_JAWAB_FILED, next: DealStatus.SENGKETA },
+    { event: DealEventName.FLAG_PUBLISHED, next: DealStatus.TIDAK_DIPENUHI }, // self
   ],
   [DealStatus.SENGKETA]: [
     { event: DealEventName.SENGKETA_KADALUARSA, next: DealStatus.TIDAK_DIPENUHI },

@@ -4,6 +4,8 @@
 // right now. The OTP verification *flow* itself (a separate, unbuilt
 // feature) is still deferred until build step 4 regardless of this client.
 
+import { maskPhone } from '@/lib/db/accountHistory';
+
 const FONNTE_API_URL = 'https://api.fonnte.com/send';
 
 export interface WaMessage {
@@ -22,24 +24,47 @@ export interface WaMessage {
     | 'RECEIPT_CONFIRMED'
     | 'PAYMENT_NOT_RECEIVED'
     // Build step 4 (breach path) — copy-id.md §9's AUTHENTICATION-category
-    // OTP message, and the two report-filing turn-taking nudges.
+    // OTP message, and the report-filing turn-taking nudges. Two distinct
+    // FILED literals (same message text, formatBreachReportFiledMessage)
+    // purely so [wa] logs distinguish which entry point fired.
     | 'OTP_BREACH_REPORT'
     | 'BARANG_TIDAK_SESUAI_FILED'
+    | 'DEADLINE_LAPSE_FILED'
     | 'HAK_JAWAB_FILED';
   params: Record<string, string>;
-}
-
-// Same first+last masking style as maskRekening (lib/db/accountHistory.ts).
-function maskPhone(phoneE164: string): string {
-  if (phoneE164.length <= 6) return phoneE164;
-  const first = phoneE164.slice(0, 4);
-  const last = phoneE164.slice(-2);
-  return `${first}${'•'.repeat(phoneE164.length - 6)}${last}`;
 }
 
 /** Strip the + from E.164 so Fonnte receives 628xx, not +628xx. */
 function e164ToFonnteTarget(phoneE164: string): string {
   return phoneE164.replace(/^\+/, '');
+}
+
+// Single source of truth for "did Fonnte actually accept this send" — HTTP
+// status and body-level acceptance are two independent gates (Fonnte
+// returns 200 even on a rejected send: invalid target, out-of-package,
+// device disconnected), and collapsing them into one function avoids the
+// two-sequential-guard-block shape where a future edit could touch one gate
+// without noticing the other still needs to hold. Neither the response body
+// nor the message text is logged (may echo content back).
+async function wasFonnteSendAccepted(resp: Response, masked: string): Promise<boolean> {
+  if (!resp.ok) {
+    console.error(`[wa] Fonnte API ${resp.status} for ${masked}`);
+    return false;
+  }
+
+  let body: unknown;
+  try {
+    body = await resp.json();
+  } catch {
+    console.error(`[wa] Fonnte API returned non-JSON body for ${masked}`);
+    return false;
+  }
+
+  const accepted = typeof body === 'object' && body !== null && (body as { status?: unknown }).status === true;
+  if (!accepted) {
+    console.error(`[wa] Fonnte rejected send for ${masked}`);
+  }
+  return accepted;
 }
 
 export async function sendWaMessage(msg: WaMessage): Promise<{ sent: boolean }> {
@@ -77,10 +102,7 @@ export async function sendWaMessage(msg: WaMessage): Promise<{ sent: boolean }> 
 
     clearTimeout(timer);
 
-    if (!resp.ok) {
-      // Log status only, not the Fonnte response body (may contain the
-      // message text echoed back).
-      console.error(`[wa] Fonnte API ${resp.status} for ${masked}`);
+    if (!(await wasFonnteSendAccepted(resp, masked))) {
       return { sent: false };
     }
 

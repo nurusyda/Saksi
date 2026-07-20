@@ -20,6 +20,9 @@ import {
   TIDAK_DIPENUHI_FLAGGED_HEADING,
   TIDAK_DIPENUHI_FIELD_NOTE_LABEL,
   HAK_JAWAB_NOTE_LABEL,
+  HAK_JAWAB_EVIDENCE_LABEL,
+  HAK_JAWAB_EVIDENCE_HINT,
+  HAK_JAWAB_EVIDENCE_LINK_LABEL,
   HAK_JAWAB_SUBMIT_LABEL,
   SENGKETA_STATUS_LINE,
   PENDING_DEFAULT_LABEL,
@@ -69,7 +72,11 @@ function ReportNoteCard({ token, phone }: { token: string; phone: string }) {
     };
   }, [token, phone]);
 
-  if (note === 'loading' || !note) return null;
+  // note.fieldNote can be an empty string: the deadline-lapse entry point
+  // (breachActions.fileDeadlineLapseReport) makes the note optional, unlike
+  // C6's barang-tidak-sesuai path, which requires one. An empty-but-present
+  // breach_notes row would otherwise render a label with nothing under it.
+  if (note === 'loading' || !note || !note.fieldNote.trim()) return null;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
@@ -104,6 +111,16 @@ function SengketaResponseCard({ token, phone }: { token: string; phone: string }
     <div className="rounded-xl border border-zinc-200 p-5">
       <p className="text-sm font-medium text-zinc-900">{SENGKETA_STATUS_LINE}</p>
       {resp.responseNote && <p className="mt-2 text-sm text-zinc-700">{resp.responseNote}</p>}
+      {resp.evidenceSignedUrl && (
+        <a
+          href={resp.evidenceSignedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-block text-sm text-zinc-700 underline"
+        >
+          {HAK_JAWAB_EVIDENCE_LINK_LABEL}
+        </a>
+      )}
     </div>
   );
 }
@@ -137,6 +154,19 @@ function FlaggedPartyPanel({ deal, phone }: { deal: DealSummary; phone: string }
             rows={3}
             className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
           />
+          <div>
+            <label className="block text-sm font-medium text-zinc-700" htmlFor="evidence_file">
+              {HAK_JAWAB_EVIDENCE_LABEL}
+            </label>
+            <p className="mb-1 text-xs text-zinc-500">{HAK_JAWAB_EVIDENCE_HINT}</p>
+            <input
+              id="evidence_file"
+              name="evidence_file"
+              type="file"
+              accept="image/*,application/pdf"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm"
+            />
+          </div>
           <RespondButton />
         </form>
       )}

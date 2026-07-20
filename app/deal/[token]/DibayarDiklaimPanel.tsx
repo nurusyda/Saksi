@@ -12,7 +12,9 @@ import {
   type ConfirmActionState,
   type NotifyNotReceivedState,
 } from './paymentActions';
+import { DeadlineLapseReportModal } from './DeadlineLapseReportModal';
 import type { WhichParty } from '@/lib/db/party';
+import { getTodayWib } from '@/lib/format';
 import {
   formatOcrVerdictLabel,
   PENDING_DEFAULT_LABEL,
@@ -21,6 +23,7 @@ import {
   PAYMENT_NOT_RECEIVED_ACK,
   OCR_AUTHENTICITY_DISCLAIMER,
   WAITING_FOR_RECEIPT_CONFIRMATION,
+  DEADLINE_LAPSE_REPORT_BUTTON,
   ERROR_BUKTI_LOAD_FAILED,
 } from '@/lib/copy';
 
@@ -44,6 +47,8 @@ function getMismatchedFields(ocrResult: BuktiDisplay['ocrResult']): string[] {
 interface DealSummary {
   token: string;
   proposer_role: string;
+  item_desc: string;
+  deadline: string;
 }
 
 function FieldMatchRow({ label, match }: { label: string; match: boolean | null }) {
@@ -179,6 +184,46 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
   );
 }
 
+// Pembeli's side while waiting for Penjual to confirm receipt. Adds the
+// deadline-lapse report entry point (build step 4 follow-on) once the
+// deadline has passed — before that, filing would claim something not yet
+// true (breachActions.fileDeadlineLapseReport re-checks this server-side
+// regardless; the client-side gate here is purely to not show an action
+// that would just bounce with ERROR_DEADLINE_NOT_PASSED).
+function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  // Strict `<`, matching breachActions.deadlineHasPassed: the counterpart
+  // gets the full calendar day of the deadline itself before this is shown.
+  const deadlinePassed = deal.deadline < getTodayWib();
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+        {WAITING_FOR_RECEIPT_CONFIRMATION}
+      </div>
+
+      {deadlinePassed && (
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+        >
+          {DEADLINE_LAPSE_REPORT_BUTTON}
+        </button>
+      )}
+
+      {modalOpen && (
+        <DeadlineLapseReportModal
+          token={deal.token}
+          phone={phone}
+          itemDesc={deal.item_desc}
+          onClose={() => setModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 export function DibayarDiklaimPanel({
   deal,
   initialWhichParty,
@@ -195,9 +240,7 @@ export function DibayarDiklaimPanel({
         whichParty === payeeSlot ? (
           <PenjualReviewPanel deal={deal} phone={phone} />
         ) : (
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-            {WAITING_FOR_RECEIPT_CONFIRMATION}
-          </div>
+          <PembeliWaitingPanel deal={deal} phone={phone} />
         )
       }
     </IdentifyPartyGate>

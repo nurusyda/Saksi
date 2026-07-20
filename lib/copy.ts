@@ -100,6 +100,65 @@ export function formatAccountHistory(
   return `Rekening tujuan: ${bank} ${rekeningMasked} · ${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
 }
 
+// ============================================================
+// B5 — public /cek page (build step 4, final phase). data-model.md's
+// "Profile page" section is the locked source for the full 8-bucket set
+// and its Indonesian names ("selesai · dibatalkan bersama · tidak
+// dilanjutkan (HnR) · kedaluwarsa · dikembalikan penuh · dikembalikan
+// sebagian · tidak dipenuhi · klaim berbeda aktif") — this extends
+// formatAccountHistory's exact "[N] [label]" · -separated style
+// (copy-id.md §2) to all eight rather than just the two that line covers,
+// since §2's own line is deliberately the minimal per-deal forced-check
+// card, not this page's full profile summary. Bucket order matches
+// data-model.md's list order.
+// ============================================================
+
+export function formatAccountHistoryFull(
+  identifierLabel: string, // e.g. "BCA 12••••34" or a phone-hash-based label
+  counts: {
+    selesaiCount: number;
+    dibatalkanBersamaCount: number;
+    tidakDilanjutkanCount: number;
+    kedaluwarsaCount: number;
+    dikembalikanPenuhCount: number;
+    dikembalikanSebagianCount: number;
+    tidakDipenuhiCount: number;
+    klaimBerbedaAktifCount: number;
+  },
+  sinceLabel: string,
+): string {
+  const parts = [
+    `${counts.selesaiCount} selesai`,
+    `${counts.dibatalkanBersamaCount} dibatalkan bersama`,
+    `${counts.tidakDilanjutkanCount} tidak dilanjutkan`,
+    `${counts.kedaluwarsaCount} kedaluwarsa`,
+    `${counts.dikembalikanPenuhCount} dikembalikan penuh`,
+    `${counts.dikembalikanSebagianCount} dikembalikan sebagian`,
+    `${counts.tidakDipenuhiCount} tidak dipenuhi`,
+    `${counts.klaimBerbedaAktifCount} klaim berbeda aktif`,
+  ];
+  return `${identifierLabel} · ${parts.join(' · ')} · tercatat sejak ${sinceLabel}`;
+}
+
+// copy-id.md §18 (DRAFT, pending review) — the lookup form itself has no
+// locked source text of its own (data-model.md specifies the profile page's
+// DATA, not this form's UI copy); backfilled into §18 per the Tier B
+// copy-lock discipline.
+export const CEK_PAGE_HEADING = 'Cek rekening atau nomor HP';
+export const CEK_REKENING_TAB_LABEL = 'Rekening';
+export const CEK_PHONE_TAB_LABEL = 'Nomor HP';
+// Deliberately not PHONE_FIELD_LABEL ("Nomor HP Anda") — that wording
+// assumes the visitor is entering their own number (true when joining a
+// deal, not necessarily true here, where the number being checked could be
+// anyone's). PHONE_FORMAT_HINT has no such assumption baked in and is
+// reused as-is.
+export const CEK_PHONE_FIELD_LABEL = 'Nomor HP';
+export const CEK_BANK_FIELD_LABEL = 'Bank';
+export const CEK_REKENING_FIELD_LABEL = 'Nomor rekening';
+export const CEK_SUBMIT_LABEL = 'Cek riwayat';
+export const CEK_RATE_LIMIT_MESSAGE = 'Terlalu banyak permintaan. Coba lagi dalam beberapa menit.';
+export const CEK_INVALID_INPUT_MESSAGE = 'Masukkan bank dan nomor rekening, atau nomor HP yang valid.';
+
 // copy-id.md §4 — refund warning (always visible, not dismissible)
 export const N8_REFUND_WARNING =
   'Pengembalian dana tidak pernah memerlukan transfer tambahan dari Anda. Jika Anda diminta membayar lagi agar dana "cair", itu ciri penipuan.';
@@ -283,10 +342,17 @@ export const BARANG_TIDAK_SESUAI_CONSEQUENCES: readonly string[] = [
 // future stub needs a similar "coming soon" banner, write a new one instead
 // of reviving this text, since it's specific to this now-shipped gate.
 export const BARANG_TIDAK_SESUAI_SUBMIT_LABEL = 'Kirim Laporan';
+// Was inline JSX in BarangTidakSesuaiModal.tsx (pre-existing, predates this
+// audit pass) — moved here for consistency with every other string in that
+// modal, and reused verbatim as DeadlineLapseReportModal's heading source.
+export const BARANG_TIDAK_SESUAI_MODAL_HEADING = 'Barang Tidak Sesuai Kesepakatan';
+export const DEADLINE_LAPSE_MODAL_HEADING = 'Laporkan Kesepakatan Tidak Dipenuhi';
+// Shared close-button label across both report modals — was inline JSX in
+// both, same reasoning as the two headings above.
+export const MODAL_CLOSE_LABEL = 'Tutup';
 
-// Not in copy-id.md — build step 4's OTP step and post-submit copy, drafted
-// in the same register (state-dependent, no forbidden words) for this pass.
-// Flagged for review rather than treated as locked.
+// copy-id.md §17 (DRAFT, pending review) — build step 4's OTP step, backfilled
+// per the Tier B copy-lock discipline.
 export const OTP_STEP_HEADING = 'Verifikasi nomor HP Anda untuk melanjutkan laporan.';
 export const OTP_SEND_BUTTON_LABEL = 'Kirim kode verifikasi';
 export const OTP_RESEND_BUTTON_LABEL = 'Kirim ulang kode';
@@ -299,18 +365,88 @@ export const ERROR_OTP_INVALID = 'Kode salah atau sudah kedaluwarsa.';
 export const ERROR_OTP_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Minta kode baru.';
 export const ERROR_REPORT_FILE_FAILED = 'Gagal mencatat laporan. Coba lagi.';
 
-// Not in copy-id.md — TIDAK_DIPENUHI/SENGKETA screens (build step 4
-// follow-on), same drafting caveat as immediately above.
+// Second breach-report entry point (build step 4 follow-on) — the
+// DIBAYAR_DIKLAIM "ghost seller" case: Pembeli already uploaded bukti, the
+// deadline has passed, Penjual never confirmed receipt. Same underlying
+// mechanism, consequences, and 14-day hak-jawab window as C6's barang-tidak-
+// sesuai path; only the entry framing differs (no goods-mismatch claim to
+// describe, so the note is optional here). BARANG_TIDAK_SESUAI_CONSEQUENCES
+// and BARANG_TIDAK_SESUAI_SUBMIT_LABEL below are reused verbatim for this
+// path too — their content was already state-agnostic despite the name.
+// copy-id.md §17 (DRAFT, pending review), same backfill as OTP_STEP_HEADING etc.
+export const DEADLINE_LAPSE_REPORT_BUTTON = 'Kesepakatan tidak dipenuhi setelah batas waktu';
+export const DEADLINE_LAPSE_PROMPT = 'Catatan tambahan tentang kesepakatan ini (opsional):';
+export const ERROR_DEADLINE_NOT_PASSED = 'Batas waktu kesepakatan ini belum terlewati.';
+
+// copy-id.md §17 (DRAFT, pending review) — TIDAK_DIPENUHI/SENGKETA screens
+// (build step 4 follow-on), same backfill as immediately above. Generalized
+// (2026-07-20, deadline-lapse entry point added) to neutral wording: this
+// screen renders for TIDAK_DIPENUHI regardless of which of the two report
+// paths put the deal there, so it can no longer assume a goods-mismatch
+// claim specifically.
 export const TIDAK_DIPENUHI_REPORTER_WAITING =
   'Laporan Anda tercatat. Menunggu tanggapan pihak penjual (14 hari sejak laporan diajukan).';
 export const TIDAK_DIPENUHI_FLAGGED_HEADING =
-  'Laporan diterima: barang/jasa dianggap tidak sesuai kesepakatan.';
-export const TIDAK_DIPENUHI_FIELD_NOTE_LABEL = 'Bagian yang dianggap tidak sesuai (klaim pelapor):';
+  'Laporan diterima: kesepakatan dianggap tidak dipenuhi.';
+export const TIDAK_DIPENUHI_FIELD_NOTE_LABEL = 'Catatan pelapor:';
 export const HAK_JAWAB_NOTE_LABEL = 'Catatan tanggapan Anda (opsional)';
+// Build step 4 follow-on (migration 0022) — the evidence-attachment field,
+// same §17 DRAFT backfill as HAK_JAWAB_NOTE_LABEL above. The hint's "seluruh
+// rentang tanggal" wording is a design decision carried from planning: it
+// makes selective cropping more visible without claiming SAKSI can verify
+// anything about the attachment.
+export const HAK_JAWAB_EVIDENCE_LABEL = 'Lampirkan bukti pendukung (opsional)';
+export const HAK_JAWAB_EVIDENCE_HINT =
+  'Jika mengunggah mutasi rekening, sertakan seluruh rentang tanggal yang diklaim, bukan potongan sebagian.';
+export const HAK_JAWAB_EVIDENCE_LINK_LABEL = 'Lihat bukti pendukung';
 export const HAK_JAWAB_SUBMIT_LABEL = 'Kirim Tanggapan';
 export const ERROR_HAK_JAWAB_WINDOW_CLOSED = 'Jendela 14 hari untuk menanggapi telah berakhir.';
 export const ERROR_HAK_JAWAB_FAILED = 'Gagal mencatat tanggapan. Coba lagi.';
 export const SENGKETA_STATUS_LINE = 'Status: klaim berbeda.';
+
+// ============================================================
+// copy-id.md §1 — the flag ladder (build step 4, migration 0023: publication).
+// First programmatic use of this section; every string below is a verbatim
+// transcription, not a paraphrase. Composed by lib/flags/render.ts rather
+// than by runtime string search-and-replace on the tier templates: each
+// tier body is split into a fixed STEM (everything up to but not including
+// the trailing sentence) plus one of two TAILs, concatenated at render
+// time. This reproduces the exact locked strings byte-for-byte for the
+// unresponded case (STEM + TAIL_SILENT) while keeping the DISPUTED
+// replacement (STEM + TAIL_DISPUTED) impossible to get subtly wrong via a
+// find/replace on text that might not match if the stem ever changes.
+// ============================================================
+
+export const FLAG_RUNG_LINES: Record<0 | 1 | 2, string> = {
+  0: 'Bukti transfer diklaim pelapor. Belum dikonfirmasi pihak terlapor, belum diverifikasi bank.',
+  1: 'Pembayaran dikonfirmasi kedua pihak. Belum diverifikasi bank.',
+  // Roadmap only (open-banking verified) — do not ship a code path that can
+  // actually select this until that integration exists (copy-id.md §1).
+  2: 'Pembayaran terverifikasi melalui mutasi bank.',
+};
+
+// [tgl] is filled in by the caller (lib/flags/render.ts) via formatDate on
+// the originating TENGGAT_LEWAT event's created_at — the date the deal was
+// recorded as unfulfilled, matching every other §7 exit-state line's [tgl].
+const FLAG_BODY_STEM: Record<'GRATIS' | 'LIMA_RIBU' | 'BERMETERAI', (tgl: string) => string> = {
+  GRATIS: (tgl) => `1 kesepakatan tercatat tidak dipenuhi (${tgl}). Identitas para pihak tidak diverifikasi.`,
+  LIMA_RIBU: (tgl) => `1 kesepakatan tercatat tidak dipenuhi (${tgl}). Nomor HP kedua pihak terverifikasi.`,
+  BERMETERAI: (tgl) =>
+    `1 kesepakatan bermeterai tidak dipenuhi (${tgl}). Identitas terverifikasi (e-KYC). Dokumen siap diajukan sebagai bukti.`,
+};
+
+export function formatFlagBodyStem(tier: 'GRATIS' | 'LIMA_RIBU' | 'BERMETERAI', tgl: string): string {
+  return FLAG_BODY_STEM[tier](tgl);
+}
+
+export const FLAG_TAIL_SILENT = 'Terlapor tidak merespons dalam 14 hari.';
+// Replaces FLAG_TAIL_SILENT when hak jawab was filed — permanent once a
+// response exists (2026-07-20 decision: resolved a conflict where
+// data-model.md's prose read as a second silence window that could
+// eventually re-publish FLAG_TAIL_SILENT despite a real response on
+// record — rejected as a false statement on a public record).
+export const FLAG_TAIL_DISPUTED = 'Terlapor memberikan tanggapan. Status: klaim berbeda.';
+export const FLAG_EVIDENCE_SUB_LINE = 'Terlapor menyertakan bukti pada tanggapannya.';
 
 // C7 — SELESAI, minimal placeholder pending a real design pass
 export const SELESAI_CLOSING_LINE = 'Kesepakatan selesai. Tercatat di SAKSI.';
@@ -327,9 +463,11 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   BUKTI_UPLOADED: 'Bukti transfer diunggah',
   RECEIPT_CONFIRMED: 'Penerimaan dana dikonfirmasi',
   FULFILLMENT_CONFIRMED: 'Barang/pemenuhan dikonfirmasi',
-  // Build step 4 additions — not in copy-id.md's table (predates the breach
-  // path), same fallback-to-raw-name contract as every other unmapped event.
-  TENGGAT_LEWAT: 'Laporan diajukan: barang/jasa tidak sesuai',
+  // Build step 4 additions — now in copy-id.md §16's timeline table, same
+  // fallback-to-raw-name contract as every other unmapped event. Generalized
+  // (deadline-lapse entry point added) since TENGGAT_LEWAT now fires from two
+  // different report paths, not just barang-tidak-sesuai.
+  TENGGAT_LEWAT: 'Laporan diajukan: kesepakatan tidak dipenuhi',
   HAK_JAWAB_FILED: 'Tanggapan pihak terlapor diajukan',
 };
 
@@ -390,10 +528,13 @@ export function formatOtpMessage(code: string): string {
   return `Kode verifikasi SAKSI Anda: ${code}. Berlaku 5 menit. Jangan bagikan kepada siapa pun, termasuk pihak yang mengaku dari SAKSI.`;
 }
 
-// Not in copy-id.md — build step 4 (breach path) turn-taking notifications,
-// same house style as §9b. Fired by fileBarangTidakSesuaiReport (to the
-// flagged party) and respondHakJawab (to the reporter).
-export function formatBarangTidakSesuaiFiledMessage(itemDesc: string, dealUrl: string): string {
+// copy-id.md §9c (DRAFT, pending review) — build step 4 (breach path)
+// turn-taking notifications, same house style as §9b. Fired by fileBarangTidakSesuaiReport and
+// fileDeadlineLapseReport (both, to the flagged party) and respondHakJawab
+// (to the reporter). Renamed from formatBarangTidakSesuaiFiledMessage
+// (deadline-lapse entry point added) — the text was already generic (names
+// no specific claim), only the old name implied it was C6-specific.
+export function formatBreachReportFiledMessage(itemDesc: string, dealUrl: string): string {
   return `Laporan diajukan untuk kesepakatan SAKSI Anda ("${itemDesc}"). Anda memiliki 14 hari untuk menanggapi. Buka ${dealUrl} untuk melihat detail.`;
 }
 

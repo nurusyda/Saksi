@@ -100,6 +100,107 @@ deferred, and the milestone it's tied to.
   worth querying.
 - **Target:** Gated on corpus-density milestone (~50-100rb identifiers).
 
+### Full transaction ledger view + reputation-gaming detection (rekening/phone drill-down)
+- **What it is:** A "Lihat detail lengkap" link under the aggregate count
+  line in the existing account-history check (Phase 0.5's ungated card on
+  `/buat`, and Phase 3's gated forced-check card in the payment flow — both
+  backed by `lib/db/accountHistory.ts`'s `getAccountHistory()`) that opens
+  the full ledger for that rekening: every deal it has ever been the
+  destination account for, which were disputed (`TIDAK_DIPENUHI`/`SENGKETA`)
+  vs completed (`SELESAI`) vs other exit states, and every phone number that
+  has used that rekening across different deals (cross-identifier linkage,
+  not just a single phone-to-rekening pair). Later addition, explicitly
+  separate scope: detection for patterns suggesting the ledger itself has
+  been gamed — e.g. a small closed loop of phone_hashes repeatedly trading
+  `SELESAI` outcomes with each other in a short window to manufacture a
+  clean-looking record, mirroring the "seller ships empty box to a fake
+  buyer account who leaves a good review" pattern already documented in
+  Indonesian e-commerce fraud research.
+- **Not a standalone lookup tool:** only reachable by clicking through from
+  an account-history check that's already showing that specific rekening —
+  never a public search-by-rekening/phone entry point on its own. Matches
+  the Phase 0.2 decision to remove the homepage search bar and the
+  product's "trust first" positioning.
+- **Entry-point UX — resolved 2026-07-20:** a single "Lihat detail lengkap"
+  link/small button below the count line, not the individual numbers made
+  clickable. Numbers-as-links would mean several different pieces of text
+  all pointing to the same destination (confusing — why would "5 selesai"
+  and "3 tidak dipenuhi" lead to the same page?) and isn't a self-evident
+  affordance to every visitor. One explicit link is clearer and matches the
+  plain, restrained tone the rest of the copy already has. Exact string is
+  a suggestion, not locked — low-stakes UI chrome, same category as other
+  strings approved inline in Session 3, not legal-adjacent like copy-id.md's
+  numbered sections.
+- **Content principle — resolved 2026-07-20, "no bumbu":** the ledger shows
+  only what actually happened — raw counts, raw per-deal facts (status,
+  date, the other linked identifiers) — never SAKSI's own interpretation,
+  framing, or spin on what a pattern means. This is the same invariant
+  SKILL.md already states for the whole product ("every string SAKSI shows
+  must be true... claims are attributed to claimants") applied specifically
+  to this feature: no added commentary, no "ini mencurigakan," just facts.
+  Gaming-detection signals (below) are surfaced as raw numbers under this
+  same rule (e.g. "5 dari 5 kesepakatan selesai dengan pihak yang sama"),
+  never as a verdict SAKSI renders about the person.
+- **T&C gap — resolved 2026-07-20, action needed before shipping:**
+  `content/legal/syarat-ketentuan.md` §4 is titled and scoped specifically
+  to publishing *unfulfilled* agreements. It does not yet authorize
+  publishing full ledger detail — `SELESAI` records and phone-to-rekening
+  cross-linkage are both new kinds of disclosure this feature introduces.
+  Needs an explicit clause (extend §4 or add a new section) stating the
+  full ledger, not just breach records, is publicly viewable — otherwise a
+  user could reasonably argue they consented to "bad stuff becomes visible
+  if I don't pay," not "everything I've ever done here is visible to any
+  stranger." Not drafted here — real T&C language needs the same care as
+  every other locked string, not something to invent inline.
+- **Goes beyond the current locked spec:** `data-model.md`'s "Profile page
+  (public, per phone_hash or rekening)" section only specifies aggregate
+  counts per outcome plus account age/verification level — never per-deal
+  detail or cross-identifier linkage. Still needs an explicit decision on
+  exactly which per-deal fields become visible (status + date confirmed in
+  scope per "no bumbu" above; item_desc/amount-range/masked-counterpart
+  still open) before implementation.
+- **Reputation-gaming detection — resolved 2026-07-20, ideas locked in, not
+  yet built.** "Wait for someone to file a report" is not sufficient on its
+  own: reports only catch disputes, and wash-trading (two colluding phone
+  numbers trading fake `SELESAI` outcomes with each other) has no unhappy
+  party to ever file one — it's structurally invisible to a complaint-driven
+  system. Five candidate signals, cheapest/most-defensible first, all
+  computable from data already stored (no new integration):
+  1. **Concentration ratio** — what fraction of a rekening's deals are with
+     the same one or two counterpart phone_hashes vs. spread across distinct
+     people. High concentration is the core wash-trading tell.
+  2. **Velocity/timing** — real deals have friction (an actual bank transfer
+     takes time, a package takes days). DISEPAKATI→SELESAI in minutes,
+     repeated with the same pair, is a tell. Free to compute from existing
+     `deal_events` timestamps.
+  3. **Volume vs. account age** — 10+ `SELESAI` in a rekening's first two
+     days reads differently than the same count over six months.
+  4. **Show the raw pattern, don't auto-judge (recommended lead approach)**
+     — matches the "no bumbu" rule above and the product's core "SAKSI is
+     not a judge" stance (`syarat-ketentuan.md` §1). Surface concentration/
+     velocity as plain facts in the ledger (e.g. "5 dari 5 kesepakatan
+     selesai dengan pihak yang sama") and let the viewer draw their own
+     conclusion, rather than SAKSI silently flagging or hiding accounts.
+  5. **Rate-limit the pair, not just the phone** — extends the existing
+     rate-limit idiom already used everywhere in this app (20 deals/day/
+     phone_hash, 3 OTP/hour, etc.): cap how many deals the *same two*
+     phone_hashes can complete with each other in a short window, as a
+     circuit breaker rather than a judgment call.
+  Explicitly **not in scope**: Rung 2 (open-banking mutasi verification,
+  already tracked separately under Post-launch below) is the real structural
+  fix — it's the only thing that checks whether money actually moved.
+  Everything above is a stopgap for rung 0/1, which are already honest
+  about being unverified claims (the flag ladder says "Belum diverifikasi
+  bank"), not a replacement for real verification. Not building rung 2 yet.
+- **Why deferred:** Raised mid-conversation (2026-07-20) while scoping the
+  proposal's check/flag surfaces; founder wants this designed and built
+  right after Tier B, not before — sequencing intentional, not a sign this
+  is low-priority. As of this note, founder is on Tier B's task b6, close to
+  done.
+- **Target:** Immediately post-Tier B (scale hardening). Design pass first
+  (remaining per-deal-field decision above, plus drafting the T&C addition),
+  same discipline as any other schema/state-machine change, before code.
+
 ### Real bank account-holder name lookup
 - **What it is:** Verify the actual registered name behind a rekening_tujuan
   via a vendor lookup (Xendit Name Validator, ~Rp300/hit, or Flip/OY!

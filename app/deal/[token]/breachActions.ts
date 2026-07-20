@@ -11,6 +11,8 @@ import { submitAnchor } from '@/lib/db/anchor';
 import { maskRekening } from '@/lib/db/accountHistory';
 import { sendOtp, verifyOtp, consumeVerifiedOtp } from '@/lib/otp';
 import { sendWaMessage } from '@/lib/wa/send';
+import { getTodayWib } from '@/lib/format';
+import { uploadHakJawabEvidence } from '@/lib/db/storage';
 import { checkIdentifyRateLimit } from './paymentActions';
 import {
   ERROR_DEAL_NOT_FOUND,
@@ -25,9 +27,11 @@ import {
   ERROR_OTP_INVALID,
   ERROR_OTP_TOO_MANY_ATTEMPTS,
   ERROR_REPORT_FILE_FAILED,
+  ERROR_DEADLINE_NOT_PASSED,
   ERROR_HAK_JAWAB_WINDOW_CLOSED,
   ERROR_HAK_JAWAB_FAILED,
-  formatBarangTidakSesuaiFiledMessage,
+  ERROR_BUKTI_UPLOAD_FAILED,
+  formatBreachReportFiledMessage,
   formatHakJawabFiledMessage,
 } from '@/lib/copy';
 
@@ -47,7 +51,7 @@ function hashNote(note: string): string {
 async function notifyTurn(
   db: ReturnType<typeof supabaseServer>,
   partyId: string | null,
-  template: 'BARANG_TIDAK_SESUAI_FILED' | 'HAK_JAWAB_FILED',
+  template: 'BARANG_TIDAK_SESUAI_FILED' | 'DEADLINE_LAPSE_FILED' | 'HAK_JAWAB_FILED',
   message: string,
 ): Promise<void> {
   const phone = await getPartyPhone(db, partyId);
@@ -258,7 +262,217 @@ export async function fileBarangTidakSesuaiReport(
         db,
         flaggedPartyId,
         'BARANG_TIDAK_SESUAI_FILED',
-        formatBarangTidakSesuaiFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+        formatBreachReportFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+      );
+      revalidatePath(`/deal/${token}`);
+      redirect(`/deal/${token}`);
+    }
+    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_REPORT_FILE_FAILED };
+  }
+
+  return { error: ERROR_REPORT_FILE_FAILED };
+}
+
+// ============================================================
+// sendDeadlineLapseOtp / verifyDeadlineLapseOtpAction / fileDeadlineLapseReport
+// — the second breach-report entry point (build step 4 follow-on): the
+// "ghost seller" case. Pembeli already uploaded bukti (DIBAYAR_DIKLAIM), the
+// deadline has passed, and Penjual never confirmed receipt at all. Mirrors
+// sendBreachReportOtp/verifyBreachReportOtpAction/fileBarangTidakSesuaiReport
+// above exactly in structure (same OTP gate, same reporter-is-Pembeli
+// restriction, same atomic retry-with-hash-chain pattern) — kept as
+// separate functions rather than parameterizing the existing three, mirroring
+// migration 0021's choice to add a separate RPC rather than generalize
+// 0020's. The one substantive difference: eligibility is DIBAYAR_DIKLAIM +
+// deadline passed, not DIKONFIRMASI_TERIMA, and rung is unconditionally 0.
+// ============================================================
+
+// Strict `<`, not `<=`: the create form's minimum enforces deadline >=
+// tomorrow (getTomorrowWib()), so the counterpart is entitled to the full
+// calendar day of the deadline itself to act. Using `<=` would open
+// eligibility at 00:00 WIB on the deadline date, cutting that day short by
+// one day on both the client-side gate below and this server-side check.
+function deadlineHasPassed(deadline: string): boolean {
+  return deadline < getTodayWib();
+}
+
+export async function sendDeadlineLapseOtp(
+  token: string,
+  phone: string,
+  _prev: SendOtpState,
+  _formData: FormData,
+): Promise<SendOtpState> {
+  const db = supabaseServer();
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  let phoneE164: string;
+  try {
+    phoneE164 = normalizePhone(phone);
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+
+  const { sent, rateLimited } = await sendOtp(db, deal.id, phoneE164);
+  if (rateLimited) return { error: ERROR_OTP_SEND_RATE_LIMITED };
+  if (!sent) return { error: ERROR_OTP_SEND_FAILED };
+  return { sent: true };
+}
+
+export async function verifyDeadlineLapseOtpAction(
+  token: string,
+  phone: string,
+  _prev: VerifyOtpState,
+  formData: FormData,
+): Promise<VerifyOtpState> {
+  const db = supabaseServer();
+  const code = (formData.get('otp_code') as string | null)?.trim() ?? '';
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  let phoneE164: string;
+  try {
+    phoneE164 = normalizePhone(phone);
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+
+  const result = await verifyOtp(db, deal.id, phoneE164, code);
+  if (!result.verified) {
+    return { error: result.error === 'too_many_attempts' ? ERROR_OTP_TOO_MANY_ATTEMPTS : ERROR_OTP_INVALID };
+  }
+  return { verified: true };
+}
+
+export async function fileDeadlineLapseReport(
+  token: string,
+  phone: string,
+  _prev: FileReportState,
+  formData: FormData,
+): Promise<FileReportState> {
+  const db = supabaseServer();
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  let phoneE164: string;
+  try {
+    phoneE164 = normalizePhone(phone);
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+
+  if (!(await consumeVerifiedOtp(db, deal.id, phoneE164))) {
+    return { error: ERROR_OTP_INVALID };
+  }
+
+  // Optional here (unlike C6's field_note, which requires the reporter to
+  // describe which part of the description wasn't met): the claim itself is
+  // system-derivable — deadline passed, Penjual never confirmed receipt.
+  const fieldNote = (formData.get('field_note') as string | null)?.trim() ?? '';
+
+  try {
+    assertTransition(DealStatus.DIBAYAR_DIKLAIM, DealEventName.TENGGAT_LEWAT);
+  } catch {
+    return { error: ERROR_DEAL_CLOSED };
+  }
+
+  const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
+
+  // No local rung constant here (unlike fileBarangTidakSesuaiReport's rung
+  // = 1): file_deadline_lapse_with_event (migration 0021) hardcodes rung 0
+  // inside the function rather than taking it as a parameter, since it's
+  // unconditionally true whenever this RPC's WHERE status = 'DIBAYAR_DIKLAIM'
+  // guard passes — RECEIPT_CONFIRMED has never fired for this deal.
+
+  const flaggedSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
+  const flaggedPartyId = flaggedSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+  const flagged = await getPartyIdentityFields(db, flaggedPartyId);
+
+  const identifiers: Record<string, unknown> = {
+    rekening_masked: maskRekening(deal.rekening_tujuan as string),
+    bank: deal.rekening_bank,
+  };
+  if ((deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') && flagged.phoneHash) {
+    identifiers.phone_hash = flagged.phoneHash;
+  }
+  if (deal.tier === 'BERMETERAI' && flagged.ekycPassed) {
+    identifiers.identity_verified = true;
+  }
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+    const { data: cur } = await db.from('deals').select('*').eq('id', deal.id).single();
+    if (!cur || cur.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+
+    const { data: lastEvent } = await db
+      .from('deal_events')
+      .select('new_hash')
+      .eq('deal_id', deal.id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const priorHash = lastEvent?.new_hash ?? null;
+
+    const fieldNoteHash = hashNote(fieldNote);
+    const virtualDeal = { ...cur, status: DealStatus.TIDAK_DIPENUHI };
+    const canonical = buildCanonicalPayload(
+      virtualDeal,
+      { name: DealEventName.TENGGAT_LEWAT, actor, payload: { field_note_hash: fieldNoteHash } },
+      priorHash,
+    );
+    const newHash = hashDeal(canonical);
+
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('file_deadline_lapse_with_event', {
+        p_deal_id: deal.id,
+        p_actor: actor,
+        p_field_note: fieldNote,
+        p_field_note_hash: fieldNoteHash,
+        p_identifiers: identifiers,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
+      })
+      .maybeSingle();
+
+    if (rpcErr) return { error: ERROR_REPORT_FILE_FAILED };
+    if (rpcRow) {
+      void submitAnchor(newHash);
+      void notifyTurn(
+        db,
+        flaggedPartyId,
+        'DEADLINE_LAPSE_FILED',
+        formatBreachReportFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
       );
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
@@ -324,6 +538,7 @@ export async function getBreachReportNote(token: string, phone: string): Promise
 export interface HakJawabResponse {
   responseNote: string;
   hasEvidence: boolean;
+  evidenceSignedUrl: string | null;
   respondedAt: string;
 }
 
@@ -360,9 +575,30 @@ export async function getHakJawabResponse(token: string, phone: string): Promise
   if (!note || !note.responded_at) return null;
 
   const payload = event.payload as { has_evidence?: boolean } | null;
+  const hasEvidence = payload?.has_evidence ?? false;
+
+  // Short-lived signed URL, same 300s pattern as getBuktiForDisplay — the
+  // private bucket path is never exposed directly, and both parties to the
+  // dispute (not just one slot, unlike bukti's payee-only view) are allowed
+  // to see it: identifyPartyByPhone above already proved this caller is one
+  // of the two.
+  let evidenceSignedUrl: string | null = null;
+  if (hasEvidence) {
+    const { data: evidence } = await db
+      .from('hak_jawab_evidence')
+      .select('storage_path')
+      .eq('deal_id', deal.id)
+      .maybeSingle();
+    if (evidence) {
+      const { data: signed } = await db.storage.from('bukti').createSignedUrl(evidence.storage_path, 300);
+      evidenceSignedUrl = signed?.signedUrl ?? null;
+    }
+  }
+
   return {
     responseNote: note.response_note ?? '',
-    hasEvidence: payload?.has_evidence ?? false,
+    hasEvidence,
+    evidenceSignedUrl,
     respondedAt: note.responded_at,
   };
 }
@@ -420,7 +656,23 @@ export async function respondHakJawab(
   if (Date.now() > windowDeadline) return { error: ERROR_HAK_JAWAB_WINDOW_CLOSED };
 
   const responseNote = (formData.get('response_note') as string | null)?.trim() ?? '';
-  const hasEvidence = false; // see header comment — no upload mechanism yet
+
+  // Optional, unlike bukti transfer upload: offered only as a response to
+  // being reported (never proactively), and its absence isn't itself a
+  // claim about anything. hasEvidence only becomes true once the upload has
+  // actually succeeded — a failed upload must not silently proceed as "no
+  // evidence" when the responder explicitly attached a file, so that case
+  // errors out below instead.
+  const evidenceFile = formData.get('evidence_file') as File | null;
+  let evidenceStoragePath: string | null = null;
+  let evidenceMimeType: string | null = null;
+  if (evidenceFile && evidenceFile.size > 0) {
+    const uploaded = await uploadHakJawabEvidence(db, deal.id, evidenceFile);
+    if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
+    evidenceStoragePath = uploaded.storagePath;
+    evidenceMimeType = uploaded.mimeType;
+  }
+  const hasEvidence = evidenceStoragePath !== null;
 
   try {
     assertTransition(DealStatus.TIDAK_DIPENUHI, DealEventName.HAK_JAWAB_FILED);
@@ -465,6 +717,8 @@ export async function respondHakJawab(
         p_has_evidence: hasEvidence,
         p_response_note: responseNote,
         p_response_note_hash: responseNoteHash,
+        p_evidence_storage_path: evidenceStoragePath,
+        p_evidence_mime_type: evidenceMimeType,
         p_prior_hash: priorHash,
         p_new_hash: newHash,
       })

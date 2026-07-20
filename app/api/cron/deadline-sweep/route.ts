@@ -8,13 +8,19 @@ import { sendWaMessage } from '@/lib/wa/send';
 import { formatDeadlineNudgeMessage } from '@/lib/copy';
 import { getTodayWib } from '@/lib/format';
 
-// Phase 6 deadline sweep — one unified cron entry, two branches. Decision
+// Phase 6 deadline sweep — one unified cron entry, three branches. Decision
 // tree confirmed 2026-07-20, corrected same day after review (an earlier
 // version had a third branch firing TENGGAT_LEWAT on a timer for
 // DIKONFIRMASI_TERIMA — wrong; see migration 0018's header comment for the
 // full reasoning, verified against content/legal/syarat-ketentuan.md §4.1).
 // TENGGAT_LEWAT is never sweep-driven, for either state — only an actual
-// filed report (Section C6, not yet built) can fire it.
+// filed report (breachActions.ts's fileBarangTidakSesuaiReport /
+// fileDeadlineLapseReport) fires it.
+//
+// The third branch, runFlagPublishBranch (migration 0023, build step 4
+// final phase), is the sweep outcome for the breach pipeline's own 14-day
+// hak-jawab window — added later than the two below, gated behind
+// FLAGS_PUBLICATION_ENABLED pending lawyer review (GATE 1).
 //
 // Per-candidate races are handled by skip-and-log, not retry: a lost race
 // (RPC returns 0 rows) means the deal's state already changed since
@@ -116,17 +122,17 @@ async function runNudgeBranch(db: ReturnType<typeof supabaseServer>, todayWib: s
         const dealUrl = `https://saksi.app/deal/${deal.token}`;
         const message = formatDeadlineNudgeMessage(deal.item_desc, dealUrl);
         try {
-          // Awaited sequentially, not fire-and-forget: the current stub
-          // resolves immediately, but a real WA client that hangs on one
-          // candidate will stall every later candidate in this loop until
-          // it resolves or times out — separate from the try/catch below,
-          // which only covers what happens once it settles. Worth revisiting
-          // (a short timeout, or moving off the await path) when a real
-          // client replaces this stub.
+          // Awaited sequentially, not fire-and-forget: the real Fonnte
+          // client (lib/wa/send.ts) bounds each call to a 10s timeout via
+          // AbortController, so one hung candidate stalls the rest of this
+          // loop by at most 10s rather than indefinitely. It also never
+          // throws on its own (network errors, non-2xx, and Fonnte's
+          // in-body rejection status all resolve to { sent: false }) — this
+          // try/catch is a defensive backstop, not the expected path.
           await sendWaMessage({ toPhoneE164: targetParty.phone_e164, template: 'DEADLINE_NUDGE', params: { message } });
         } catch (err) {
-          // Current stub never throws, but a real WA client will — the
-          // NUDGE_SENT event is already committed at this point, so a
+          // Should not happen given sendWaMessage's never-throw contract —
+          // the NUDGE_SENT event is already committed at this point, so a
           // delivery failure shouldn't abort the rest of the sweep run.
           console.error('[deadline-sweep] WA send failed', deal.id, err);
         }
@@ -134,6 +140,103 @@ async function runNudgeBranch(db: ReturnType<typeof supabaseServer>, todayWib: s
     }
 
     count++;
+  }
+
+  return count;
+}
+
+// Build step 4, final phase — publication (migration 0023). Gated on
+// FLAGS_PUBLICATION_ENABLED per the standing GATE 1 requirement (lawyer
+// review before any flag is publicly visible): until that env var is set
+// to 'true', this branch is a complete no-op — candidates are never even
+// fetched, so flags.published_at cannot be set by any code path. The gate
+// lives here, not in the RPCs themselves (same posture as every other
+// feature-flag-style gate in this app).
+async function runFlagPublishBranch(db: ReturnType<typeof supabaseServer>, now: string): Promise<number> {
+  if (process.env.FLAGS_PUBLICATION_ENABLED !== 'true') return 0;
+
+  const { data: candidates } = await db.rpc('get_flag_publish_candidates', { p_now: now });
+  let count = 0;
+
+  for (const deal of (candidates ?? []) as DealRow[]) {
+    const { data: flag } = await db
+      .from('flags')
+      .select('hak_jawab_status')
+      .eq('deal_id', deal.id)
+      .single();
+    if (!flag) continue; // candidate query already joined flags; a miss here means it changed mid-run
+
+    const priorHash = await getLastHash(db, deal.id);
+
+    if (flag.hak_jawab_status === 'MENUNGGU') {
+      const canonical = buildCanonicalPayload(
+        deal, // self-transition — status stays TIDAK_DIPENUHI
+        { name: DealEventName.FLAG_PUBLISHED, actor: 'SYSTEM', payload: null },
+        priorHash,
+      );
+      const newHash = hashDeal(canonical);
+
+      const { data: rpcRow, error } = await db
+        .rpc('publish_flag_silent_with_event', { p_deal_id: deal.id, p_prior_hash: priorHash, p_new_hash: newHash })
+        .maybeSingle();
+
+      if (error) {
+        console.error('[deadline-sweep] publish_flag_silent_with_event failed', deal.id, error);
+        continue;
+      }
+      if (!rpcRow) continue; // lost race or already published; skip
+
+      void submitAnchor(newHash);
+      count++;
+      continue;
+    }
+
+    if (flag.hak_jawab_status === 'DISPUTED') {
+      // has_evidence lives on the HAK_JAWAB_FILED event's payload (set by
+      // respondHakJawab), not on flags itself — read it once here and
+      // snapshot it into flags.identifiers via the RPC, same "cache for
+      // public reads, deal_events stays the source of truth" pattern
+      // migration 0023's header comment describes.
+      const { data: hakJawabEvent, error: hakJawabErr } = await db
+        .from('deal_events')
+        .select('payload')
+        .eq('deal_id', deal.id)
+        .eq('event', DealEventName.HAK_JAWAB_FILED)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (hakJawabErr) {
+        console.error('[deadline-sweep] could not read HAK_JAWAB_FILED event for', deal.id, hakJawabErr);
+        continue; // skip this deal — don't publish with a guessed-false has_evidence
+      }
+      const hasEvidence = (hakJawabEvent?.payload as { has_evidence?: boolean } | null)?.has_evidence ?? false;
+
+      const virtualDeal = { ...deal, status: DealStatus.TIDAK_DIPENUHI };
+      const canonical = buildCanonicalPayload(
+        virtualDeal,
+        { name: DealEventName.SENGKETA_KADALUARSA, actor: 'SYSTEM', payload: null },
+        priorHash,
+      );
+      const newHash = hashDeal(canonical);
+
+      const { data: rpcRow, error } = await db
+        .rpc('publish_flag_disputed_with_event', {
+          p_deal_id: deal.id,
+          p_has_evidence: hasEvidence,
+          p_prior_hash: priorHash,
+          p_new_hash: newHash,
+        })
+        .maybeSingle();
+
+      if (error) {
+        console.error('[deadline-sweep] publish_flag_disputed_with_event failed', deal.id, error);
+        continue;
+      }
+      if (!rpcRow) continue;
+
+      void submitAnchor(newHash);
+      count++;
+    }
   }
 
   return count;
@@ -200,6 +303,21 @@ export async function GET(request: NextRequest) {
   // candidate query's status filter, so it's correctly skipped.
   const kedaluwarsa = await runKedaluwarsaBranch(db, todayWib);
   const nudged = await runNudgeBranch(db, todayWib);
+  // Independent of the two branches above: operates on TIDAK_DIPENUHI/
+  // SENGKETA, entirely disjoint from DIBAYAR_DIKLAIM/DIKONFIRMASI_TERIMA,
+  // so there's no candidate-selection race to order against like
+  // kedaluwarsa-vs-nudge has. Sequential anyway, matching this route's
+  // existing style rather than introducing Promise.all only here.
+  //
+  // p_now anchored to WIB midnight of todayWib, not a raw new Date() UTC
+  // instant — matches the other two branches' posture of comparing against
+  // a stable, explicit WIB reference rather than the literal execution
+  // moment (which drifts with cron scheduling jitter). The 14-day
+  // hak-jawab window still lands within the same daily-cron-granularity
+  // margin either way; this is about consistency for legal-adjacent
+  // timing, not a correctness fix.
+  const nowWib = new Date(`${todayWib}T00:00:00+07:00`).toISOString();
+  const published = await runFlagPublishBranch(db, nowWib);
 
-  return NextResponse.json({ nudged, kedaluwarsa });
+  return NextResponse.json({ nudged, kedaluwarsa, published });
 }

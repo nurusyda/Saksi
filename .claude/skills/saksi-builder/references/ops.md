@@ -7,7 +7,8 @@
 - **Supabase**: project `saksi-mvp`, region **ap-southeast-1 (Singapore)**, free plan. Free plan has NO backups and pauses after 7 days of inactivity — both are mitigated by the backup Action below, which is a week-one requirement, not optional.
 - **Domain/DNS/email**: saksi.app registered at Squarespace; DNS stays at Squarespace (nameservers NOT moved to Vercel — moving them would break email). Email sapa@saksi.app is live; never propose DNS changes beyond single records, and never touch MX records.
 - **OCR**: Gemini API (key exists, held locally). NOT Claude API.
-- **OTP**: the verification *flow itself* is still deferred until build step 4 — do not build OTP earlier than the breach path needs it. The WA send channel is live: the dedicated prepaid number is registered with Fonnte, `FONNTE_API_KEY` is live in `.env.local`. `lib/wa/send.ts` is a real Fonnte HTTP client as of 2026-07-20 (deadline-sweep nudges) — no longer a logging-only stub. Fonnte remains flagged as a pre-launch swap candidate; Meta Cloud API is the longer-term target.
+- **OTP**: built (build step 4, migration 0020) — `lib/otp.ts`, scoped to the breach-report filing call sites (`sendBreachReportOtp`/`sendDeadlineLapseOtp` in `breachActions.ts`). 6-digit, 5-minute expiry, hashed, single-use, 3 sends/phone/hour. Not yet a generic multi-purpose OTP module — LIMA_RIBU/BERMETERAI OTP (build step 6) is a different, not-yet-built call site; widen `otp_codes`' shape then rather than assuming it already covers it. The WA send channel is live: the dedicated prepaid number is registered with Fonnte, `FONNTE_API_KEY` is live in `.env.local`. `lib/wa/send.ts` is a real Fonnte HTTP client as of 2026-07-20 (deadline-sweep nudges), including body-level response parsing (Fonnte returns HTTP 200 even on a rejected send) — no longer a logging-only stub. Fonnte remains flagged as a pre-launch swap candidate; Meta Cloud API is the longer-term target.
+- **Flag publication**: built (build step 4 final phase, migration 0023) but gated behind `FLAGS_PUBLICATION_ENABLED` — do NOT set to `'true'` in Vercel until GATE 1 (lawyer review) clears. See `.claude/skills/saksi-builder/references/ops.md`'s env var table below and `app/api/cron/deadline-sweep/route.ts`'s `runFlagPublishBranch`.
 - **Midtrans**: sandbox account exists; keys not yet retrieved. Not needed until build step 6. Never propose manual/personal QRIS collection as an interim — rejected decision.
 
 ## Environment variable names (use exactly these)
@@ -20,6 +21,9 @@ GEMINI_API_KEY=                   # server-only
 MIDTRANS_SERVER_KEY=              # server-only, sandbox first
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=
 CRON_SECRET=                      # server-only; verifies Vercel Cron -> /api/cron/deadline-sweep
+FLAGS_PUBLICATION_ENABLED=        # server-only; unset/anything but 'true' = publication sweep branch
+                                   # is a no-op. Gates GATE 1 (lawyer review) -- do NOT set to 'true'
+                                   # until that review has cleared. See migration 0023.
 ```
 
 Local: `.env.local` (already gitignored by create-next-app defaults — verify before first commit that adds it). Production: Vercel → Settings → Environment Variables; adding a var requires a redeploy to take effect.
