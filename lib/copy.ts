@@ -445,8 +445,58 @@ export const FLAG_TAIL_SILENT = 'Terlapor tidak merespons dalam 14 hari.';
 export const FLAG_TAIL_DISPUTED = 'Terlapor memberikan tanggapan. Status: klaim berbeda.';
 export const FLAG_EVIDENCE_SUB_LINE = 'Terlapor menyertakan bukti pada tanggapannya.';
 
+// copy-id.md §1 — flag identifier lines (locked 2026-07-20). Per-tier gated
+// exactly as data-model.md's Breach pipeline tier gate specifies: GRATIS
+// shows rekening only, LIMA_RIBU adds phone_hash, BERMETERAI adds
+// identity_verified.
+export function formatFlagRekeningLine(bank: string, rekeningMasked: string): string {
+  return `Rekening: ${bank} ${rekeningMasked}`;
+}
+export function formatFlagPhoneVerifiedLine(hashFragment: string): string {
+  return `Nomor HP terverifikasi · ID: ${hashFragment}`;
+}
+export const FLAG_IDENTITY_VERIFIED_LINE = 'Identitas terverifikasi (e-KYC)';
+
 // C7 — SELESAI, minimal placeholder pending a real design pass
 export const SELESAI_CLOSING_LINE = 'Kesepakatan selesai. Tercatat di SAKSI.';
+
+// C7 — exit state panels (5 terminal states, reachable via RPC). Read-only,
+// both sides identical, no actions. Badges are new UI chrome (not in
+// copy-id.md, same low-stakes category as other approved-inline labels —
+// §7 has no badge-style short label for any of these, only full sentences).
+//
+// Closing lines corrected 2026-07-20 (review finding): the first version of
+// these five invented new wording instead of reusing copy-id.md §7's
+// already-locked record lines, which exist for exactly these states and
+// include a [tgl] interpolation the invented versions dropped entirely.
+// Fixed to the exact §7 text, now as format functions taking the relevant
+// past event's date (see paymentActions.ts's getEventCreatedAt) — the same
+// treatment every other locked string with an interpolated value already
+// gets (formatAccountHistory, formatDeadlineNudgeMessage, etc.).
+export const DIBATALKAN_BERSAMA_BADGE = 'Dibatalkan Bersama';
+export function formatDibatalkanBersamaLine(tgl: string): string {
+  return `Dibatalkan atas kesepakatan bersama (${tgl}).`;
+}
+export const TIDAK_DILANJUTKAN_BADGE = 'Tidak Dilanjutkan';
+export function formatTidakDilanjutkanLine(tgl: string): string {
+  return `Disepakati ${tgl}; tidak dilanjutkan. Belum ada transfer tercatat.`;
+}
+export const KEDALUWARSA_BADGE = 'Kedaluwarsa';
+// Two [tgl]s in §7's locked text: when DISEPAKATI happened, then when
+// payment was claimed (BUKTI_UPLOADED) — KEDALUWARSA is only reachable from
+// DIBAYAR_DIKLAIM/DIKONFIRMASI_TERIMA (migration 0018's get_kedaluwarsa_
+// candidates), so a payment claim always exists by the time this fires.
+export function formatKedaluwarsaLine(disepakatiTgl: string, diklaimTgl: string): string {
+  return `Disepakati ${disepakatiTgl}; pembayaran diklaim ${diklaimTgl}, tidak ada tindak lanjut dari kedua pihak selama 30 hari. Catatan kedaluwarsa.`;
+}
+export const DIKEMBALIKAN_PENUH_BADGE = 'Dikembalikan Penuh';
+export function formatDikembalikanPenuhLine(tgl: string): string {
+  return `Dibatalkan; dana dikembalikan penuh, dikonfirmasi kedua pihak (${tgl}).`;
+}
+export const DIKEMBALIKAN_SEBAGIAN_BADGE = 'Dikembalikan Sebagian';
+export function formatDikembalikanSebagianLine(tgl: string): string {
+  return `Dibatalkan; sebagian dana dikembalikan, dikonfirmasi kedua pihak (${tgl}).`;
+}
 
 // C5/C7 — "riwayat" timeline event labels (deal_events.event -> display text).
 // Only the event names actually reachable on the jual-beli happy path built
@@ -466,6 +516,17 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   // different report paths, not just barang-tidak-sesuai.
   TENGGAT_LEWAT: 'Laporan diajukan: kesepakatan tidak dipenuhi',
   HAK_JAWAB_FILED: 'Tanggapan pihak terlapor diajukan',
+  // C7 — exit state + breach pipeline event labels (2026-07-20). Same
+  // fallback-to-raw-name contract as every other unmapped event; these are
+  // the ones reachable via the 5 terminal exit states + publication sweep.
+  CANCEL_AGREED: 'Kesepakatan dibatalkan bersama',
+  CANCEL_UNILATERAL: 'Kesepakatan tidak dilanjutkan',
+  KEDALUWARSA_LAPSED: 'Kesepakatan kedaluwarsa',
+  REFUND_UPLOADED: 'Bukti pengembalian diunggah',
+  REFUND_CONFIRMED: 'Pengembalian dana dikonfirmasi',
+  REFUND_CONFIRMED_PARTIAL: 'Pengembalian dana sebagian dikonfirmasi',
+  FLAG_PUBLISHED: 'Laporan dipublikasikan',
+  SENGKETA_KADALUARSA: 'Jendela hak jawab berakhir',
 };
 
 // copy-id.md §16 — minimal fill-ins for the non-Section-C-defined side of

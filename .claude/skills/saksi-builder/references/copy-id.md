@@ -20,6 +20,11 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - DISPUTED suffix (replaces the last sentence when hak jawab filed): `Terlapor memberikan tanggapan. Status: klaim berbeda.`
   - If terlapor attached evidence, append: `Terlapor menyertakan bukti pada tanggapannya.`
 
+**Flag identifier lines** (shown below the flag body, per-tier gated — matches data-model.md's Breach pipeline tier gate: GRATIS shows rekening only, LIMA_RIBU adds phone_hash, BERMETERAI adds identity_verified):
+- Rekening (all tiers): `Rekening: [bank] [rekening_masked]`
+- Phone verified (LIMA_RIBU+): `Nomor HP terverifikasi · ID: [12-char hash fragment]`
+- Identity verified (BERMETERAI only): `Identitas terverifikasi (e-KYC)`
+
 **Note:** `SENGKETA` remains the internal status value only (`DealStatus.SENGKETA`, `flags.hak_jawab_status`); the word "sengketa" must never appear on any user-facing surface.
 
 ## 2. Forced-check page (payer, before copy-rekening activates)

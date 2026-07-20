@@ -621,6 +621,32 @@ export async function getDealTimeline(token: string): Promise<TimelineEntry[]> {
   return events ?? [];
 }
 
+// getEventCreatedAt — the exit-state panels (DibatalkanBersamaPanel and
+// friends) need one specific past event's date to fill copy-id.md §7's
+// locked [tgl] interpolation (e.g. "Dibatalkan atas kesepakatan bersama
+// ([tgl])."). A single-event lookup rather than reusing getDealTimeline's
+// full list, mirroring the flag page's own inline single-event query
+// (app/flag/[token]/page.tsx) — same shape, shared here since five panels
+// need it rather than one. Earliest match (ascending order) — every event
+// this is used for fires at most once per deal, but ascending is the safer
+// default over descending if that ever stops being true.
+export async function getEventCreatedAt(token: string, eventName: string): Promise<string | null> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('id').eq('token', token).single();
+  if (!deal) return null;
+
+  const { data: event } = await db
+    .from('deal_events')
+    .select('created_at')
+    .eq('deal_id', deal.id)
+    .eq('event', eventName)
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return event?.created_at ?? null;
+}
+
 // ============================================================
 // confirmFulfillment — C5. Recipient (Pembeli) confirms goods received.
 // Atomic: DIKONFIRMASI_TERIMA -> SELESAI + FULFILLMENT_CONFIRMED event.

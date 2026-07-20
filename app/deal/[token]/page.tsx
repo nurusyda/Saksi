@@ -10,6 +10,11 @@ import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
 import { TidakDipenuhiPanel } from './TidakDipenuhiPanel';
 import { SelesaiPanel } from './SelesaiPanel';
+import { DibatalkanBersamaPanel } from './DibatalkanBersamaPanel';
+import { TidakDilanjutkanPanel } from './TidakDilanjutkanPanel';
+import { KedaluwarsaPanel } from './KedaluwarsaPanel';
+import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
+import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
 import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
 import { formatRp, formatDate } from '@/lib/format';
@@ -49,6 +54,11 @@ export default async function DealPage({
       DealStatus.TIDAK_DIPENUHI,
       DealStatus.SENGKETA,
       DealStatus.SELESAI,
+      DealStatus.DIBATALKAN_BERSAMA,
+      DealStatus.TIDAK_DILANJUTKAN,
+      DealStatus.KEDALUWARSA,
+      DealStatus.DIKEMBALIKAN_PENUH,
+      DealStatus.DIKEMBALIKAN_SEBAGIAN,
     ].includes(deal.status)
   ) {
     notFound();
@@ -83,6 +93,17 @@ export default async function DealPage({
   // earlier IdentifyPartyGate submission) skip re-typing their phone on the
   // next status screen, within the same browser and a ~45-minute window.
   const partySession = await getPartySession(token);
+
+  // Role auto-display (2026-07-20): derive the viewer's own role from the
+  // party-session cookie + the deal's known role pair — no new cookie, no new
+  // DB query. Cold visitors (no session) see nothing.
+  const viewerRoleKey =
+    partySession === 'proposer'
+      ? deal.proposer_role
+      : partySession === 'counterpart'
+        ? counterpartRoleKey
+        : null;
+  const viewerRoleLabel = viewerRoleKey ? ROLE_LABELS[viewerRoleKey] ?? viewerRoleKey : null;
 
   const boundJoinDeal = joinDeal.bind(null, token);
 
@@ -135,10 +156,23 @@ export default async function DealPage({
         {/* Persistent deal link — every status, not just DRAF (UX-audit fix:
             identity is phone-only with no session, so this URL is the only
             way back into the deal; a party who loses it has no recovery
-            path). Omitted at SELESAI: the deal is closed and re-access is no
-            longer time-sensitive. */}
-        {deal.status !== DealStatus.SELESAI && (
+            path). Omitted for terminal states: the deal is closed and
+            re-access is no longer time-sensitive. */}
+        {![
+          DealStatus.SELESAI,
+          DealStatus.DIBATALKAN_BERSAMA,
+          DealStatus.TIDAK_DILANJUTKAN,
+          DealStatus.KEDALUWARSA,
+          DealStatus.DIKEMBALIKAN_PENUH,
+          DealStatus.DIKEMBALIKAN_SEBAGIAN,
+        ].includes(deal.status) && (
           <DealLinkCard url={shareUrl} itemDesc={deal.item_desc} />
+        )}
+
+        {/* Role auto-display (2026-07-20): visible only when the party-session
+            cookie identifies the viewer as one of the two parties. */}
+        {viewerRoleLabel && (
+          <p className="mb-4 text-sm font-medium text-zinc-600">Anda: {viewerRoleLabel}</p>
         )}
 
         {deal.status === DealStatus.DRAF && (
@@ -208,6 +242,12 @@ export default async function DealPage({
         )}
 
         {deal.status === DealStatus.SELESAI && <SelesaiPanel token={token} />}
+
+        {deal.status === DealStatus.DIBATALKAN_BERSAMA && <DibatalkanBersamaPanel token={token} />}
+        {deal.status === DealStatus.TIDAK_DILANJUTKAN && <TidakDilanjutkanPanel token={token} />}
+        {deal.status === DealStatus.KEDALUWARSA && <KedaluwarsaPanel token={token} />}
+        {deal.status === DealStatus.DIKEMBALIKAN_PENUH && <DikembalikanPenuhPanel token={token} />}
+        {deal.status === DealStatus.DIKEMBALIKAN_SEBAGIAN && <DikembalikanSebagianPanel token={token} />}
       </div>
     </div>
   );
