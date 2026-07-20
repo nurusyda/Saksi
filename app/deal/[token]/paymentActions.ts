@@ -7,10 +7,11 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
-import { identifyPartyByPhone, type WhichParty } from '@/lib/db/party';
+import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { uploadBuktiImage } from '@/lib/db/storage';
 import { checkBuktiConsistency } from '@/lib/ocr/gemini';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
+import { sendWaMessage } from '@/lib/wa/send';
 import {
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
@@ -24,7 +25,23 @@ import {
   ERROR_CONFIRM_FAILED,
   ERROR_WRONG_PARTY_PEMBELI_ONLY,
   ERROR_WRONG_PARTY_PENJUAL_ONLY,
+  formatBuktiUploadedMessage,
+  formatReceiptConfirmedMessage,
 } from '@/lib/copy';
+
+// Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
+// copy-id.md §9b) — same contract as actions.ts's notifyTurn: never blocks
+// or fails the transition it's attached to.
+async function notifyTurn(
+  db: ReturnType<typeof supabaseServer>,
+  partyId: string | null,
+  template: 'BUKTI_UPLOADED' | 'RECEIPT_CONFIRMED',
+  message: string,
+): Promise<void> {
+  const phone = await getPartyPhone(db, partyId);
+  if (!phone) return;
+  void sendWaMessage({ toPhoneE164: phone, template, params: { message } });
+}
 
 const RETRY_LIMIT = 3;
 
@@ -276,6 +293,18 @@ export async function submitBukti(
     if (rpcErr) return { error: ERROR_BUKTI_SAVE_FAILED };
     if (rpcRow) {
       void submitAnchor(newHash);
+
+      // Notify the payee (Penjual slot) it's their turn to review the bukti
+      // and confirm receipt.
+      const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
+      const payeePartyId = payeeSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+      void notifyTurn(
+        db,
+        payeePartyId,
+        'BUKTI_UPLOADED',
+        formatBuktiUploadedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+      );
+
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
     }
@@ -420,6 +449,18 @@ export async function confirmReceipt(
     if (rpcErr) return { error: ERROR_CONFIRM_FAILED };
     if (rpcRow) {
       void submitAnchor(newHash);
+
+      // Notify the payer (Pembeli slot) it's their turn to confirm the
+      // goods/fulfillment.
+      const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+      const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+      void notifyTurn(
+        db,
+        payerPartyId,
+        'RECEIPT_CONFIRMED',
+        formatReceiptConfirmedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+      );
+
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
     }

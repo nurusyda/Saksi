@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { supabaseServer } from '@/lib/supabase/server';
 import { DealStatus } from '@/lib/db/transitions';
-import { DealShareButton } from './DealShareButton';
+import { DealLinkCard } from './DealLinkCard';
+import { DealProgressStepper } from './DealProgressStepper';
 import { JoinDealForm } from './JoinDealForm';
 import { AcceptDealForm } from './AcceptDealForm';
 import { DisepakatiPanel } from './DisepakatiPanel';
@@ -76,6 +77,8 @@ export default async function DealPage({
           ← SAKSI
         </a>
 
+        <DealProgressStepper status={deal.status} />
+
         {/* Deal summary card */}
         <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -113,21 +116,17 @@ export default async function DealPage({
           </div>
         </div>
 
+        {/* Persistent deal link — every status, not just DRAF (UX-audit fix:
+            identity is phone-only with no session, so this URL is the only
+            way back into the deal; a party who loses it has no recovery
+            path). Omitted at SELESAI: the deal is closed and re-access is no
+            longer time-sensitive. */}
+        {deal.status !== DealStatus.SELESAI && (
+          <DealLinkCard url={shareUrl} itemDesc={deal.item_desc} />
+        )}
+
         {deal.status === DealStatus.DRAF && (
           <>
-            {/* Share section */}
-            <div className="mb-6 rounded-xl border border-zinc-200 p-5">
-              <p className="mb-2 text-sm font-medium text-zinc-700">
-                Bagikan link ini kepada pihak lain:
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 truncate rounded bg-zinc-100 px-3 py-2 text-xs text-zinc-800">
-                  {shareUrl}
-                </code>
-                <DealShareButton url={shareUrl} />
-              </div>
-            </div>
-
             {/* Counterpart entry form */}
             <div className="rounded-xl border border-zinc-200 p-5">
               <p className="mb-1 text-sm font-semibold text-zinc-900">

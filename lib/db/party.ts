@@ -30,3 +30,18 @@ export async function identifyPartyByPhone(
   if (counterpartParty?.phone_hash === pHash) return 'counterpart';
   return null;
 }
+
+// Added for the UX-audit fix pass (2026-07-20) — turn-taking WA
+// notifications need the *other* (or next-to-act) party's phone_e164 by
+// party id. Returns null on a missing id or a lookup miss so call sites can
+// treat "no phone to notify" as a no-op rather than an error; sending a
+// best-effort WA nudge should never block or fail the transition it's
+// attached to.
+export async function getPartyPhone(
+  db: SupabaseClient,
+  partyId: string | null,
+): Promise<string | null> {
+  if (!partyId) return null;
+  const { data } = await db.from('parties').select('phone_e164').eq('id', partyId).single();
+  return data?.phone_e164 ?? null;
+}

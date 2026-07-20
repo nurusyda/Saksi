@@ -6,8 +6,9 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
-import { identifyPartyByPhone, type WhichParty } from '@/lib/db/party';
+import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
+import { sendWaMessage } from '@/lib/wa/send';
 import {
   ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
@@ -21,7 +22,27 @@ import {
   ERROR_DEAL_CLOSED,
   ERROR_TOO_MANY_ATTEMPTS,
   ERROR_ACCEPT_FAILED,
+  formatCounterpartJoinedMessage,
+  formatPartyAcceptedMessage,
+  formatDisepakatiMessage,
 } from '@/lib/copy';
+
+// Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
+// copy-id.md §9b). Never awaited by callers with a blocking `await` on its
+// result and never allowed to fail the transition it's attached to —
+// sendWaMessage already swallows its own errors (returns {sent: false}
+// rather than throwing), so this is a thin fetch-phone-then-send wrapper,
+// not a retry/queue mechanism.
+async function notifyTurn(
+  db: ReturnType<typeof supabaseServer>,
+  partyId: string | null,
+  template: 'COUNTERPART_JOINED' | 'PARTY_ACCEPTED' | 'DISEPAKATI',
+  message: string,
+): Promise<void> {
+  const phone = await getPartyPhone(db, partyId);
+  if (!phone) return;
+  void sendWaMessage({ toPhoneE164: phone, template, params: { message } });
+}
 
 export type JoinDealState = {
   error?: string;
@@ -167,6 +188,16 @@ export async function joinDeal(
 
   void submitAnchor(newHash);
 
+  // Notify the proposer it's their turn to accept — they created the deal
+  // but have no way of knowing the counterpart just joined otherwise (no
+  // session, no push; the URL is only as live as whoever last opened it).
+  void notifyTurn(
+    db,
+    deal.proposer_id,
+    'COUNTERPART_JOINED',
+    formatCounterpartJoinedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+  );
+
   revalidatePath(`/deal/${token}`);
   redirect(`/deal/${token}`);
 }
@@ -299,6 +330,22 @@ export async function acceptDeal(
 
   void submitAnchor(recordedNewHash);
 
+  const bothAccepted = recordedFlags.proposer_accepted && recordedFlags.counterpart_accepted;
+
+  // Only one side has accepted so far — notify whichever party this request
+  // was NOT from that it's their turn. (When both are true, both parties
+  // have already accepted; the DISEPAKATI notification below covers that
+  // case instead, targeted at the payer specifically.)
+  if (!bothAccepted) {
+    const otherPartyId = whichParty === 'proposer' ? deal.counterpart_id : deal.proposer_id;
+    void notifyTurn(
+      db,
+      otherPartyId,
+      'PARTY_ACCEPTED',
+      formatPartyAcceptedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+    );
+  }
+
   // Always attempt to finalize right after — finalize_deal_acceptance's own
   // guard (WHERE status = 'DIAJUKAN' AND proposer_accepted AND
   // counterpart_accepted) makes this a safe no-op when the other party
@@ -381,6 +428,18 @@ export async function acceptDeal(
       console.error('finalize_deal_acceptance exhausted retries', deal.id);
       return { error: ERROR_ACCEPT_FAILED };
     }
+
+    // Both parties have now accepted — notify the payer it's their turn.
+    // proposer_role never changes, so it's safe to read off the original
+    // `deal` fetch rather than the loop's re-fetched `cur`.
+    const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+    const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+    void notifyTurn(
+      db,
+      payerPartyId,
+      'DISEPAKATI',
+      formatDisepakatiMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
+    );
   }
 
   revalidatePath(`/deal/${token}`);

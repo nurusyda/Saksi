@@ -312,3 +312,53 @@ export const WAITING_FOR_RECEIPT_CONFIRMATION =
 export function formatDeadlineNudgeMessage(itemDesc: string, dealUrl: string): string {
   return `Kesepakatan SAKSI Anda ("${itemDesc}") telah melewati batas waktu. Buka ${dealUrl} untuk melihat status dan tindakan yang diperlukan.`;
 }
+
+// copy-id.md §9b — turn-taking WA notifications (locked 2026-07-20). Unlike
+// formatDeadlineNudgeMessage, each of these is tied to exactly one transition,
+// so each names the specific next action instead of staying state-agnostic.
+// Sender identity matches §9/§9a: SAKSI (saksi.app).
+export function formatCounterpartJoinedMessage(itemDesc: string, dealUrl: string): string {
+  return `Kesepakatan SAKSI Anda ("${itemDesc}") sudah dibuka pihak lain. Buka ${dealUrl} untuk menyetujui.`;
+}
+
+export function formatPartyAcceptedMessage(itemDesc: string, dealUrl: string): string {
+  return `Pihak lain telah menyetujui kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk menyetujui.`;
+}
+
+export function formatDisepakatiMessage(itemDesc: string, dealUrl: string): string {
+  return `Kesepakatan SAKSI Anda ("${itemDesc}") telah disetujui kedua pihak. Buka ${dealUrl} untuk melakukan pembayaran.`;
+}
+
+export function formatBuktiUploadedMessage(itemDesc: string, dealUrl: string): string {
+  return `Bukti transfer telah diunggah untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi penerimaan dana.`;
+}
+
+export function formatReceiptConfirmedMessage(itemDesc: string, dealUrl: string): string {
+  return `Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi barang diterima.`;
+}
+
+// ============================================================
+// UI chrome added for the UX-audit fix pass (2026-07-20) — not legally
+// adjacent copy, not in copy-id.md by design (same category as
+// PENDING_DEFAULT_LABEL / COPY_REKENING_COPIED_LABEL above), but centralized
+// here per Law 3 discipline.
+// ============================================================
+
+// Persistent deal-link card (shown on every non-terminal deal status, not
+// just DRAF — the audit's "lost link = lost deal" finding, since identity is
+// phone-only with no session).
+export const DEAL_LINK_CARD_HEADING = 'Link kesepakatan ini';
+export const DEAL_LINK_SAVE_HINT =
+  'Simpan link ini. Tanpa link, kesepakatan tidak dapat dibuka kembali.';
+export const SHARE_TO_WHATSAPP_LABEL = 'Bagikan ke WhatsApp';
+
+// Progress stepper (6 nodes: Dibuat -> Bergabung -> Disepakati -> Dibayar ->
+// Diterima -> Selesai), shown on every deal-page status.
+export const PROGRESS_STEP_LABELS: readonly string[] = [
+  'Dibuat',
+  'Bergabung',
+  'Disepakati',
+  'Dibayar',
+  'Diterima',
+  'Selesai',
+];

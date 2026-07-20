@@ -8,7 +8,18 @@ const FONNTE_API_URL = 'https://api.fonnte.com/send';
 
 export interface WaMessage {
   toPhoneE164: string;
-  template: 'DEADLINE_NUDGE';
+  // Turn-taking templates added for the UX-audit fix pass (2026-07-20,
+  // copy-id.md §9b) — one per state transition, fired to whichever party
+  // must act next. DEADLINE_NUDGE remains the only one the deadline-sweep
+  // cron sends; the rest are sent inline from the transition actions
+  // themselves (joinDeal, acceptDeal, submitBukti, confirmReceipt).
+  template:
+    | 'DEADLINE_NUDGE'
+    | 'COUNTERPART_JOINED'
+    | 'PARTY_ACCEPTED'
+    | 'DISEPAKATI'
+    | 'BUKTI_UPLOADED'
+    | 'RECEIPT_CONFIRMED';
   params: Record<string, string>;
 }
 

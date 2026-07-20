@@ -96,6 +96,23 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 
 *Message is state-agnostic by design: does not name the specific action (differs by DIBAYAR_DIKLAIM vs DIKONFIRMASI_TERIMA) and does not preview day-counts for what happens next, so the text can't drift out of sync with the sweep's grace-period numbers.*
 
+## 9b. Turn-taking WA notifications (locked 2026-07-20)
+
+*Sender identity: same as §9/§9a — `SAKSI (saksi.app)`. Unlike §9a's deadline nudge, each of these is tied to exactly one transition, so each names the specific next action rather than staying state-agnostic.*
+
+Fired once per transition, to whichever party must act next:
+
+- **Counterpart joined (DRAF → DIAJUKAN), to the proposer:**
+  > Kesepakatan SAKSI Anda ("[deskripsi]") sudah dibuka pihak lain. Buka [url] untuk menyetujui.
+- **One party accepted, to the party who hasn't yet:**
+  > Pihak lain telah menyetujui kesepakatan SAKSI Anda ("[deskripsi]"). Buka [url] untuk menyetujui.
+- **Both accepted (→ DISEPAKATI), to the payer:**
+  > Kesepakatan SAKSI Anda ("[deskripsi]") telah disetujui kedua pihak. Buka [url] untuk melakukan pembayaran.
+- **Bukti uploaded (→ DIBAYAR_DIKLAIM), to the payee:**
+  > Bukti transfer telah diunggah untuk kesepakatan SAKSI Anda ("[deskripsi]"). Buka [url] untuk mengonfirmasi penerimaan dana.
+- **Receipt confirmed (→ DIKONFIRMASI_TERIMA), to the payer:**
+  > Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("[deskripsi]"). Buka [url] untuk mengonfirmasi barang diterima.
+
 ## 10. Meterai mock label (demo only)
 
 > Simulasi meterai elektronik. Integrasi distributor resmi Peruri pada rilis produksi. Dokumen ini belum bermeterai.

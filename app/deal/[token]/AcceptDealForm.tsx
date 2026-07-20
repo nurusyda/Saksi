@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { AcceptDealState } from './actions';
+import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import { ACCEPT_BUTTON_LABEL, PHONE_FIELD_LABEL, PHONE_FORMAT_HINT, PENDING_DEFAULT_LABEL } from '@/lib/copy';
 
 function SubmitButton() {
@@ -26,6 +27,7 @@ export function AcceptDealForm({
   action: (prev: AcceptDealState, formData: FormData) => Promise<AcceptDealState>;
 }) {
   const [state, formAction] = useActionState(action, initialState);
+  const [phone, setPhone] = usePersistedPhone();
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -51,6 +53,8 @@ export function AcceptDealForm({
           type="tel"
           inputMode="tel"
           autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
         />
       </div>

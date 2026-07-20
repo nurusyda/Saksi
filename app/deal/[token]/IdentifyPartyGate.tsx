@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState, useState, type ReactNode } from 'react';
+import { useActionState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { IdentifyState } from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
+import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import { PHONE_FIELD_LABEL, PHONE_FORMAT_HINT } from '@/lib/copy';
 
 function SubmitButton() {
@@ -36,7 +37,7 @@ export function IdentifyPartyGate({
   children: (whichParty: WhichParty, phone: string) => ReactNode;
 }) {
   const [state, formAction] = useActionState(action, initialState);
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = usePersistedPhone();
 
   if (state.whichParty) {
     return <>{children(state.whichParty, phone)}</>;
