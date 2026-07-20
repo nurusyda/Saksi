@@ -365,23 +365,29 @@ export default function BuatPage() {
                 </div>
               </label>
               {/* Paid tiers — compact "segera hadir" cards */}
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
-                <span className="text-zinc-400">·</span>
-                <span className="truncate text-zinc-400">{TIER_LIMA_RIBU_DESC}</span>
-                <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
-                  <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                  {NOTIFY_ME_LABEL}
-                </label>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
+                  <span className="text-zinc-400">·</span>
+                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
+                  <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
+                    <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
+                    {NOTIFY_ME_LABEL}
+                  </label>
+                </div>
+                <p className="mt-0.5 text-zinc-400">{TIER_LIMA_RIBU_DESC}</p>
               </div>
-              <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
-                <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
-                <span className="text-zinc-400">·</span>
-                <span className="truncate text-zinc-400">{TIER_BERMETERAI_DESC}</span>
-                <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
-                  <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                  {NOTIFY_ME_LABEL}
-                </label>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
+                  <span className="text-zinc-400">·</span>
+                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
+                  <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
+                    <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
+                    {NOTIFY_ME_LABEL}
+                  </label>
+                </div>
+                <p className="mt-0.5 text-zinc-400">{TIER_BERMETERAI_DESC}</p>
               </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
