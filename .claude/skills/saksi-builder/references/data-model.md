@@ -25,7 +25,11 @@ create table deals (
   amount_idr bigint not null,
   rekening_tujuan text not null,            -- destination account; masked in public views
   rekening_bank text not null,
-  deadline date not null,
+  deadline date not null,                   -- target date both parties expect the whole
+                                             -- exchange (payment + fulfillment) to be
+                                             -- concluded by; anchors both TIDAK_DILANJUTKAN
+                                             -- and KEDALUWARSA (resolved 2026-07-20 — see
+                                             -- State machine section for the reasoning)
   status text not null default 'DRAF',
   meterai_applied boolean default false,
   created_at timestamptz default now()
@@ -207,6 +211,8 @@ ROADMAP.md Tier A+: the current schema's single `amount_idr` column, and the sin
 - **Copy — resolved.** copy-id.md §14's `Konfirmasi uang sudah dikembalikan` becomes the label for the **collapsed** step — the single `REPAYMENT_CONFIRMED` action that both confirms receipt and closes the loan (`DIBAYAR_DIKLAIM` → `SELESAI`), not a separate later fulfillment step. Not touching copy-id.md itself yet — this stays a design-doc note; the string is already locked as-is and its *meaning* (which transition it labels) is what changed here, not its text. Still needed, not drafted here since it postdates this resolution: leg-1 labels (disbursement claim + confirm-receipt + the "Option A, not received" mirror of jual-beli's "Dana belum masuk"), none of which exist in copy-id.md today — wording should follow the now-resolved flow, to be drafted when this gets built.
 
 - **Open gap, flagged, not resolved here: PERPANJANGAN eligibility for the two new leg-1 states.** The locked PERPANJANGAN spec's eligible source states are `DISEPAKATI`/`DIBAYAR_DIKLAIM`/`DIKONFIRMASI_TERIMA` — written before `DANA_DICAIRKAN_DIKLAIM`/`DANA_DIKONFIRMASI_DITERIMA` existed. As currently specified, a lender who needs more time before disbursing has no way to propose a deadline extension while the deal sits in `DANA_DICAIRKAN_DIKLAIM`. Not silently adding the two new states to PERPANJANGAN's eligible-states list here — that's a separate decision (this section doesn't touch the Extension section above), just flagging that the two designs don't yet cover each other's states.
+
+- **Open gap, flagged, not resolved here: what "deadline" means across two legs.** The core `deals.deadline` field is now documented (Tables section, resolved 2026-07-20) as "the date both parties expect the *whole exchange* to be concluded by." For the two-leg case that raises a question this design pass doesn't answer: does "whole exchange concluded" mean by *repayment* (the loan's actual end, leg 2) — leaving disbursement (leg 1) with no deadline of its own — or does leg 1 need its own implicit target date, distinct from `deadline`, so a stalled disbursement and a stalled repayment aren't both silently measured against the same single date? Not resolved here; pinjam-meminjam is still gated off.
 
 - **DDL comment** (not a migration — design pass, no code):
   ```sql
