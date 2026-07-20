@@ -75,6 +75,7 @@ end;
 $$;
 
 revoke execute on function join_deal_with_event(uuid, uuid, text, text, text, text, text, text) from public;
+grant execute on function join_deal_with_event(uuid, uuid, text, text, text, text, text, text) to service_role;
 
 -- ============================================================
 -- Dead code removal: the old two-step accept mechanism (individual
