@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { supabaseServer } from '@/lib/supabase/server';
 import { DealStatus } from '@/lib/db/transitions';
 import { DealLinkCard } from './DealLinkCard';
@@ -67,6 +68,13 @@ export default async function DealPage({
 
   const shareUrl = `https://saksi.app/deal/${token}`;
 
+  // Detect whether the viewer is the proposer (cookie set by createDeal).
+  // Without sessions, this is a best-effort signal: it works for the
+  // proposer's current browser, doesn't survive cross-device or clearing
+  // cookies, and a miss harmlessly shows the join form anyway.
+  const cookieStore = await cookies();
+  const isProposer = cookieStore.get(`saksi_proposer_${token}`)?.value === '1';
+
   const boundJoinDeal = joinDeal.bind(null, token);
   const boundAcceptDeal = acceptDeal.bind(null, token);
 
@@ -127,16 +135,21 @@ export default async function DealPage({
 
         {deal.status === DealStatus.DRAF && (
           <>
-            {/* Counterpart entry form */}
-            <div className="rounded-xl border border-zinc-200 p-5">
-              <p className="mb-1 text-sm font-semibold text-zinc-900">
-                {JOIN_FORM_HEADING}
-              </p>
-              <p className="mb-4 text-xs text-zinc-500">
-                {JOIN_DEAL_INSTRUCTION}
-              </p>
-              <JoinDealForm action={boundJoinDeal} needsRekening={deal.proposer_role === 'PEMBELI'} />
-            </div>
+            {isProposer ? (
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+                Menunggu pihak lain membuka link dan bergabung. Bagikan link di bawah ke pihak penerima.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-zinc-200 p-5">
+                <p className="mb-1 text-sm font-semibold text-zinc-900">
+                  {JOIN_FORM_HEADING}
+                </p>
+                <p className="mb-4 text-xs text-zinc-500">
+                  {JOIN_DEAL_INSTRUCTION}
+                </p>
+                <JoinDealForm action={boundJoinDeal} needsRekening={deal.proposer_role === 'PEMBELI'} />
+              </div>
+            )}
           </>
         )}
 

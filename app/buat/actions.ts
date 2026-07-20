@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
 import { nanoid } from 'nanoid';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -209,6 +210,12 @@ export async function createDeal(
   }
 
   void submitAnchor(newHash);
+
+  // Mark this browser as the proposer so the deal page hides the join form.
+  // The cookie is scoped to this specific token — creating another deal sets
+  // a different cookie, so proposer-of-A isn't mistaken for proposer-of-B.
+  const cookieStore = await cookies();
+  cookieStore.set(`saksi_proposer_${token}`, '1', { maxAge: 86400, path: '/', sameSite: 'lax', secure: true });
 
   redirect(`/deal/${token}`);
 }
