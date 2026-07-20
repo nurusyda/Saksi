@@ -11,7 +11,6 @@ import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { sendWaMessage } from '@/lib/wa/send';
 import {
-  ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_SELF_JOIN,
   ERROR_PHONE_INVALID,
@@ -69,11 +68,12 @@ export async function joinDeal(
   if (deal.status !== DealStatus.DRAF)
     return { error: ERROR_DEAL_CLOSED };
 
-  // Attestation gate — must pass before any DB write
-  const allAttestationsOn =
-    ATTESTATIONS.every((_, i) => formData.get(`attest_${i}`) === 'on') &&
-    formData.get('attest_tc') === 'on';
-  if (!allAttestationsOn) return { error: ERROR_ATTESTATIONS_REQUIRED };
+  // Attestation gate — the four pernyataan (displayed as fine print above the
+  // T&C checkbox) are covered by the single T&C consent checkbox per the
+  // 2026-07-20 design: Syarat & Ketentuan already enumerates them, and
+  // collecting 5 individual checkbox clicks for what is legally one consent
+  // (accepting the terms) added friction without adding consent quality.
+  if (formData.get('attest_tc') !== 'on') return { error: ERROR_ATTESTATIONS_REQUIRED };
 
   // Parse counterpart phone
   const rawPhone = (formData.get('counterpart_phone') as string | null)?.trim() ?? '';

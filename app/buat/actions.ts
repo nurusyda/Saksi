@@ -14,7 +14,6 @@ import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import { getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
 import { getTodayWib } from '@/lib/format';
 import {
-  ATTESTATIONS,
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_RATE_LIMIT,
   ERROR_PHONE_INVALID,
@@ -72,10 +71,10 @@ export async function createDeal(
   const tier = (formData.get('tier') as string | null) ?? 'GRATIS';
 
   // Attestation gate — must pass before any field validation or DB write
-  const allAttestationsOn =
-    ATTESTATIONS.every((_, i) => formData.get(`attest_${i}`) === 'on') &&
-    formData.get('attest_tc') === 'on';
-  if (!allAttestationsOn) return { error: ERROR_ATTESTATIONS_REQUIRED };
+  // Single T&C consent checkbox covers the four pernyataan (displayed as fine
+  // print above it) — see JoinDealForm's 2026-07-20 design pass for the full
+  // reasoning (same consent model, same change applied to both forms).
+  if (formData.get('attest_tc') !== 'on') return { error: ERROR_ATTESTATIONS_REQUIRED };
 
   const fieldErrors: Record<string, string> = {};
 

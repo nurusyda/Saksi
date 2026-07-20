@@ -35,9 +35,7 @@ export function JoinDealForm({
   needsRekening?: boolean;
 }) {
   const [state, formAction] = useActionState(action, initialState);
-  const [checked, setChecked] = useState<boolean[]>(
-    Array(ATTESTATIONS.length + 1).fill(false),
-  );
+  const [tcChecked, setTcChecked] = useState(false);
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
   // Written to sessionStorage on change — with the accept step folded away
@@ -48,9 +46,6 @@ export function JoinDealForm({
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
 
   const fe = state.fieldErrors ?? {};
-  const allChecked = checked.every(Boolean);
-  const toggle = (i: number) =>
-    setChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -135,24 +130,17 @@ export function JoinDealForm({
 
       <fieldset className="flex flex-col gap-3">
         <legend className="text-sm font-medium text-zinc-700">Pernyataan</legend>
-        {ATTESTATIONS.map((text, i) => (
-          <label key={i} className="flex items-start gap-3 text-sm text-zinc-700">
-            <input
-              type="checkbox"
-              name={`attest_${i}`}
-              checked={checked[i]}
-              onChange={() => toggle(i)}
-              className="mt-0.5 shrink-0"
-            />
-            <span>{text}</span>
-          </label>
-        ))}
+        <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs text-zinc-500">
+          {ATTESTATIONS.map((text, i) => (
+            <li key={i}>{text}</li>
+          ))}
+        </ol>
         <label className="flex items-start gap-3 text-sm text-zinc-700">
           <input
             type="checkbox"
             name="attest_tc"
-            checked={checked[ATTESTATIONS.length]}
-            onChange={() => toggle(ATTESTATIONS.length)}
+            checked={tcChecked}
+            onChange={() => setTcChecked((v) => !v)}
             className="mt-0.5 shrink-0"
           />
           <TCLabel />
@@ -160,7 +148,7 @@ export function JoinDealForm({
         <PrivacyLink />
       </fieldset>
 
-      <SubmitButton allChecked={allChecked} />
+      <SubmitButton allChecked={tcChecked} />
     </form>
   );
 }

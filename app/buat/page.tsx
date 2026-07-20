@@ -84,9 +84,7 @@ const initialState: CreateDealState = {};
 
 export default function BuatPage() {
   const [state, formAction] = useActionState(createDeal, initialState);
-  const [checked, setChecked] = useState<boolean[]>(
-    Array(ATTESTATIONS.length + 1).fill(false),
-  );
+  const [tcChecked, setTcChecked] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
@@ -134,10 +132,6 @@ export default function BuatPage() {
   }, [effectiveBank, rekening]);
 
   const fe = state.fieldErrors ?? {};
-  const allChecked = checked.every(Boolean);
-
-  const toggle = (i: number) =>
-    setChecked((prev) => prev.map((v, j) => (j === i ? !v : v)));
 
   return (
     <div className="min-h-screen bg-white px-4 py-10">
@@ -430,27 +424,21 @@ export default function BuatPage() {
             <FieldError msg={fe.tier} />
           </fieldset>
 
-          {/* 4 individual attestations + bundled T&C */}
+          {/* Pernyataan — displayed as fine print above the single T&C consent
+              checkbox, matching JoinDealForm's 2026-07-20 design. */}
           <fieldset className="flex flex-col gap-3">
             <legend className="text-sm font-medium text-zinc-700">Pernyataan</legend>
-            {ATTESTATIONS.map((text, i) => (
-              <label key={i} className="flex items-start gap-3 text-sm text-zinc-700">
-                <input
-                  type="checkbox"
-                  name={`attest_${i}`}
-                  checked={checked[i]}
-                  onChange={() => toggle(i)}
-                  className="mt-0.5 shrink-0"
-                />
-                <span>{text}</span>
-              </label>
-            ))}
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs text-zinc-500">
+              {ATTESTATIONS.map((text, i) => (
+                <li key={i}>{text}</li>
+              ))}
+            </ol>
             <label className="flex items-start gap-3 text-sm text-zinc-700">
               <input
                 type="checkbox"
                 name="attest_tc"
-                checked={checked[ATTESTATIONS.length]}
-                onChange={() => toggle(ATTESTATIONS.length)}
+                checked={tcChecked}
+                onChange={() => setTcChecked((v) => !v)}
                 className="mt-0.5 shrink-0"
               />
               <TCLabel />
@@ -458,7 +446,7 @@ export default function BuatPage() {
             <PrivacyLink />
           </fieldset>
 
-          <SubmitButton allChecked={allChecked} />
+          <SubmitButton allChecked={tcChecked} />
         </form>
       </div>
     </div>
