@@ -18,7 +18,6 @@ import {
   TIER_LIMA_RIBU_DESC,
   TIER_BERMETERAI_DESC,
   TIER_FOOTER,
-  BELUM_TERSEDIA_LABEL,
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
   formatAccountHistory,
@@ -38,12 +37,12 @@ const SELECTABLE_ROLES = [
   { value: 'PEMBELI', label: ROLE_LABELS.PEMBELI },
 ];
 
-// Pemberi Pinjaman/Peminjam and Pemilik/Penyewa are no longer listed here —
-// the jenis-transaksi selector above (Section B) now covers "not available"
-// messaging for those two deal types at a higher level. LAINNYA isn't a
-// jenis-transaksi option, so it keeps its own disabled card here.
+// Unavailable role groups — compact "segera hadir" cards with grey shadow
+// so they read as informational, not interactive. PEMBERI_PINJAMAN/PEMINJAM
+// and PEMILIK/PENYEWA show both complementary roles in one card.
 const UNAVAILABLE_ROLE_GROUPS = [
-  { key: 'LAINNYA', label: ROLE_LABELS.LAINNYA },
+  { key: 'PINJAM_MEMINJAM', label: `${ROLE_LABELS.PEMBERI_PINJAMAN} / ${ROLE_LABELS.PEMINJAM}` },
+  { key: 'SEWA_MENYEWA', label: `${ROLE_LABELS.PEMILIK} / ${ROLE_LABELS.PENYEWA}` },
 ];
 
 // Section B — jenis transaksi selector. Only jual-beli is functional;
@@ -51,12 +50,6 @@ const UNAVAILABLE_ROLE_GROUPS = [
 const UNAVAILABLE_DEAL_TYPES = [
   { key: 'PINJAM_MEMINJAM', label: DEAL_TYPE_LABELS.PINJAM_MEMINJAM, fieldName: 'interest_pinjam_meminjam' },
   { key: 'SEWA_MENYEWA', label: DEAL_TYPE_LABELS.SEWA_MENYEWA, fieldName: 'interest_sewa_menyewa' },
-];
-
-const TIERS: { value: string; label: string; desc: string; interestFieldName?: string }[] = [
-  { value: 'GRATIS', label: TIER_LABELS.GRATIS, desc: TIER_GRATIS_DESC },
-  { value: 'LIMA_RIBU', label: TIER_LABELS.LIMA_RIBU, desc: TIER_LIMA_RIBU_DESC, interestFieldName: 'interest_tier_lima_ribu' },
-  { value: 'BERMETERAI', label: TIER_LABELS.BERMETERAI, desc: TIER_BERMETERAI_DESC, interestFieldName: 'interest_tier_bermeterai' },
 ];
 
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
@@ -157,10 +150,11 @@ export default function BuatPage() {
                 <span className="font-medium text-blue-900">{DEAL_TYPE_LABELS.JUAL_BELI}</span>
               </div>
               {UNAVAILABLE_DEAL_TYPES.map((d) => (
-                <div key={d.key} className="rounded-lg border border-zinc-200 p-3 text-sm">
-                  <span className="font-medium text-zinc-900">{d.label}</span>
-                  <p className="text-zinc-500">{SEGERA_HADIR_LABEL}</p>
-                  <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+                <div key={d.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                  <span className="font-medium text-zinc-500">{d.label}</span>
+                  <span className="text-zinc-400">·</span>
+                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
+                  <label className="ml-auto flex items-center gap-1 text-zinc-500">
                     <input type="checkbox" name={d.fieldName} className="shrink-0" />
                     {NOTIFY_ME_LABEL}
                   </label>
@@ -215,11 +209,12 @@ export default function BuatPage() {
                 </p>
               );
             })()}
-            <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-2 flex flex-col gap-1.5">
               {UNAVAILABLE_ROLE_GROUPS.map((g) => (
-                <div key={g.key} className="rounded-lg border border-zinc-200 p-3 text-sm">
-                  <span className="font-medium text-zinc-900">{g.label}</span>
-                  <p className="text-zinc-500">{BELUM_TERSEDIA_LABEL}</p>
+                <div key={g.key} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                  <span className="font-medium text-zinc-500">{g.label}</span>
+                  <span className="text-zinc-400">·</span>
+                  <span className="text-zinc-400">{SEGERA_HADIR_LABEL}</span>
                 </div>
               ))}
             </div>
@@ -336,6 +331,9 @@ export default function BuatPage() {
             <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
               Batas waktu
             </label>
+            <p className="text-xs text-zinc-500">
+              Tanggal terakhir kesepakatan harus dipenuhi. Kesepakatan yang tidak ada tindak lanjut dapat berakhir kedaluwarsa.
+            </p>
             <input
               id="deadline"
               name="deadline"
@@ -350,35 +348,41 @@ export default function BuatPage() {
           <fieldset>
             <legend className="text-sm font-medium text-zinc-700">Tingkatan pencatatan</legend>
             <div className="mt-2 flex flex-col gap-2">
-              {TIERS.map((t) =>
-                t.value === 'GRATIS' ? (
-                  <label
-                    key={t.value}
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
-                  >
-                    <input
-                      type="radio"
-                      name="tier"
-                      value={t.value}
-                      defaultChecked
-                      className="mt-0.5 shrink-0"
-                    />
-                    <div>
-                      <span className="font-medium text-blue-900">{t.label}</span>
-                      <p className="text-zinc-500">{t.desc}</p>
-                    </div>
-                  </label>
-                ) : (
-                  <div key={t.value} className="rounded-lg border border-zinc-200 p-3 text-sm">
-                    <span className="font-medium text-zinc-900">{t.label}</span>
-                    <p className="text-zinc-500">{t.desc}</p>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
-                      <input type="checkbox" name={t.interestFieldName} className="shrink-0" />
-                      {NOTIFY_ME_LABEL}
-                    </label>
-                  </div>
-                ),
-              )}
+              <label
+                key="GRATIS"
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
+              >
+                <input
+                  type="radio"
+                  name="tier"
+                  value="GRATIS"
+                  defaultChecked
+                  className="mt-0.5 shrink-0"
+                />
+                <div>
+                  <span className="font-medium text-blue-900">{TIER_LABELS.GRATIS}</span>
+                  <p className="text-zinc-500">{TIER_GRATIS_DESC}</p>
+                </div>
+              </label>
+              {/* Paid tiers — compact "segera hadir" cards */}
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                <span className="font-medium text-zinc-500">{TIER_LABELS.LIMA_RIBU}</span>
+                <span className="text-zinc-400">·</span>
+                <span className="truncate text-zinc-400">{TIER_LIMA_RIBU_DESC}</span>
+                <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
+                  <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
+                  {NOTIFY_ME_LABEL}
+                </label>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-2 py-1.5 text-xs shadow-sm shadow-zinc-200/50">
+                <span className="font-medium text-zinc-500">{TIER_LABELS.BERMETERAI}</span>
+                <span className="text-zinc-400">·</span>
+                <span className="truncate text-zinc-400">{TIER_BERMETERAI_DESC}</span>
+                <label className="ml-auto flex shrink-0 items-center gap-1 text-zinc-500">
+                  <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
+                  {NOTIFY_ME_LABEL}
+                </label>
+              </div>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
               {TIER_FOOTER}
