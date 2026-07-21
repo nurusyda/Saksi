@@ -314,45 +314,87 @@ export async function submitBukti(
   _prev: SubmitBuktiState,
   formData: FormData,
 ): Promise<SubmitBuktiState> {
+  if (formData.get('attest_bukti') !== 'on') return { error: ERROR_BUKTI_ATTESTATION_REQUIRED };
+  const file = formData.get('bukti_file') as File | null;
+  if (!file || file.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
+
+  const result = await recordBuktiForPayer(token, phone, file);
+  if (result.error) return result;
+
+  revalidatePath(`/deal/${token}`);
+  redirect(`/deal/${token}`);
+}
+
+// ============================================================
+// recordBuktiForPayer (§38) — the payment claim itself, taking the File
+// directly instead of re-reading it from FormData.
+//
+// joinAndPay used to call submitBukti, which re-read `bukti_file` from the
+// same FormData *after* the join's DB round-trips. Two production attempts to
+// fix that in place (§36 re-buffering, §37 collapsing the screens) both left
+// the join landing without the bukti — verified in the data, not the logs:
+// deals sitting at DISEPAKATI with `CREATED -> COUNTERPART_JOINED -> ACCEPTED`
+// and zero bukti rows, while the standalone upload path always worked.
+//
+// Rather than keep guessing at which part of that re-read was unsafe, the
+// re-read is gone: the caller passes the File it already holds. joinAndPay
+// buffers once, up front, and hands the same object here. Nothing about this
+// function depends on request plumbing surviving an await.
+//
+// Every early return is logged with a distinct reason. The previous two
+// attempts were hard to diagnose precisely because this failed silently while
+// every layer reported success.
+// ============================================================
+
+export async function recordBuktiForPayer(
+  token: string,
+  phone: string,
+  file: File,
+): Promise<SubmitBuktiState> {
   const db = supabaseServer();
+  const fail = (code: string, message: string): SubmitBuktiState => {
+    console.error(`[bukti] ${code} for ${token}`);
+    return { error: message };
+  };
 
   const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
-  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
-  if (deal.status !== DealStatus.DISEPAKATI) return { error: ERROR_DEAL_CLOSED };
+  if (dealErr || !deal) return fail('deal-not-found', ERROR_DEAL_NOT_FOUND);
+  if (deal.status !== DealStatus.DISEPAKATI) {
+    return fail(`wrong-status:${deal.status}`, ERROR_DEAL_CLOSED);
+  }
 
   // Blocker found by monster_check: every action that re-verifies a
   // caller-supplied phone against a deal is a phone-enumeration oracle
   // (distinct error responses leak match/no-match/wrong-party) unless
   // rate-limited — this mutating action had the same identifyPartyByPhone
   // call as the view actions but was missing the guard.
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+  if (!(await checkIdentifyRateLimit(db, deal.id))) {
+    return fail('rate-limited', ERROR_TOO_MANY_ATTEMPTS);
+  }
 
   let whichParty: WhichParty | null;
   try {
     whichParty = await identifyPartyByPhone(db, deal, phone);
   } catch {
-    return { error: ERROR_PHONE_INVALID };
+    return fail('phone-invalid', ERROR_PHONE_INVALID);
   }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+  if (!whichParty) return fail('phone-not-in-deal', ERROR_PHONE_NOT_IN_DEAL);
 
   // Jual-beli only (Section B gating) — the payer is whichever slot holds
   // Pembeli.
   const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  if (formData.get('attest_bukti') !== 'on') return { error: ERROR_BUKTI_ATTESTATION_REQUIRED };
-
-  const file = formData.get('bukti_file') as File | null;
-  if (!file || file.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
+  if (whichParty !== payerSlot) {
+    return fail(`wrong-party:${whichParty}`, ERROR_WRONG_PARTY_PEMBELI_ONLY);
+  }
 
   try {
     assertTransition(DealStatus.DISEPAKATI, DealEventName.BUKTI_UPLOADED);
   } catch {
-    return { error: ERROR_DEAL_CLOSED };
+    return fail('invalid-transition', ERROR_DEAL_CLOSED);
   }
 
   const uploaded = await uploadBuktiImage(db, deal.id, file);
-  if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
+  if (!uploaded) return fail('upload-failed', ERROR_BUKTI_UPLOAD_FAILED);
 
   const { ocrResult, verdict } = await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
     amount_idr: Number(deal.amount_idr),
@@ -399,7 +441,7 @@ export async function submitBukti(
       })
       .maybeSingle();
 
-    if (rpcErr) return { error: ERROR_BUKTI_SAVE_FAILED };
+    if (rpcErr) return fail(`rpc-error:${rpcErr.code}`, ERROR_BUKTI_SAVE_FAILED);
     if (rpcRow) {
       void submitAnchor(newHash);
 
@@ -414,14 +456,15 @@ export async function submitBukti(
         formatBuktiUploadedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
       );
 
-      revalidatePath(`/deal/${token}`);
-      redirect(`/deal/${token}`);
+      // No redirect here — this is a plain function, not the action. Callers
+      // decide what to do next, which is what lets joinAndPay keep running.
+      return {};
     }
-    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_BUKTI_SAVE_FAILED };
+    if (attempt === RETRY_LIMIT - 1) return fail('stale-hash-exhausted', ERROR_BUKTI_SAVE_FAILED);
     // 0 rows, no error: stale prior_hash race — loop retries with a fresh snapshot.
   }
 
-  return { error: ERROR_BUKTI_SAVE_FAILED };
+  return fail('retry-exhausted', ERROR_BUKTI_SAVE_FAILED);
 }
 
 // ============================================================

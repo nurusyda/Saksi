@@ -10,7 +10,7 @@ import { getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { sendWaMessage } from '@/lib/wa/send';
-import { submitBukti } from './paymentActions';
+import { recordBuktiForPayer } from './paymentActions';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_SELF_JOIN,
@@ -296,10 +296,12 @@ export async function joinAndPay(
   const joined = await joinDealCore(token, formData);
   if (!('phoneE164' in joined)) return joined;
 
-  // submitBukti redirects on success (throws NEXT_REDIRECT, which propagates
-  // through this function untouched — deliberately not wrapped in try/catch,
-  // which would swallow it). It only returns when something went wrong.
-  const bukti = await submitBukti(token, joined.phoneE164, {}, formData);
+  // §38 — hand recordBuktiForPayer the File this function already buffered,
+  // instead of letting it re-read `bukti_file` out of FormData after the
+  // join's DB round-trips. That re-read is what two previous fixes failed to
+  // make safe; removing it removes the dependency rather than working around
+  // it. This core does not redirect, so control returns here either way.
+  const bukti = await recordBuktiForPayer(token, joined.phoneE164, buffered);
 
   // Join landed, payment claim did not. The deal is no longer DRAF, so this
   // form's own page will not render again — the retry has to happen on the
@@ -307,7 +309,8 @@ export async function joinAndPay(
   // minus the phone. Log the reason: this used to redirect silently, which is
   // how the double-upload bug above stayed invisible in production.
   if (bukti.error) {
-    console.error(`[joinAndPay] join succeeded but bukti failed for ${token}: ${bukti.error}`);
+    // recordBuktiForPayer already logged the specific reason code.
+    console.error(`[joinAndPay] joined but bukti not recorded for ${token}`);
   }
   revalidatePath(`/deal/${token}`);
   redirect(`/deal/${token}`);

@@ -1168,3 +1168,39 @@ to DRAF's long-standing behaviour, not a new gap.
 Verified against production: a deal seeded at DISEPAKATI accepts a bukti through
 `submit_bukti_with_event`, advances to DIBAYAR_DIKLAIM, and records exactly one
 bukti row.
+
+## §38 — The bukti re-read is gone (2026-07-21)
+
+Two attempts to fix `joinAndPay` losing the payment claim both failed in
+production: §36 re-buffered the upload, §37 collapsed the two screens. Verified
+in the **data**, not the logs — deals sitting at DISEPAKATI with
+`CREATED -> COUNTERPART_JOINED -> ACCEPTED` and zero `bukti` rows, while the
+standalone upload path always worked.
+
+Both attempts kept the same shape: `joinAndPay` called `submitBukti`, which
+**re-read `bukti_file` out of the same FormData** after the join's DB
+round-trips. Rather than keep guessing which part of that re-read was unsafe,
+the re-read is removed.
+
+`recordBuktiForPayer(token, phone, file)` now holds the payment claim and takes
+the `File` **directly**. `submitBukti` is a thin form wrapper over it (validate
+form → core → redirect); `joinAndPay` buffers the file once, up front, and hands
+that same object to the core. Nothing in the claim path depends on request
+plumbing surviving an `await` any more.
+
+The core **does not redirect** — it returns. That is what lets `joinAndPay` keep
+running after it, and it removes the previous arrangement where success was
+signalled by a thrown `NEXT_REDIRECT` propagating through a caller that was also
+trying to inspect the result.
+
+**Every early return now logs a distinct reason code** (`deal-not-found`,
+`wrong-status:X`, `rate-limited`, `phone-not-in-deal`, `wrong-party:X`,
+`upload-failed`, `rpc-error:X`, `stale-hash-exhausted`). The previous two fixes
+were slow to diagnose precisely because this failed silently while every layer
+reported success — the `void submitAnchor()` log that would have shown it is
+fire-and-forget and gets killed by the redirect, so logs were actively
+misleading. Reason codes carry no PII: token and status only.
+
+**Standing lesson:** when a fix does not take, stop patching the mechanism and
+delete the dependency. And never let a claim path fail without a log — "the
+data says otherwise" is not a debugging tool anyone should need twice.
