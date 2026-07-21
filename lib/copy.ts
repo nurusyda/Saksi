@@ -61,6 +61,12 @@ export const TIER_LABELS: Record<string, string> = {
 export const TIER_GRATIS_DESC =
   'Catat kesepakatan. Rekening tujuan terekam dari bukti transfer.';
 
+// DORMANT — not rendered anywhere (the tier selector was removed; every deal
+// is created GRATIS). Flagged §25 (2026-07-21): this string, TIER_LABELS'
+// LIMA_RIBU entry, and FLAG_BODY_STEM.LIMA_RIBU all promise a phone
+// verification whose only implementation (WA OTP) has been removed. Do NOT
+// ship this tier without first rebuilding a verification mechanism — as
+// written, these would be false claims the moment they became reachable.
 export const TIER_LIMA_RIBU_DESC =
   'Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).';
 
@@ -98,6 +104,21 @@ export function formatAccountHistory(
   sinceLabel: string,
 ): string {
   return `Rekening tujuan: ${bank} ${rekeningMasked} · ${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
+}
+
+// §26 (2026-07-21) — the counts half of formatAccountHistory, for surfaces
+// that already render the bank + masked number as their own heading and
+// would otherwise print it twice. Same facts, same words, same order as the
+// tail of the line above; this is a projection of that locked string, not a
+// reworded second version of it. Do NOT reconstruct this by string-replacing
+// the prefix out of formatAccountHistory's output — that couples the two
+// through their exact punctuation and breaks silently if either changes.
+export function formatAccountHistoryCounts(
+  selesaiCount: number,
+  tidakDipenuhiCount: number,
+  sinceLabel: string,
+): string {
+  return `${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
 }
 
 // ============================================================
@@ -328,24 +349,38 @@ export const CONFIRM_RECEIPT_LABEL = 'Konfirmasi uang diterima';
 // always covered two distinct situations — the money genuinely has not landed,
 // and the uploaded bukti does not match this deal — and the old label named
 // only the first, so a penjual looking at a wrong/mismatched bukti had no
-// obvious control. Still not an accusation and still writes no deal_events
-// row; PAYMENT_NOT_RECEIVED_ACK's wording is unchanged and remains accurate.
+// obvious control. Still not an accusation. (It DOES write a deal_events row
+// as of §24/migration 0029 — see DANA_BELUM_MASUK_* below; the earlier
+// "writes nothing" note here is no longer true and was removed with it.)
 export const PAYMENT_NOT_RECEIVED_LABEL = 'Dana belum masuk / bukti salah';
-// Not in copy-id.md (added with the WA-nudge wiring) — must not say
-// "dicatat"/"tercatat" here: unlike the rest of C4, this tap writes nothing
-// to deal_events. Only a best-effort notification goes out.
-export const PAYMENT_NOT_RECEIVED_ACK =
-  'Notifikasi terkirim ke pembeli. Kesepakatan tetap berjalan; periksa kembali secara berkala.';
-// Bug found by monster_check: PAYMENT_NOT_RECEIVED_ACK above was previously
-// shown unconditionally, even when the WA send failed. This is the honest
-// counterpart for that case.
-export const ERROR_NOTIFY_SEND_FAILED = 'Gagal mengirim notifikasi. Coba lagi.';
-// 2026-07-21: separate from ERROR_NOTIFY_SEND_FAILED above on purpose — that
-// string frames this as a retriable failure ("coba lagi"), which is false
-// while the WA channel itself is down; retrying sends the same request into
-// the same outage. Neutral, not an error state in the UI (no red styling).
-export const PAYMENT_NOT_RECEIVED_UNDELIVERED =
-  'Percobaan mengirim notifikasi WA ke pembeli tidak berhasil. Kesepakatan tetap berjalan; hubungi pembeli langsung jika perlu.';
+
+// §24 (2026-07-21, migration 0029) — this action now records the penjual's
+// own account of what happened instead of firing a WA nudge. The three
+// strings it used to need (PAYMENT_NOT_RECEIVED_ACK,
+// ERROR_NOTIFY_SEND_FAILED, PAYMENT_NOT_RECEIVED_UNDELIVERED) are retired:
+// all three described the delivery state of a WhatsApp message, which is no
+// longer what this action does and was never a fact about the deal.
+export const DANA_BELUM_MASUK_HEADING = 'Apa yang terjadi?';
+export const DANA_BELUM_MASUK_PROMPT =
+  'Ceritakan yang kamu terima sebenarnya. Contoh: dana belum masuk sama sekali, nominalnya beda, atau bukti yang dikirim bukan untuk transaksi ini.';
+export const DANA_BELUM_MASUK_PLACEHOLDER =
+  'Contoh: Sampai sekarang belum ada dana masuk ke rekening saya. Saya sudah cek mutasi hari ini.';
+export const DANA_BELUM_MASUK_SUBMIT_LABEL = 'Catat keterangan saya';
+// States exactly what happens, and just as importantly what does not: this
+// records a disagreement, it does not resolve one and does not move the deal.
+export const DANA_BELUM_MASUK_CONSEQUENCES: readonly string[] = [
+  'Keterangan ini tercatat sebagai pernyataan Anda, bukan putusan SAKSI.',
+  'Pembeli dapat melihat keterangan ini di halaman transaksi.',
+  'Kesepakatan tetap berjalan. Status dan batas waktu tidak berubah.',
+  'SAKSI tidak menengahi dan tidak memindahkan dana.',
+];
+export const DANA_BELUM_MASUK_RECORDED = 'Keterangan Anda tercatat.';
+export const STATEMENT_FROM_PENJUAL_LABEL = 'Keterangan dari penjual';
+export const STATEMENT_FROM_PEMBELI_LABEL = 'Keterangan dari pembeli';
+
+export const ERROR_STATEMENT_TOO_SHORT = 'Tulis keterangan minimal 10 karakter.';
+export const ERROR_STATEMENT_TOO_LONG = 'Maksimal 600 karakter.';
+export const ERROR_STATEMENT_SAVE_FAILED = 'Gagal mencatat keterangan. Coba lagi.';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 
@@ -357,12 +392,20 @@ export const BARANG_TIDAK_SESUAI_BUTTON = 'Barang tidak sesuai kesepakatan';
 // C6 — "barang tidak sesuai" report filing (copy-id.md §16, locked)
 export const BARANG_TIDAK_SESUAI_PROMPT =
   'Bagian mana dari keterangan di atas yang tidak dipenuhi?';
+// §25 (2026-07-21) — the last bullet used to read "Nomor HP pelapor
+// terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini." With
+// the OTP step removed, the first sentence of that bullet became false: the
+// reporter's number is the one already recorded as a party to this deal, but
+// nothing proves they currently possess it. The false half is gone; the true
+// half — that a false report is itself permanently on the record, attributed
+// to that party — is kept, because it is still exactly true and it is the
+// part that actually deters a bogus filing.
 export const BARANG_TIDAK_SESUAI_CONSEQUENCES: readonly string[] = [
   'Laporan tercatat sebagai klaim Anda, bukan putusan SAKSI.',
   'Penjual mendapat 14 hari untuk menanggapi.',
   'Laporan Anda dan tanggapan pihak lain (jika ada) sama-sama tercatat permanen di catatan rekening ini.',
   'SAKSI tidak menengahi dan tidak mengembalikan dana.',
-  'Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat permanen atas nomor ini.',
+  'Laporan palsu juga tercatat permanen atas nomor HP yang tercatat sebagai pihak dalam kesepakatan ini.',
 ];
 // BARANG_TIDAK_SESUAI_GATE_BANNER retired (build step 4, 2026-07-20): it
 // announced the OTP gate as "belum tersedia" — no longer true now that the
@@ -380,18 +423,14 @@ export const DEADLINE_LAPSE_MODAL_HEADING = 'Laporkan Kesepakatan Tidak Dipenuhi
 // both, same reasoning as the two headings above.
 export const MODAL_CLOSE_LABEL = 'Tutup';
 
-// copy-id.md §17 (DRAFT, pending review) — build step 4's OTP step, backfilled
-// per the Tier B copy-lock discipline.
-export const OTP_STEP_HEADING = 'Verifikasi nomor HP Anda untuk melanjutkan laporan.';
-export const OTP_SEND_BUTTON_LABEL = 'Kirim kode verifikasi';
-export const OTP_RESEND_BUTTON_LABEL = 'Kirim ulang kode';
-export const OTP_CODE_FIELD_LABEL = 'Kode verifikasi';
-export const OTP_CODE_FORMAT_HINT = '6 digit, berlaku 5 menit';
-export const OTP_VERIFY_BUTTON_LABEL = 'Verifikasi';
-export const ERROR_OTP_SEND_FAILED = 'Gagal mengirim kode. Coba lagi.';
-export const ERROR_OTP_SEND_RATE_LIMITED = 'Terlalu banyak permintaan kode. Coba lagi dalam satu jam.';
-export const ERROR_OTP_INVALID = 'Kode salah atau sudah kedaluwarsa.';
-export const ERROR_OTP_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Minta kode baru.';
+// §25 (2026-07-21) — the whole OTP string set (OTP_STEP_HEADING,
+// OTP_SEND_BUTTON_LABEL, OTP_RESEND_BUTTON_LABEL, OTP_CODE_FIELD_LABEL,
+// OTP_CODE_FORMAT_HINT, OTP_VERIFY_BUTTON_LABEL, ERROR_OTP_*) is retired
+// along with lib/otp.ts and the OTP step in both report modals. Noted here
+// rather than silently dropped, same treatment every other retirement in
+// this file gets. The `otp_codes` table from migration 0020 is deliberately
+// NOT dropped — leaving an unused table costs nothing and dropping one is
+// irreversible.
 export const ERROR_REPORT_FILE_FAILED = 'Gagal mencatat laporan. Coba lagi.';
 
 // Second breach-report entry point (build step 4 follow-on) — the
@@ -600,22 +639,15 @@ export function formatReceiptConfirmedMessage(itemDesc: string, dealUrl: string)
   return `Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi barang diterima.`;
 }
 
-// Not in copy-id.md §9b (added later, same house style) — fired by the
-// Penjual's "Dana belum masuk" tap on C4. Deliberately NOT a claim: no
-// deal_events row, no state change, same as every string above it. This is
-// the only consequence of that tap — a nudge to the payer to double-check
-// their own transfer, addressed to a plausible bank-delay explanation, not
-// an accusation.
-export function formatPaymentNotReceivedMessage(itemDesc: string, dealUrl: string): string {
-  return `Penjual belum menerima dana untuk kesepakatan SAKSI Anda ("${itemDesc}"). Periksa kembali transfer Anda. Buka ${dealUrl} untuk melihat status.`;
-}
+// formatPaymentNotReceivedMessage retired §24 (2026-07-21): the "Dana belum
+// masuk / bukti salah" tap no longer sends a WA message at all. It records
+// the penjual's own keterangan instead (migration 0029), which the pembeli
+// reads on the deal page. Noted here rather than silently dropped, same
+// treatment formatCounterpartJoinedMessage's retirement got above.
 
-// copy-id.md §9 — OTP message, locked. First real call site: breach-report
-// filing (build step 4). Sender identity: SAKSI (saksi.app), same as every
-// WA message above.
-export function formatOtpMessage(code: string): string {
-  return `Kode verifikasi SAKSI Anda: ${code}. Berlaku 5 menit. Jangan bagikan kepada siapa pun, termasuk pihak yang mengaku dari SAKSI.`;
-}
+// formatOtpMessage retired §25 (2026-07-21) — no OTP is sent anywhere in the
+// app anymore. If phone-possession proof is ever reintroduced, write a new
+// message for the mechanism actually chosen rather than reviving this one.
 
 // copy-id.md §9c (DRAFT, pending review) — build step 4 (breach path)
 // turn-taking notifications, same house style as §9b. Fired by fileBarangTidakSesuaiReport and
@@ -753,3 +785,12 @@ export const BUAT_INTRO =
 export const BUAT_SECTION_DATA = 'Data kamu';
 export const BUAT_SECTION_BARANG = 'Barang & harga';
 export const BUAT_SECTION_REKENING = 'Rekening pembayaran kamu';
+
+// §27 (2026-07-21) — the auto-derived window, finally stated. It was already
+// creation + 7 days server-side (getDefaultDeadlineWib) but was never shown
+// anywhere, so neither party knew the window they were in. The note explains
+// what lapsing actually enables, and deliberately does not promise a refund
+// or any automatic consequence, because there is none.
+export const BUAT_DEADLINE_LABEL = 'Batas waktu kesepakatan';
+export const BUAT_DEADLINE_NOTE =
+  'Dihitung otomatis 7 hari sejak tagihan dibuat. Setelah lewat batas ini, pihak yang dirugikan dapat mengajukan laporan.';

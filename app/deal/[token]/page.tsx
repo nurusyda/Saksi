@@ -4,9 +4,9 @@ import { cookies } from 'next/headers';
 import { supabaseServer } from '@/lib/supabase/server';
 import { DealStatus } from '@/lib/db/transitions';
 import { DealLinkCard } from './DealLinkCard';
-import { DealProgressStepper } from './DealProgressStepper';
+import { DealProgress } from './DealProgress';
 import { InvoiceCard } from './InvoiceCard';
-import { JoinDealForm } from './JoinDealForm';
+import { BuyerJoinGate } from './BuyerJoinGate';
 import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
@@ -18,16 +18,10 @@ import { KedaluwarsaPanel } from './KedaluwarsaPanel';
 import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
 import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
-import { LiveIndicator } from './LiveIndicator';
 import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
-import {
-  JOIN_FORM_HEADING,
-  JOIN_DEAL_INSTRUCTION,
-  STATUS_DIAJUKAN,
-  ROLE_LABELS,
-  ROLE_PAIR,
-} from '@/lib/copy';
+import { PageShell, SplitLayout, Card } from '@/components/ui';
+import { STATUS_DIAJUKAN, ROLE_LABELS, ROLE_PAIR } from '@/lib/copy';
 
 const TERMINAL_STATUSES: string[] = [
   DealStatus.SELESAI,
@@ -151,14 +145,35 @@ export default async function DealPage({
 
   const boundJoinDeal = joinDeal.bind(null, token);
 
-  return (
-    <div className="min-h-screen bg-white px-4 py-10">
-      <div className="mx-auto max-w-lg">
-        <a href="/" className="mb-6 inline-block text-sm text-zinc-500 hover:text-zinc-800">
-          ← SAKSI
-        </a>
+  // §23/§26 — event times for DealProgress. Queried here rather than fetched
+  // client-side so the timestamps are present in the first paint (no flash of
+  // a timeline with no times). deal_events carries no PII (0001's RLS notes),
+  // and this selects only the two columns the stepper renders.
+  const { data: progressEvents } = await db
+    .from('deal_events')
+    .select('event, created_at')
+    .eq('deal_id', deal.id)
+    .order('id', { ascending: true });
 
-        <DealProgressStepper status={deal.status} />
+  // §26: the deal-link card is the seller's tool — it exists so whoever
+  // created the tagihan can re-share or re-save the capability URL. Showing
+  // it to the buyer put "Link tagihan ini / Simpan link ini" in the middle
+  // of the payment flow, which is noise: the buyer arrived *via* that link
+  // and is not the one who needs to distribute it.
+  const showLinkCard =
+    isProposer &&
+    ![
+      DealStatus.SELESAI,
+      DealStatus.DIBATALKAN_BERSAMA,
+      DealStatus.TIDAK_DILANJUTKAN,
+      DealStatus.KEDALUWARSA,
+      DealStatus.DIKEMBALIKAN_PENUH,
+      DealStatus.DIKEMBALIKAN_SEBAGIAN,
+    ].includes(deal.status);
+
+  const main = (
+    <>
+      <DealProgress status={deal.status} events={progressEvents ?? []} />
 
         {/* §23 — the summary is now presented as a tagihan. Same fields, same
             masking rule; the two "Peran ..." lines are dropped because the
@@ -177,46 +192,23 @@ export default async function DealPage({
             auto-derived at creation. Faking the chip would put a label on the
             invoice that nothing in the record supports. */}
 
-        {/* Persistent deal link — every status, not just DRAF (UX-audit fix:
-            identity is phone-only with no session, so this URL is the only
-            way back into the deal; a party who loses it has no recovery
-            path). Omitted for terminal states: the deal is closed and
-            re-access is no longer time-sensitive. */}
-        {![
-          DealStatus.SELESAI,
-          DealStatus.DIBATALKAN_BERSAMA,
-          DealStatus.TIDAK_DILANJUTKAN,
-          DealStatus.KEDALUWARSA,
-          DealStatus.DIKEMBALIKAN_PENUH,
-          DealStatus.DIKEMBALIKAN_SEBAGIAN,
-        ].includes(deal.status) && (
-          <DealLinkCard url={shareUrl} itemDesc={deal.item_desc} />
-        )}
-
         {/* Role auto-display (2026-07-20): visible only when the party-session
             cookie identifies the viewer as one of the two parties. */}
         {viewerRoleLabel && (
-          <p className="mb-4 text-sm font-medium text-zinc-600">Anda: {viewerRoleLabel}</p>
+          <p className="mb-4 text-sm font-semibold text-zinc-600">Anda: {viewerRoleLabel}</p>
         )}
 
         {deal.status === DealStatus.DRAF && (
           <>
             {isProposer ? (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-                <LiveIndicator />
-                <p>Menunggu pihak lain membuka link dan bergabung. Bagikan link di bawah ke pihak penerima.</p>
+              <Card className="bg-zinc-50 text-sm text-zinc-700">
+                <p>Menunggu pembeli membuka tagihan dan bergabung. Bagikan link di bawah.</p>
                 <WaitingStatusPoll token={token} knownStatus={DealStatus.DRAF} />
-              </div>
+              </Card>
             ) : (
-              <div className="rounded-xl border border-zinc-200 p-5">
-                <p className="mb-1 text-sm font-semibold text-zinc-900">
-                  {JOIN_FORM_HEADING}
-                </p>
-                <p className="mb-4 text-xs text-zinc-500">
-                  {JOIN_DEAL_INSTRUCTION}
-                </p>
-                <JoinDealForm action={boundJoinDeal} />
-              </div>
+              /* §26 — rekening + its record + the phone gate, as one section
+                 inside this page rather than a separate screen in front of it. */
+              <BuyerJoinGate token={token} action={boundJoinDeal} />
             )}
           </>
         )}
@@ -274,7 +266,19 @@ export default async function DealPage({
         {deal.status === DealStatus.KEDALUWARSA && <KedaluwarsaPanel token={token} />}
         {deal.status === DealStatus.DIKEMBALIKAN_PENUH && <DikembalikanPenuhPanel token={token} />}
         {deal.status === DealStatus.DIKEMBALIKAN_SEBAGIAN && <DikembalikanSebagianPanel token={token} />}
-      </div>
-    </div>
+    </>
+  );
+
+  return (
+    <PageShell wide={showLinkCard}>
+      {showLinkCard ? (
+        <SplitLayout
+          main={main}
+          rail={<DealLinkCard url={shareUrl} itemDesc={deal.item_desc} />}
+        />
+      ) : (
+        main
+      )}
+    </PageShell>
   );
 }

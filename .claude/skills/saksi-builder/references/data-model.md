@@ -314,7 +314,17 @@ GATE 1 (lawyer review) and the T&C gap above both apply, same reasoning as the b
 ## Breach → flag pipeline
 
 1. Deadline lapses in an eligible state → SYSTEM event `TENGGAT_LEWAT`.
-2. Reporter (the unpaid/undelivered party) files breach. **Filing is free at every tier but requires reporter OTP** (we pay ~Rp430) — every flag has a traceable reporter; serial false accusers become as visible as serial breachers.
+2. Reporter (the unpaid/undelivered party) files breach. **Filing is free at every tier.**
+   ~~Requires reporter OTP (we pay ~Rp430) — every flag has a traceable reporter~~ —
+   **removed 2026-07-21 (copy-id.md §25).** The OTP step sat on the WhatsApp
+   channel, so a Fonnte outage blocked the wronged party's only recourse: the
+   one failure mode this pipeline cannot tolerate. Identity is now
+   `identifyPartyByPhone` only — proves the filer is a party to this deal, not
+   that they currently possess the number. `BARANG_TIDAK_SESUAI_CONSEQUENCES`'
+   last bullet was corrected to stop claiming phone verification and instead
+   names what's actually true: a false report stays permanently on the record,
+   attributed to that party. Do not reintroduce this OTP step without reading
+   §25 first — it documents exactly why it was removed.
 3. Notification to the other party (WA utility template) opens the 14-day hak jawab window.
 4. Window closes silent → flag publishes. Rung selection: bukti confirmed by counterpart earlier? rung 1 : rung 0. (Rung 2 reserved for open-banking roadmap.)
 5. Flag lands on identifiers by tier: GRATIS → rekening (masked) + bank; LIMA_RIBU → + phone_hash; BERMETERAI → + verified-identity marker (never the NIK itself).

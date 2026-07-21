@@ -8,12 +8,26 @@
 - Verify the acquirer's QRIS minimum amount in sandbox before demo (some floors ~Rp1.500; Rp5.000 clears, but confirm).
 - Webhook: Supabase Edge Function; verify signature; idempotent by `order_id`; on `settlement` → emit fee-paid event and advance flow. Fee is charged at DISEPAKATI and is non-refundable (state in T&C).
 
-## 2. WhatsApp OTP
+## 2. WhatsApp OTP — REMOVED from the breach-filing path 2026-07-21 (copy-id.md §25)
+
+**Do not build against this section for breach filing.** It described the
+`lib/otp.ts` module and its one call site — gating `fileBarangTidakSesuaiReport`/
+`fileDeadlineLapseReport` on a verified WA code. That module is deleted. The
+OTP step meant a Fonnte outage blocked the wronged party's only recourse —
+the worst failure mode this pipeline can have — so identity on those paths is
+now `identifyPartyByPhone` only (party-of-this-deal, re-derived server-side),
+which does not prove phone possession. See §25 for the full reasoning before
+touching this again.
+
+The content below is kept for reference only, in case phone-possession proof
+is ever rebuilt for a *different* call site (LIMA_RIBU/BERMETERAI tier
+verification, data-model.md's Tier spec — a separate, not-yet-built feature
+that never shared `lib/otp.ts`'s implementation in the first place per its own
+"not yet a generic multi-purpose OTP module" note):
 
 - Meta Cloud API direct (no BSP subscription; per-message billing, authentication category ~Rp367–430 for Indonesian numbers) — needs a Meta Business + a dedicated phone number. If setup friction threatens the deadline, use Fonnte/Maxchat (Indonesian BSPs, fast onboarding, ~Rp430+/message).
-- Template category: AUTHENTICATION, with the copy in copy-id.md §9.
+- Template category: AUTHENTICATION, with the copy in copy-id.md §9 (formatOtpMessage — also retired §25; write new copy for whatever mechanism is actually chosen).
 - Rate limits (enforce server-side): 3 sends/phone/hour, 5 verify attempts/code. Codes: 6 digits, 5-minute expiry, single-use, stored hashed.
-- Breach filing OTP is free to the user at every tier — SAKSI absorbs the cost (~Rp430; breaches are a small minority of records).
 
 ## 3. Didit e-KYC (BERMETERAI tier)
 

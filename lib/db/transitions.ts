@@ -84,6 +84,14 @@ export const DealEventName = {
   // source states stay distinguishable via whether RECEIPT_CONFIRMED
   // precedes this event in deal_events, without needing a second status.
   KEDALUWARSA_LAPSED: 'KEDALUWARSA_LAPSED',
+  // Payee states that the claimed payment has not landed, or that the bukti
+  // does not match this deal (migration 0029). Self-transition on
+  // DIBAYAR_DIKLAIM — this is one party's account of events, recorded and
+  // attributed, NOT a breach report: no flags row, no status change, no
+  // publication. It sits alongside the payer's bukti claim so a reader can
+  // see both sides and see that they disagree. Replaces the old
+  // WA-nudge-only version of this action, which recorded nothing at all.
+  DANA_BELUM_MASUK: 'DANA_BELUM_MASUK',
   // System: deadline sweep's WA reminder (T+2 days past deadline, DIBAYAR_DIKLAIM
   // or DIKONFIRMASI_TERIMA, once only). Self-transition — status unchanged.
   // Targets exactly one party (whichever is expected to act next), not both
@@ -125,6 +133,7 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.TENGGAT_LEWAT, next: DealStatus.TIDAK_DIPENUHI },
     { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
     { event: DealEventName.NUDGE_SENT, next: DealStatus.DIBAYAR_DIKLAIM }, // self
+    { event: DealEventName.DANA_BELUM_MASUK, next: DealStatus.DIBAYAR_DIKLAIM }, // self
   ],
   [DealStatus.DIKONFIRMASI_TERIMA]: [
     { event: DealEventName.FULFILLMENT_CONFIRMED, next: DealStatus.SELESAI },

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { supabaseServer } from '@/lib/supabase/server';
 import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
@@ -28,9 +28,11 @@ import {
   ERROR_WRONG_PARTY_PEMBELI_ONLY,
   ERROR_WRONG_PARTY_PENJUAL_ONLY,
   ERROR_PAIR_COMPLETION_LIMIT,
+  ERROR_STATEMENT_TOO_SHORT,
+  ERROR_STATEMENT_TOO_LONG,
+  ERROR_STATEMENT_SAVE_FAILED,
   formatBuktiUploadedMessage,
   formatReceiptConfirmedMessage,
-  formatPaymentNotReceivedMessage,
 } from '@/lib/copy';
 
 // Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
@@ -439,23 +441,34 @@ export async function getBuktiForDisplay(token: string, phone: string): Promise<
 }
 
 // ============================================================
-// notifyPaymentNotReceived — C4's "Dana belum masuk". Deliberately NOT the
-// start of a claim: no deal_events row, no status change, no RPC beyond the
-// shared identify rate-limit. The only effect is a best-effort WA nudge to
-// the payer, addressed to a plausible bank-delay explanation. The real
-// mechanism for "funds genuinely never arrived" stays the deadline-lapse +
-// OTP-gated breach pipeline (data-model.md) — this tap doesn't shortcut into
-// that pipeline early.
+// recordDanaBelumMasuk — C4's "Dana belum masuk / bukti salah".
+//
+// Rewritten 2026-07-21 (migration 0029). The previous version wrote nothing
+// at all: no deal_events row, no persisted text, just a best-effort WA nudge
+// whose delivery result the UI then reported. Two things were wrong with
+// that. When the WA channel was down the buyer learned nothing, so the
+// disagreement existed only in the seller's head. And the seller was shown
+// a notification-delivery failure — a fact about an integration, not about
+// their deal, and nothing they could act on.
+//
+// Now the seller says what actually happened and that statement is recorded,
+// hash-chained, and shown to the buyer on their own status page. The record
+// carries the disagreement rather than a messaging channel carrying it.
+//
+// Still NOT a breach report: self-transition on DIBAYAR_DIKLAIM, no flags
+// row, no status change, no publication. It is one party's attributed
+// account sitting next to the other party's bukti claim. The breach pipeline
+// is unchanged and still gated on the deadline actually lapsing.
 // ============================================================
 
-export type NotifyNotReceivedState = { sent?: boolean; undelivered?: boolean; error?: string };
+export type DanaBelumMasukState = { recorded?: boolean; error?: string; fieldError?: string };
 
-export async function notifyPaymentNotReceived(
+export async function recordDanaBelumMasuk(
   token: string,
   phone: string,
-  _prev: NotifyNotReceivedState,
-  _formData: FormData,
-): Promise<NotifyNotReceivedState> {
+  _prev: DanaBelumMasukState,
+  formData: FormData,
+): Promise<DanaBelumMasukState> {
   const db = supabaseServer();
 
   const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
@@ -475,23 +488,97 @@ export async function notifyPaymentNotReceived(
   const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
   if (whichParty !== payeeSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
 
-  const payerSlot: WhichParty = payeeSlot === 'proposer' ? 'counterpart' : 'proposer';
-  const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
+  const body = (formData.get('body') as string | null)?.trim() ?? '';
+  if (body.length < 10) return { fieldError: ERROR_STATEMENT_TOO_SHORT };
+  if (body.length > 600) return { fieldError: ERROR_STATEMENT_TOO_LONG };
 
-  // Bug found by monster_check: this previously fired notifyTurn with `void`
-  // and unconditionally returned { sent: true } — so PAYMENT_NOT_RECEIVED_ACK
-  // ("Notifikasi terkirim ke pembeli...") displayed even when the WA send
-  // actually failed (Fonnte down, invalid number, etc.), a false claim. This
-  // is the one call site where the UI makes an explicit delivery claim, so
-  // unlike the other notifyTurn calls in this file, it must be awaited.
-  const sent = await notifyTurn(
-    db,
-    payerPartyId,
-    'PAYMENT_NOT_RECEIVED',
-    formatPaymentNotReceivedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-  );
+  try {
+    assertTransition(DealStatus.DIBAYAR_DIKLAIM, DealEventName.DANA_BELUM_MASUK);
+  } catch {
+    return { error: ERROR_DEAL_CLOSED };
+  }
 
-  return sent ? { sent: true } : { undelivered: true };
+  const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
+  const bodyHash = createHash('sha256').update(body, 'utf8').digest('hex');
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+    const { data: cur } = await db.from('deals').select('*').eq('id', deal.id).single();
+    if (!cur || cur.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+
+    const { data: lastEvent } = await db
+      .from('deal_events')
+      .select('new_hash')
+      .eq('deal_id', deal.id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const priorHash = lastEvent?.new_hash ?? null;
+
+    // Self-transition: the canonical payload hashes the deal as it stands,
+    // status unchanged — same shape sweep_nudge_with_event's caller uses.
+    const canonical = buildCanonicalPayload(
+      cur,
+      { name: DealEventName.DANA_BELUM_MASUK, actor, payload: { body_hash: bodyHash } },
+      priorHash,
+    );
+    const newHash = hashDeal(canonical);
+
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('record_dana_belum_masuk_with_event', {
+        p_deal_id: deal.id,
+        p_actor: actor,
+        p_body: body,
+        p_body_hash: bodyHash,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
+      })
+      .maybeSingle();
+
+    if (rpcErr) return { error: ERROR_STATEMENT_SAVE_FAILED };
+    if (rpcRow) {
+      void submitAnchor(newHash);
+      revalidatePath(`/deal/${token}`);
+      return { recorded: true };
+    }
+    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_STATEMENT_SAVE_FAILED };
+  }
+
+  return { error: ERROR_STATEMENT_SAVE_FAILED };
+}
+
+// ============================================================
+// getDealStatements — both parties' recorded statements on this deal, shown
+// to whichever party is viewing. Party-gated by phone like every other read
+// here, and rate-limited through the same shared limiter (the phone argument
+// makes it a guess-and-check oracle otherwise).
+// ============================================================
+
+export type DealStatement = { actor: 'PROPOSER' | 'COUNTERPART'; body: string; created_at: string };
+
+export async function getDealStatements(token: string, phone: string): Promise<DealStatement[]> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
+  if (!deal) return [];
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return [];
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return [];
+  }
+  if (!whichParty) return [];
+
+  const { data } = await db
+    .from('deal_statements')
+    .select('actor, body, created_at')
+    .eq('deal_id', deal.id)
+    .order('id', { ascending: true });
+
+  return data ?? [];
 }
 
 // ============================================================

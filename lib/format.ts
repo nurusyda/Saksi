@@ -40,6 +40,76 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+// ============================================================
+// Ledger time display (2026-07-21). Every timestamp SAKSI shows as part of
+// the record goes through one of these three.
+//
+// Why they exist: `formatDateTime` above renders "21 Juli 2026, 09.34" with
+// no timezone marker at all. For a record whose entire purpose is to be
+// shown back to a third party during a dispute, a bare wall-clock time is
+// ambiguous — the reader cannot tell which zone it was recorded in, and
+// Indonesia spans three (WIB/WITA/WIT). UU ITE Pasal 6/15/16 conditions an
+// electronic record's evidentiary weight on keautentikan/keutuhan and on
+// the system being able to display the record back intact; a timestamp that
+// can be read two ways fails that on its face. Standard audit-log practice
+// is the same: store UTC, render with an explicit offset or zone label.
+//
+// Storage is unchanged and already correct — `deal_events.created_at` is
+// `timestamptz`, i.e. an absolute UTC instant. These functions only fix the
+// display end, and always pin the zone to Asia/Jakarta rather than the
+// viewer's local zone, so two parties in different places reading the same
+// record see the identical string.
+// ============================================================
+
+const WIB_TZ = 'Asia/Jakarta';
+
+/** "21 Jul 2026, 09.34 WIB" — compact, for timeline rows and step times. */
+export function formatTimeWib(iso: string): string {
+  const s = new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: WIB_TZ,
+  });
+  return `${s} WIB`;
+}
+
+/**
+ * "21 Juli 2026, 09.34.07 WIB" — to the second, for the evidence view.
+ * Seconds matter here and only here: this is the string a party would point
+ * at to establish ordering between two events that happened close together.
+ */
+export function formatTimeWibPrecise(iso: string): string {
+  const s = new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: WIB_TZ,
+  });
+  return `${s} WIB`;
+}
+
+/**
+ * "28 Juli 2026, 23.59 WIB" — the deadline as the exact instant it lapses.
+ *
+ * `deals.deadline` is a naive `date` (a WIB calendar date), and the breach
+ * gate is `deadline < getTodayWib()` (breachActions.ts) — strictly less
+ * than, so a party has the whole of the deadline date itself to act and
+ * eligibility opens at 00.00 WIB the following day. The last moment still
+ * inside the window is therefore 23.59 WIB on the deadline date, which is
+ * what this renders. Do not "simplify" this to 00.00 of the deadline date:
+ * that would state a cutoff a full day earlier than the one the code
+ * actually enforces, i.e. a false deadline on a record people rely on.
+ */
+export function formatDeadlineWib(dateStr: string): string {
+  return `${formatDate(dateStr)}, 23.59 WIB`;
+}
+
 // Extracted from app/buat/actions.ts's deadline validation (SESSION_LOG.md
 // Session 3: "Deadline timezone — new Date(deadline) compared against
 // server local time — off by one day for WIB users on a UTC server").

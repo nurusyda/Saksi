@@ -9,11 +9,11 @@ import {
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-16">
+    <div className="flex min-h-screen flex-col bg-zinc-50">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 py-16 sm:px-6">
         <p className="text-sm font-semibold tracking-wide text-zinc-400">SAKSI</p>
 
-        <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-zinc-900">
+        <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-zinc-900 sm:text-4xl">
           {LANDING_HEADING}
         </h1>
         <p className="mt-4 text-base leading-relaxed text-zinc-600">{LANDING_SUBHEAD}</p>
@@ -35,14 +35,14 @@ export default function Home() {
         <div className="mt-10">
           <Link
             href="/buat"
-            className="flex h-12 items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover"
+            className="flex h-12 items-center justify-center rounded-xl bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover"
           >
             {CTA_BUAT_TAGIHAN}
           </Link>
         </div>
       </main>
 
-      <footer className="mx-auto w-full max-w-md px-5 pb-8 text-xs text-zinc-400">
+      <footer className="mx-auto w-full max-w-xl px-4 pb-8 text-xs text-zinc-400 sm:px-6">
         {CANONICAL_DOMAIN}
       </footer>
     </div>

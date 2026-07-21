@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { CekForm } from './CekForm';
+import { PageShell } from '@/components/ui';
 
 // GATE 2 — noindex + no inbound links (Option A distribution: invite-only,
 // no discovery surface, until PSE Kominfo clears). This metadata is the
@@ -15,10 +16,8 @@ export const metadata: Metadata = {
 
 export default function CekPage() {
   return (
-    <div className="min-h-screen bg-white px-4 py-10">
-      <div className="mx-auto max-w-lg">
-        <CekForm />
-      </div>
-    </div>
+    <PageShell>
+      <CekForm />
+    </PageShell>
   );
 }

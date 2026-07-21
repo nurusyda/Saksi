@@ -27,11 +27,10 @@ export interface WaMessage {
     | 'BUKTI_UPLOADED'
     | 'RECEIPT_CONFIRMED'
     | 'PAYMENT_NOT_RECEIVED'
-    // Build step 4 (breach path) — copy-id.md §9's AUTHENTICATION-category
-    // OTP message, and the report-filing turn-taking nudges. Two distinct
-    // FILED literals (same message text, formatBreachReportFiledMessage)
-    // purely so [wa] logs distinguish which entry point fired.
-    | 'OTP_BREACH_REPORT'
+    // Report-filing turn-taking nudges. Two distinct FILED literals (same
+    // message text, formatBreachReportFiledMessage) purely so [wa] logs
+    // distinguish which entry point fired. 'OTP_BREACH_REPORT' removed §25
+    // (2026-07-21) along with lib/otp.ts — no OTP is sent anywhere now.
     | 'BARANG_TIDAK_SESUAI_FILED'
     | 'DEADLINE_LAPSE_FILED'
     | 'HAK_JAWAB_FILED';

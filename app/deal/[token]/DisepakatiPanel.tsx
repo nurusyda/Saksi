@@ -4,7 +4,6 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
-import { LiveIndicator } from './LiveIndicator';
 import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
@@ -232,7 +231,6 @@ export function DisepakatiPanel({
             <PaymentForm deal={deal} phone={phone} />
           ) : (
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-              <LiveIndicator />
               <p>{WAITING_FOR_PAYMENT_PROOF}</p>
               <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DISEPAKATI} />
             </div>

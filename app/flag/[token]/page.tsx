@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabase/server';
 import { renderFlag, type FlagTier, type FlagRung } from '@/lib/flags/render';
+import { PageShell } from '@/components/ui';
 import { shortHashFragment } from '@/lib/format';
 import {
   CANONICAL_DOMAIN,
@@ -75,11 +76,7 @@ export default async function FlagPage({
   });
 
   return (
-    <div className="min-h-screen bg-white px-4 py-10">
-      <div className="mx-auto max-w-lg">
-        <a href="/" className="mb-6 inline-block text-sm text-zinc-500 hover:text-zinc-800">
-          ← SAKSI
-        </a>
+    <PageShell>
 
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
           <p className="text-sm text-zinc-700">{rendered.rungLine}</p>
@@ -99,7 +96,6 @@ export default async function FlagPage({
         </div>
 
         <p className="mt-4 text-xs text-zinc-400">{CANONICAL_DOMAIN}</p>
-      </div>
-    </div>
+    </PageShell>
   );
 }

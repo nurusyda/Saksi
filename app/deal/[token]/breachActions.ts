@@ -9,7 +9,6 @@ import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transition
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { submitAnchor } from '@/lib/db/anchor';
 import { maskRekening } from '@/lib/db/accountHistory';
-import { sendOtp, verifyOtp, consumeVerifiedOtp } from '@/lib/otp';
 import { sendWaMessage } from '@/lib/wa/send';
 import { getTodayWib } from '@/lib/format';
 import { uploadHakJawabEvidence } from '@/lib/db/storage';
@@ -22,10 +21,6 @@ import {
   ERROR_TOO_MANY_ATTEMPTS,
   ERROR_WRONG_PARTY_PEMBELI_ONLY,
   ERROR_WRONG_PARTY_PENJUAL_ONLY,
-  ERROR_OTP_SEND_FAILED,
-  ERROR_OTP_SEND_RATE_LIMITED,
-  ERROR_OTP_INVALID,
-  ERROR_OTP_TOO_MANY_ATTEMPTS,
   ERROR_REPORT_FILE_FAILED,
   ERROR_DEADLINE_NOT_PASSED,
   ERROR_HAK_JAWAB_WINDOW_CLOSED,
@@ -60,83 +55,16 @@ async function notifyTurn(
 }
 
 // ============================================================
-// sendBreachReportOtp / verifyBreachReportOtpAction — the OTP step inside
-// BarangTidakSesuaiModal. Reporter is always the Pembeli slot (only the
-// buyer can claim goods didn't match — this modal is only ever rendered
-// from DikonfirmasiTerimaPanel's PembeliPanel). Both re-derive whichParty
-// from the phone independently, same posture as every other action here —
-// the modal's own state is never trusted.
+// §25 (2026-07-21): sendBreachReportOtp / verifyBreachReportOtpAction and
+// their DeadlineLapse twins are removed, along with the SendOtpState /
+// VerifyOtpState types. The OTP step gated the wronged party's only recourse
+// on a WhatsApp delivery, so a channel outage meant a real complaint could
+// not be recorded at all. Identity is still established the same way every
+// other action in this file establishes it — identifyPartyByPhone, re-derived
+// server-side on submit, never trusted from the client. What is gone is
+// proof of possession of the number, and the flag/consequences copy no
+// longer claims otherwise.
 // ============================================================
-
-export type SendOtpState = { sent?: boolean; error?: string };
-
-export async function sendBreachReportOtp(
-  token: string,
-  phone: string,
-  _prev: SendOtpState,
-  _formData: FormData,
-): Promise<SendOtpState> {
-  const db = supabaseServer();
-  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
-  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
-  if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
-
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  let phoneE164: string;
-  try {
-    phoneE164 = normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  const { sent, rateLimited } = await sendOtp(db, deal.id, phoneE164);
-  if (rateLimited) return { error: ERROR_OTP_SEND_RATE_LIMITED };
-  if (!sent) return { error: ERROR_OTP_SEND_FAILED };
-  return { sent: true };
-}
-
-export type VerifyOtpState = { verified?: boolean; error?: string };
-
-export async function verifyBreachReportOtpAction(
-  token: string,
-  phone: string,
-  _prev: VerifyOtpState,
-  formData: FormData,
-): Promise<VerifyOtpState> {
-  const db = supabaseServer();
-  const code = (formData.get('otp_code') as string | null)?.trim() ?? '';
-  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
-  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
-  if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
-
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  let phoneE164: string;
-  try {
-    phoneE164 = normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  const result = await verifyOtp(db, deal.id, phoneE164, code);
-  if (!result.verified) {
-    return { error: result.error === 'too_many_attempts' ? ERROR_OTP_TOO_MANY_ATTEMPTS : ERROR_OTP_INVALID };
-  }
-  return { verified: true };
-}
 
 // ============================================================
 // fileBarangTidakSesuaiReport — C6's real submit. Requires an OTP verified
@@ -170,9 +98,10 @@ export async function fileBarangTidakSesuaiReport(
   if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
 
   let whichParty: WhichParty | null;
-  let phoneE164: string;
   try {
-    phoneE164 = normalizePhone(phone);
+    // Still normalized purely as a validity check — the value itself is no
+    // longer needed now that the OTP gate (its only consumer) is gone.
+    normalizePhone(phone);
     whichParty = await identifyPartyByPhone(db, deal, phone);
   } catch {
     return { error: ERROR_PHONE_INVALID };
@@ -181,10 +110,6 @@ export async function fileBarangTidakSesuaiReport(
 
   const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
   if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  if (!(await consumeVerifiedOtp(db, deal.id, phoneE164))) {
-    return { error: ERROR_OTP_INVALID };
-  }
 
   const fieldNote = (formData.get('field_note') as string | null)?.trim() ?? '';
 
@@ -296,74 +221,6 @@ function deadlineHasPassed(deadline: string): boolean {
   return deadline < getTodayWib();
 }
 
-export async function sendDeadlineLapseOtp(
-  token: string,
-  phone: string,
-  _prev: SendOtpState,
-  _formData: FormData,
-): Promise<SendOtpState> {
-  const db = supabaseServer();
-  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
-  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
-  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
-  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
-
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  let phoneE164: string;
-  try {
-    phoneE164 = normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  const { sent, rateLimited } = await sendOtp(db, deal.id, phoneE164);
-  if (rateLimited) return { error: ERROR_OTP_SEND_RATE_LIMITED };
-  if (!sent) return { error: ERROR_OTP_SEND_FAILED };
-  return { sent: true };
-}
-
-export async function verifyDeadlineLapseOtpAction(
-  token: string,
-  phone: string,
-  _prev: VerifyOtpState,
-  formData: FormData,
-): Promise<VerifyOtpState> {
-  const db = supabaseServer();
-  const code = (formData.get('otp_code') as string | null)?.trim() ?? '';
-  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
-  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
-  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
-  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
-
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  let phoneE164: string;
-  try {
-    phoneE164 = normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  const result = await verifyOtp(db, deal.id, phoneE164, code);
-  if (!result.verified) {
-    return { error: result.error === 'too_many_attempts' ? ERROR_OTP_TOO_MANY_ATTEMPTS : ERROR_OTP_INVALID };
-  }
-  return { verified: true };
-}
-
 export async function fileDeadlineLapseReport(
   token: string,
   phone: string,
@@ -379,9 +236,10 @@ export async function fileDeadlineLapseReport(
   if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
 
   let whichParty: WhichParty | null;
-  let phoneE164: string;
   try {
-    phoneE164 = normalizePhone(phone);
+    // Still normalized purely as a validity check — the value itself is no
+    // longer needed now that the OTP gate (its only consumer) is gone.
+    normalizePhone(phone);
     whichParty = await identifyPartyByPhone(db, deal, phone);
   } catch {
     return { error: ERROR_PHONE_INVALID };
@@ -390,10 +248,6 @@ export async function fileDeadlineLapseReport(
 
   const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
   if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-
-  if (!(await consumeVerifiedOtp(db, deal.id, phoneE164))) {
-    return { error: ERROR_OTP_INVALID };
-  }
 
   // Optional here (unlike C6's field_note, which requires the reporter to
   // describe which part of the description wasn't met): the claim itself is

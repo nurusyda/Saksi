@@ -4,17 +4,16 @@ import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
-import { LiveIndicator } from './LiveIndicator';
 import { DealStatus } from '@/lib/db/transitions';
 import {
   identifyParty,
   getBuktiForDisplay,
   confirmReceipt,
-  notifyPaymentNotReceived,
   type BuktiDisplay,
   type ConfirmActionState,
-  type NotifyNotReceivedState,
 } from './paymentActions';
+import { DanaBelumMasukForm } from './DanaBelumMasukForm';
+import { DealStatements } from './DealStatements';
 import { DeadlineLapseReportModal } from './DeadlineLapseReportModal';
 import type { WhichParty } from '@/lib/db/party';
 import { getTodayWib } from '@/lib/format';
@@ -22,9 +21,6 @@ import {
   formatOcrVerdictLabel,
   PENDING_DEFAULT_LABEL,
   CONFIRM_RECEIPT_LABEL,
-  PAYMENT_NOT_RECEIVED_LABEL,
-  PAYMENT_NOT_RECEIVED_ACK,
-  PAYMENT_NOT_RECEIVED_UNDELIVERED,
   OCR_AUTHENTICITY_DISCLAIMER,
   WAITING_FOR_RECEIPT_CONFIRMATION,
   DEADLINE_LAPSE_REPORT_BUTTON,
@@ -80,25 +76,8 @@ function ConfirmReceiptButton() {
   );
 }
 
-function NotReceivedButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="flex h-12 w-full items-center justify-center rounded-lg border border-muted-amber-line bg-white px-6 text-sm font-medium text-muted-amber transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {pending ? PENDING_DEFAULT_LABEL : PAYMENT_NOT_RECEIVED_LABEL}
-    </button>
-  );
-}
-
 function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   const [bukti, setBukti] = useState<BuktiDisplay | null | 'loading' | 'error'>('loading');
-
-  const boundNotifyNotReceived = notifyPaymentNotReceived.bind(null, deal.token, phone);
-  const notifyInitialState: NotifyNotReceivedState = {};
-  const [notifyState, notifyFormAction] = useActionState(boundNotifyNotReceived, notifyInitialState);
 
   useEffect(() => {
     let ignore = false;
@@ -176,18 +155,9 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
         <ConfirmReceiptButton />
       </form>
 
-      <form action={notifyFormAction}>
-        <NotReceivedButton />
-      </form>
-      {notifyState.error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {notifyState.error}
-        </p>
-      )}
-      {notifyState.sent && <p className="text-xs text-zinc-500">{PAYMENT_NOT_RECEIVED_ACK}</p>}
-      {notifyState.undelivered && (
-        <p className="text-xs text-zinc-500">{PAYMENT_NOT_RECEIVED_UNDELIVERED}</p>
-      )}
+      <DanaBelumMasukForm token={deal.token} phone={phone} />
+
+      <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
     </div>
   );
 }
@@ -207,7 +177,6 @@ function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-        <LiveIndicator />
         <p>{WAITING_FOR_RECEIPT_CONFIRMATION}</p>
         {/* Paused while the report modal is open — that modal holds an
             in-progress form (DeadlineLapseReportModal), and an unannounced
@@ -215,6 +184,13 @@ function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string
             friction this component exists to remove. */}
         {!modalOpen && <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DIBAYAR_DIKLAIM} />}
       </div>
+
+      {/* §24: the penjual may have recorded a keterangan saying the funds
+          never landed or the bukti was wrong. That is the whole point of
+          recording it — the pembeli has to actually see it, on the screen
+          where they are waiting, not only in a WA message that may never
+          have arrived. */}
+      <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
 
       {deadlinePassed && (
         <button

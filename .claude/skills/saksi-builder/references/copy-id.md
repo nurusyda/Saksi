@@ -568,3 +568,194 @@ An invoice that looks like a real tagihan must not become an invoice that
 The witness mark states what SAKSI is doing (recording), never what the deal
 is (safe). "Menyaksikan" is the whole product in one word and carries no
 guarantee.
+
+## §24 — "Dana belum masuk / bukti salah" becomes a recorded statement (2026-07-21, migration 0029)
+
+**What it was.** The penjual tapped one button and the only consequence was a
+best-effort WhatsApp nudge at the pembeli. No `deal_events` row, no persisted
+text, nothing on the record. The UI then reported the *delivery state of that
+message* — "Notifikasi terkirim", or on failure "Percobaan mengirim notifikasi
+WA tidak berhasil."
+
+**Why that was wrong.** Two ways. When the WA channel was down the pembeli
+learned nothing at all, so a genuine disagreement existed only in the seller's
+head and vanished. And the seller was shown a notification-integration failure,
+which is not a fact about their deal and not something they can act on.
+
+**What it is now.** The penjual writes what actually happened and that
+keterangan is recorded, hash-chained, and shown to the pembeli on their own
+status page. The record carries the disagreement instead of a messaging channel
+carrying it.
+
+Still **not** a breach report: `DANA_BELUM_MASUK` is a self-transition on
+`DIBAYAR_DIKLAIM`. No flags row, no status change, no publication, no deadline
+effect. It is one party's attributed account sitting next to the other party's
+bukti claim, so a reader can see both sides and see that they disagree. The
+breach pipeline is untouched and still gated on the deadline actually lapsing.
+
+Note text lives in `deal_statements` (RLS, service-role only); the event payload
+carries only a SHA-256 of it — same split as `breach_notes` (§0020).
+
+**Retired:** `PAYMENT_NOT_RECEIVED_ACK`, `ERROR_NOTIFY_SEND_FAILED`,
+`PAYMENT_NOT_RECEIVED_UNDELIVERED`, `formatPaymentNotReceivedMessage`. All four
+described the delivery state of a WhatsApp message.
+
+**New:** `DANA_BELUM_MASUK_HEADING`, `_PROMPT`, `_PLACEHOLDER`, `_SUBMIT_LABEL`,
+`_CONSEQUENCES`, `_RECORDED`, `STATEMENT_FROM_PENJUAL_LABEL`,
+`STATEMENT_FROM_PEMBELI_LABEL`, `ERROR_STATEMENT_*`.
+
+## §25 — WA OTP removed from the breach path (2026-07-21)
+
+Filing a report was three steps: write the note, request a WA code, enter the
+code, submit. It is now one step.
+
+**Why.** The OTP sat on the WhatsApp channel, so an outage in a *notification
+integration* blocked the wronged party from recording a complaint at all. That
+is the worst available failure mode for this product: the whole point is that
+the record exists when someone is harmed.
+
+**What identity still means on these paths.** `identifyPartyByPhone`, re-derived
+server-side on submit, same as every other action — it proves the filer is a
+party to this deal. It does **not** prove they currently possess that number.
+
+**Copy corrected accordingly.** `BARANG_TIDAK_SESUAI_CONSEQUENCES`' last bullet
+used to read *"Nomor HP pelapor terverifikasi. Laporan palsu juga tercatat
+permanen atas nomor ini."* The first sentence became false the moment the OTP
+went; it is removed. The second is kept, reworded to name what is actually true:
+*"Laporan palsu juga tercatat permanen atas nomor HP yang tercatat sebagai pihak
+dalam kesepakatan ini."*
+
+**Retired:** the whole `OTP_*` string set, `formatOtpMessage`, `lib/otp.ts`, and
+the `OTP_BREACH_REPORT` WA template.
+
+**Left in place deliberately:** the `otp_codes` table (0020) — dropping a table
+is irreversible, keeping an unused one is free.
+
+⚠ **Dormant strings that are now false if ever shipped:** `TIER_LIMA_RIBU_DESC`,
+`TIER_LABELS.LIMA_RIBU`, and `FLAG_BODY_STEM.LIMA_RIBU` all promise phone
+verification whose only implementation has been removed. None are rendered today
+(no tier selector; every deal is GRATIS). Do not ship that tier without first
+rebuilding a verification mechanism.
+
+## §26 — Buyer flow merged into one page (2026-07-21)
+
+The buyer opened a payment link and the first thing they saw was a bare phone
+field. The destination account, and that account's record, only appeared on a
+*later* screen — after they had already handed over a phone number.
+
+That ordering defeated the forced check (Law 7). The check is only worth
+anything before the buyer decides to trust the seller, not at the moment they
+tap upload. So the rekening and its full record now render immediately,
+server-side, with no gate in front of them — masked, since the page is reachable
+by anyone holding the link.
+
+The phone field stays, and stays before the *unmasked* number, because entering
+it is what records the buyer as a party to this deal. But it is one section
+inside the page they are already reading, not a wall in front of it.
+
+**Also removed from the buyer's view:** the deal-link card ("Link tagihan ini /
+Simpan link ini"). It is the seller's tool for re-sharing the capability URL; the
+buyer arrived *via* that link and is not the one distributing it. It now renders
+for the proposer only.
+
+**New:** `formatAccountHistoryCounts` — the counts half of
+`formatAccountHistory`, for surfaces that already render the bank and masked
+number as their own heading. A projection of that locked string, same words,
+same order. Do not reconstruct it by string-replacing the prefix out of
+`formatAccountHistory`'s output.
+
+## §27 — Time display, and the deadline as an instant (2026-07-21)
+
+**Every timestamp now carries its zone.** `formatDateTime` rendered
+"21 Juli 2026, 09.34" with no zone marker. For a record whose purpose is to be
+shown to a third party during a dispute, a bare wall-clock time is ambiguous —
+Indonesia spans WIB/WITA/WIT. UU ITE Pasal 6/15/16 conditions an electronic
+record's evidentiary weight on keautentikan/keutuhan and on the system being
+able to display it back intact; a timestamp readable two ways fails that on its
+face. Standard audit-log practice agrees: store UTC, render with an explicit
+zone.
+
+Storage was already correct (`deal_events.created_at` is `timestamptz`, an
+absolute UTC instant). Only display changed, and it always pins to Asia/Jakarta
+rather than the viewer's local zone, so both parties reading the same record see
+the identical string.
+
+- `formatTimeWib` — "21 Jul 2026, 09.34 WIB". Timeline rows, step times.
+- `formatTimeWibPrecise` — to the second. For establishing ordering between two
+  close events.
+- `formatDeadlineWib` — **"28 Juli 2026, 23.59 WIB"**.
+
+**On that 23.59.** `deals.deadline` is a naive WIB calendar date and the breach
+gate is `deadline < getTodayWib()` — strictly less than, so a party has the whole
+of the deadline date and eligibility opens at 00.00 the following day. The last
+moment inside the window is therefore 23.59 WIB on the deadline date. Do not
+"simplify" this to 00.00 of the deadline date: that states a cutoff a full day
+earlier than the code enforces.
+
+**The deadline is now shown at all.** It was auto-derived (creation + 7 days) and
+never displayed, so neither party knew the window. `BUAT_DEADLINE_LABEL` /
+`BUAT_DEADLINE_NOTE` state it read-only on the create form — read-only because
+the server derives it and would ignore a submitted value.
+
+**Progress display.** `DealProgressStepper` + `LiveIndicator` are replaced by one
+`DealProgress`: two compact lines by default (the old stepper ate a third of the
+first screen and pushed the invoice below the fold), the live-update signal
+carried on the current bead as a pulse rather than in a detached pill, and an
+expand that reveals each step with its WIB timestamp from `deal_events`. It
+displays event times; it computes nothing.
+
+## §28 — Review pass on §23–§27, before commit (2026-07-21)
+
+Manual review (no DeepSeek key available; reviewed against this file's own
+Laws/Golden-Rules directly) turned up two real issues in the §23–§27 work,
+both fixed here, plus one operational gap that isn't a code bug but will
+break the feature silently if missed.
+
+**Fixed — redundant rekening display.** `BuyerJoinGate.tsx`'s first version
+repeated the masked account number: `InvoiceCard` already renders
+"Rekening tujuan: {bank} {masked}" as one of its own rows, directly above
+`BuyerJoinGate` in the render tree, and `BuyerJoinGate` printed the same
+masked number again under its own "Rekening tujuan" heading right below it.
+That is exactly the wasted-space problem §26 was supposed to fix. Retitled
+to "Riwayat rekening ini" and dropped the duplicate number — the card's only
+job is the part `InvoiceCard` doesn't cover, the account's history.
+
+**Fixed — stale locked-spec docs.** `data-model.md`'s "Breach → flag
+pipeline" section and `integrations.md`'s §2 both still described the
+breach-report WA OTP as a live, required mechanism after §25 removed it —
+`data-model.md` even repeated the exact "every flag has a traceable
+reporter" claim that made `BARANG_TIDAK_SESUAI_CONSEQUENCES`' now-corrected
+bullet false. These are two of the four files this repo's own `CLAUDE.md`
+says to read before touching a flow ("read before wiring any external
+service" / locked product decisions) — leaving them stale risked a future
+pass reintroducing the OTP gate on the strength of a doc that no longer
+matches what was actually decided. Both corrected with a pointer back to
+§25.
+
+**Since applied:** Migration 0029 was flagged here as written-but-unapplied;
+it was pushed to the live DB via `npx supabase db push` immediately after this
+review (confirmed via `supabase migration list` showing `remote: 0029`). See
+`ops.md`.
+- **`DanaBelumMasukForm` allows one statement submission per page load.**
+  Once `state.recorded` is true from `useActionState`, the component locks
+  to the confirmation card with no way to open the form again without a
+  reload — even though the migration's own design explicitly anticipates a
+  seller needing to add a second statement ("a second transfer arrived, the
+  first statement was wrong"). Low severity (a reload is always available),
+  left as a known gap rather than patched reflexively.
+- **`/buat`'s deadline preview can go stale.** `getDefaultDeadlineWib()` is
+  read once on mount for display; `createDeal` recomputes it fresh at actual
+  submission time. If a seller leaves the form open for an unusually long
+  time before submitting, the previewed date and the persisted deadline can
+  differ. `BUAT_DEADLINE_NOTE`'s "sejak tagihan dibuat" wording is technically
+  accurate about the mechanism either way; the displayed date itself carries
+  no "estimated" qualifier. Low practical impact (forms are typically filled
+  in minutes), noted rather than engineered around.
+
+**Confirmed correct, not a bug:** `DealLinkCard` no longer rendering for the
+buyer (only the proposer, in the desktop rail) was checked against §26's own
+"lost link = lost deal" rationale and looked at first like a regression —
+but it is exactly what was asked for (remove the "Simpan link ini" card from
+the middle of the buyer's page), and the buyer's own copy of the link already
+persists in the WhatsApp thread that delivered it to them, which
+`DealLinkCard` never was the only source of. Checked, not reverted.
