@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getMyDealsSummary, type DealSummary } from './actions';
 import { useMyDeals, forgetDeal } from '@/lib/sellerDeals';
-import { Card, SectionLabel, ErrorBanner, buttonClass } from '@/components/ui';
+import { Card, SectionLabel, ErrorBanner } from '@/components/ui';
 import { formatRp, formatDeadlineWib } from '@/lib/format';
 import {
   SAYA_DEVICE_NOTE,
@@ -16,7 +16,6 @@ import {
   SAYA_RECORD_HEADING,
   SAYA_STATUS_LABELS,
   formatSayaRecord,
-  CTA_BUAT_TAGIHAN,
   TOKO_PRO_LOCKED_TITLE,
   TOKO_PRO_LOCKED_PRICE,
   TOKO_PRO_LOCKED_DESC,
@@ -101,25 +100,16 @@ export function MyDealsList() {
         </Card>
       )}
 
-      {/* §33 — the create button moves inside the empty state rather than
-          sitting above it. Rendering both meant an empty page whose card
-          said "nothing here" directly under a button that said "make one",
-          i.e. the same message twice, and made this page look like a
-          detour on the way to /buat rather than the home it is. */}
-      {total > 0 && (
-        <Link href="/buat" className={buttonClass.primary}>
-          + {CTA_BUAT_TAGIHAN}
-        </Link>
-      )}
-
+      {/* §34 — no create button on this page at all. This is a riwayat: a
+          record of what already exists, not a place you make things. Putting
+          "+ Buat Tagihan" here duplicated the landing's own primary CTA and
+          made the page read as a detour on the way to /buat. Creating starts
+          from the landing; PageShell's back link is the way there. */}
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {total === 0 ? (
         <Card>
-          <p className="text-sm text-zinc-600">{SAYA_EMPTY_STATE}</p>
-          <Link href="/buat" className={`mt-4 ${buttonClass.primary}`}>
-            + {CTA_BUAT_TAGIHAN}
-          </Link>
+          <p className="text-sm leading-relaxed text-zinc-600">{SAYA_EMPTY_STATE}</p>
         </Card>
       ) : (
         <div className="flex flex-col gap-3">

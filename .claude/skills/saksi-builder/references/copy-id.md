@@ -995,3 +995,57 @@ other; they are not alternatives.
   sitting above it. Rendering both put a card saying "nothing here" directly
   under a button saying "make one" — the same message twice, and it made the
   page look like a detour on the way to `/buat` rather than the home it is.
+
+## §34 — "Riwayat tagihan", read-only (2026-07-21)
+
+Two corrections to §32/§33, both from the same root cause: the page was named
+and shaped as a *hub* when what it actually is is a *record*.
+
+**Renamed "Tagihan saya" → "Riwayat tagihan."** "Saya" implies possession the
+app cannot back up — there is no login and no cross-device carry, so the very
+next line (`SAYA_DEVICE_NOTE`) had to walk the claim back. "Riwayat" claims only
+what is true: a record of tagihan this browser has seen. Same discipline as the
+forced-check empty state.
+
+**Removed the create button entirely.** A riwayat is where you look at what
+already exists, not where you make things. `+ Buat Tagihan` there duplicated the
+landing's own primary CTA and made the page read as a detour on the way to
+`/buat`. Creating starts from the landing; `PageShell`'s back link is the way
+there. `SAYA_EMPTY_STATE` gained a second sentence so the empty case still points
+somewhere ("tagihan yang kamu buat nanti muncul di sini otomatis") rather than
+dead-ending.
+
+`/buat`'s back link also reverted to the landing — §32 had pointed it at `/saya`,
+which made a *history* page the parent of the create form.
+
+### Note: this is not S1 Beranda
+
+SAKSI-MASTER.md §5's S1 Beranda is a hub — track record **plus** the create
+button **plus** the list. What exists now is deliberately narrower: the list and
+a counts summary, no create. Do not treat §32/§34 as having delivered S1; the hub
+shape becomes correct again if/when accounts exist and the page has a durable
+identity to be a home *for*.
+
+### Paid-tier surfacing — decided, not deferred by accident
+
+The greyed `Toko Saksi Pro` card stays on this page and is the **only** place any
+price appears. Reasoning:
+
+- **Rp100k Pro** is advertised because it is aspirational and lands where it
+  earns attention: on the screen of someone who already has a track record. It
+  renders inert (no button, no handler) so it cannot read as purchasable while
+  it is not.
+- **Rp10k Akun Saksi is deliberately NOT surfaced anywhere.** It is the price of
+  an *account*, and accounts do not exist yet. Advertising a toll on a product
+  that is currently free — during the exact phase whose purpose is measuring
+  whether the loop is used at all (master doc §6.2) — buys nothing and dampens
+  the signal being measured. It gets introduced when accounts ship, because that
+  is when it is attached to something real: durable cross-device riwayat.
+
+⚠ **Tier-naming drift to reconcile before any of this ships.** `feature_interest`
+(0012/0016) and `TIER_LABELS` still carry the *old* taxonomy —
+`LIMA_RIBU` (Rp5.000) / `BERMETERAI` (Rp50.000). SAKSI-MASTER.md §6.1 replaced
+those with **Akun Saksi (Rp10.000)** and **Toko Saksi Pro (Rp100.000)**. The
+schema, the copy constants, and the master doc must be reconciled in one pass —
+not patched independently — or the notify-me capture will key interest against
+tiers that no longer exist.

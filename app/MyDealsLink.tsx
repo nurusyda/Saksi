@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useMyDeals } from '@/lib/sellerDeals';
-import { CTA_LIHAT_TAGIHAN_SAYA } from '@/lib/copy';
+import { CTA_RIWAYAT_TAGIHAN } from '@/lib/copy';
 
-// §33 — the landing's "Tagihan saya" link, shown only when this device
+// §33 — the landing's "Riwayat tagihan" link, shown only when this device
 // actually has tagihan.
 //
 // Rendering it unconditionally created a loop: a first-time visitor saw two
@@ -31,7 +31,7 @@ export function MyDealsLink() {
       href="/saya"
       className="flex h-12 items-center justify-center rounded-xl border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50"
     >
-      {CTA_LIHAT_TAGIHAN_SAYA}
+      {CTA_RIWAYAT_TAGIHAN}
     </Link>
   );
 }

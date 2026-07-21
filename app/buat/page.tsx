@@ -117,7 +117,7 @@ export default function BuatPage() {
   const fe = state.fieldErrors ?? {};
 
   return (
-    <PageShell backHref="/saya" backLabel="← Tagihan saya">
+    <PageShell>
       <PageTitle title={BUAT_HEADING} subtitle={BUAT_INTRO} />
 
       <form action={formAction} className="flex flex-col gap-4">

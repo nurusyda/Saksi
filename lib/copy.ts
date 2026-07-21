@@ -423,16 +423,24 @@ export const MONEY_NEVER_TOUCHES_SAKSI_NOTE =
 // durable storage the app cannot keep. Same discipline as the forced-check
 // empty state — the honest weaker sentence beats the reassuring stronger one.
 // ============================================================
-export const SAYA_HEADING = 'Tagihan saya';
-export const SAYA_INTRO = 'Tagihan yang kamu buat dari perangkat ini.';
+// §34 — "Riwayat tagihan", not "Tagihan saya". More honest about what this
+// actually is: a record of tagihan this browser has seen, not an account you
+// own. "Saya" implies possession the app cannot back up (no login, no
+// cross-device), which is exactly the promise SAYA_DEVICE_NOTE has to walk
+// back two lines later. "Riwayat" claims only what is true.
+export const SAYA_HEADING = 'Riwayat tagihan';
+export const SAYA_INTRO = 'Tagihan yang dibuat dari perangkat ini.';
 export const SAYA_DEVICE_NOTE =
   'Daftar ini disimpan di perangkat ini saja, bukan akun. Kalau kamu ganti HP atau hapus data browser, daftarnya hilang. Simpan juga link tagihannya.';
-export const SAYA_EMPTY_STATE = 'Belum ada tagihan yang dibuat dari perangkat ini.';
+// No create button on this page (§34), so the empty state has to point
+// somewhere itself rather than leaving a dead end.
+export const SAYA_EMPTY_STATE =
+  'Belum ada tagihan yang dibuat dari perangkat ini. Tagihan yang kamu buat nanti muncul di sini otomatis.';
 export const SAYA_REFRESH_FAILED = 'Status terbaru tidak dapat dimuat. Coba lagi nanti.';
 export const SAYA_RATE_LIMITED = 'Terlalu banyak permintaan. Coba lagi dalam beberapa menit.';
 export const SAYA_FORGET_LABEL = 'Hapus dari daftar';
 export const SAYA_FORGET_NOTE = 'Menghapus dari daftar ini tidak menghapus catatan kesepakatannya.';
-export const CTA_LIHAT_TAGIHAN_SAYA = 'Tagihan saya';
+export const CTA_RIWAYAT_TAGIHAN = 'Riwayat tagihan';
 
 // Track-record summary. Counts per outcome only — never a score, never a
 // badge, never a safety colour (Law 4). "Tercatat" not "berhasil": the
