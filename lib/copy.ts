@@ -621,9 +621,9 @@ export function formatHakJawabFiledMessage(itemDesc: string, dealUrl: string): s
 // Persistent deal-link card (shown on every non-terminal deal status, not
 // just DRAF — the audit's "lost link = lost deal" finding, since identity is
 // phone-only with no session).
-export const DEAL_LINK_CARD_HEADING = 'Link kesepakatan ini';
+export const DEAL_LINK_CARD_HEADING = 'Link tagihan ini';
 export const DEAL_LINK_SAVE_HINT =
-  'Simpan link ini. Tanpa link, kesepakatan tidak dapat dibuka kembali.';
+  'Simpan link ini. Tanpa link, tagihan tidak dapat dibuka kembali.';
 export const SHARE_TO_WHATSAPP_LABEL = 'Bagikan ke WhatsApp';
 
 // Progress stepper (6 nodes: Dibuat -> Bergabung -> Disepakati -> Dibayar ->
@@ -694,3 +694,27 @@ export function formatLedgerRow(
   const base = `${itemDesc} · ${amountLabel} · ${LEDGER_BUCKET_LABELS[bucket]} · ${dateLabel}`;
   return counterpartHashFragment ? `${base} · pihak ${counterpartHashFragment}` : base;
 }
+
+// §20 — "Tagihan" reframe: seller create-and-send surface (copy-id.md §20).
+// Centralized here so the invariant audit sees every user-facing string in one
+// place. Truthful only: no "aman", no "terpercaya", no guarantee.
+export const LANDING_HEADING = 'Buat tagihan buat pembeli kamu.';
+export const LANDING_SUBHEAD =
+  'Isi barang, harga, dan rekening kamu. Kirim link-nya ke pembeli, bukan nomor rekening. Tiap pembayaran tercatat otomatis.';
+export const LANDING_STEPS: readonly { title: string; body: string }[] = [
+  { title: 'Isi tagihan', body: 'Barang atau jasa, harga, dan nomor rekening kamu.' },
+  { title: 'Kirim link-nya ke pembeli', body: 'Bukan nomor rekening, cukup satu link.' },
+  {
+    title: 'Pembeli bayar & upload bukti',
+    body: 'Setiap langkah tercatat otomatis. Ada catatannya kalau ada masalah.',
+  },
+];
+export const CTA_BUAT_TAGIHAN = 'Buat Tagihan';
+export const CTA_CEK_REKENING = 'Cek Rekening';
+
+export const BUAT_HEADING = 'Buat Tagihan';
+export const BUAT_INTRO =
+  'Isi tagihan buat pembeli kamu. Nanti kamu dapat link buat dikirim ke mereka.';
+export const BUAT_SECTION_DATA = 'Data kamu';
+export const BUAT_SECTION_BARANG = 'Barang & harga';
+export const BUAT_SECTION_REKENING = 'Rekening pembayaran kamu';

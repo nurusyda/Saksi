@@ -347,3 +347,39 @@ Live in production, backfilled here for the record. **GATE 2 reminder:** this pa
 **Waiting-state fill-ins (the non-active-party side of each merged status page; not explicitly specced in the original build order, minimal placeholders):**
 - Penjual waiting at DISEPAKATI: `Menunggu pihak pembeli mengunggah bukti transfer.`
 - Pembeli waiting at DIBAYAR_DIKLAIM: `Menunggu konfirmasi penerimaan dari pihak penjual.`
+
+---
+
+## §20 — "Tagihan" reframe of the seller create-and-send surface (2026-07)
+
+**Decision & boundary (read before touching any of this).** The seller's mental
+model at entry is "I am making an invoice (tagihan) to send to my buyer." So the
+**create-and-send surface** uses `tagihan`. Everything about the *witnessed
+mutual agreement and its outcome* stays `kesepakatan`, because that is what SAKSI
+legally records and publishes — renaming those would make the app claim to record
+something it doesn't, violating the one invariant.
+
+**Surface → word (locked):**
+- **Tagihan** (seller's artifact, create + send): landing page, `/buat` create
+  form, and the deal-link/share card.
+- **Kesepakatan** (the witnessed agreement — DO NOT reframe): all breach/flag
+  publication (§ breach ladder), the T&C and attestations, the lifecycle event
+  log / timeline, WA notifications, join/consent record lines, and every
+  "tidak dipenuhi / disetujui / dibatalkan / kedaluwarsa" outcome string.
+
+**New / changed strings:**
+- Landing (`app/page.tsx`): heading `Buat tagihan buat pembeli kamu.`; subhead
+  `Isi barang, harga, dan rekening kamu. Kirim link-nya ke pembeli — bukan nomor
+  rekening. Tiap pembayaran tercatat otomatis.`; steps `Isi tagihan` /
+  `Kirim link-nya ke pembeli` / `Pembeli bayar & upload bukti`; CTAs `Buat
+  Tagihan` / `Cek Rekening`. (Truthful, no "aman"/"terpercaya"/guarantee.)
+- Create form (`app/buat/page.tsx`): title `Buat Tagihan`; intro `Isi tagihan
+  buat pembeli kamu. Nanti kamu dapat link buat dikirim ke mereka.`; section
+  labels `Data kamu` / `Barang & harga` / `Rekening pembayaran kamu`; submit
+  `Buat Tagihan`; defaults `proposer_role` to PENJUAL (seller-first).
+- Share card (`lib/copy.ts`): `DEAL_LINK_CARD_HEADING = 'Link tagihan ini'`;
+  `DEAL_LINK_SAVE_HINT = 'Simpan link ini. Tanpa link, tagihan tidak dapat
+  dibuka kembali.'`; WA share text prefix `Tagihan SAKSI:` (DealLinkCard.tsx).
+
+Server contract unchanged (all form field names identical). Engine, state
+machine, anchoring, and the invariant untouched.

@@ -15,7 +15,7 @@ import { DEAL_LINK_CARD_HEADING, DEAL_LINK_SAVE_HINT, SHARE_TO_WHATSAPP_LABEL } 
 // rate limit tied to a real recipient, a spam/abuse surface this feature
 // doesn't need to introduce.
 export function DealLinkCard({ url, itemDesc }: { url: string; itemDesc: string }) {
-  const waText = encodeURIComponent(`Kesepakatan SAKSI: "${itemDesc}" - ${url}`);
+  const waText = encodeURIComponent(`Tagihan SAKSI: "${itemDesc}" - ${url}`);
   const waHref = `https://wa.me/?text=${waText}`;
 
   return (

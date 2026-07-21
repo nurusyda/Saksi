@@ -14,42 +14,25 @@ import {
   ITEM_TITLE_PLACEHOLDER,
   ITEM_DETAIL_LABEL,
   ITEM_DETAIL_PLACEHOLDER,
-  ROLE_LABELS,
-  ROLE_PAIR,
-  ROLE_PAIR_HELPER_PREFIX,
-  TIER_LABELS,
-  TIER_GRATIS_DESC,
-  TIER_LIMA_RIBU_DESC,
-  TIER_BERMETERAI_DESC,
-  TIER_FOOTER,
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
   formatAccountHistory,
   PHONE_FIELD_LABEL,
   PHONE_FORMAT_HINT,
-  NOTIFY_ME_LABEL,
   PENDING_SAVE_LABEL,
-  RINGKASAN_KESEPAKATAN_HEADING,
+  BUAT_HEADING,
+  BUAT_INTRO,
+  BUAT_SECTION_DATA,
+  BUAT_SECTION_BARANG,
+  BUAT_SECTION_REKENING,
+  CTA_BUAT_TAGIHAN,
 } from '@/lib/copy';
 
-// Deal-type gating: only jual-beli is selectable for now. Backend/schema/
-// state machine keep supporting all role pairs — see actions.ts for the
-// matching server-side rejection. The jenis-transaksi selector itself (Section
-// B) was removed from this form entirely per the UX audit (2026-07-20) — it
-// offered no real choice (only jual-beli was ever functional) and just added
-// visual clutter ahead of the fields that do matter.
-const SELECTABLE_ROLES = [
-  { value: 'PENJUAL', label: ROLE_LABELS.PENJUAL },
-  { value: 'PEMBELI', label: ROLE_LABELS.PEMBELI },
-];
-
-// Locked tier descriptions include a "${price} · " prefix (copy-id.md §6).
-// The card header already shows the price; strip the prefix so the
-// description body shows only the value-proposition text.
-function stripPricePrefix(desc: string): string {
-  const idx = desc.indexOf(' · ');
-  return idx === -1 ? desc : desc.slice(idx + 3);
-}
+// Tagihan reframe (copy-id.md §20): this is a seller-first invoice form. The
+// proposer is always PENJUAL (submitted as a hidden field below) — the visible
+// Penjual/Pembeli role selector was removed so the seller isn't asked "which
+// side am I?" when they're just making a bill. Backend/schema/state machine
+// still support PEMBELI-proposed deals; only the UI path is seller-only now.
 
 function SubmitButton({ allChecked }: { allChecked: boolean }) {
   const { pending } = useFormStatus();
@@ -59,7 +42,7 @@ function SubmitButton({ allChecked }: { allChecked: boolean }) {
       disabled={!allChecked || pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? PENDING_SAVE_LABEL : 'Buat Kesepakatan'}
+      {pending ? PENDING_SAVE_LABEL : CTA_BUAT_TAGIHAN}
     </button>
   );
 }
@@ -107,7 +90,8 @@ const initialState: CreateDealState = {};
 export default function BuatPage() {
   const [state, formAction] = useActionState(createDeal, initialState);
   const [tcChecked, setTcChecked] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<string>('');
+  // Seller-first invoice: proposer is always PENJUAL (hidden field in the form).
+  const [selectedRole] = useState<string>('PENJUAL');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
   const [itemTitle, setItemTitle] = useState('');
@@ -152,10 +136,8 @@ export default function BuatPage() {
         <a href="/" className="mb-6 inline-block text-sm text-zinc-500 hover:text-zinc-800">
           ← SAKSI
         </a>
-        <h1 className="mb-1 text-2xl font-bold text-zinc-900">Buat Kesepakatan</h1>
-        <p className="mb-8 text-sm text-zinc-500">
-          Semua kolom wajib diisi. Data Anda diproses sesuai persetujuan di bawah.
-        </p>
+        <h1 className="mb-1 text-2xl font-bold text-zinc-900">{BUAT_HEADING}</h1>
+        <p className="mb-8 text-sm text-zinc-500">{BUAT_INTRO}</p>
 
         {state.error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -164,7 +146,7 @@ export default function BuatPage() {
         )}
 
         <form action={formAction} className="flex flex-col gap-6">
-          <FormSection label="Peran Anda">
+          <FormSection label={BUAT_SECTION_DATA}>
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-zinc-700" htmlFor="proposer_phone">
@@ -184,40 +166,11 @@ export default function BuatPage() {
               <FieldError msg={fe.proposer_phone} />
             </div>
 
-            {/* Role — legend removed, de-duped against this section's own
-                "Peran Anda" header just above. */}
-            <fieldset>
-              <div className="flex flex-wrap gap-2">
-                {SELECTABLE_ROLES.map((r) => (
-                  <label
-                    key={r.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
-                  >
-                    <input
-                      type="radio"
-                      name="proposer_role"
-                      value={r.value}
-                      onChange={() => setSelectedRole(r.value)}
-                      className="sr-only"
-                    />
-                    {r.label}
-                  </label>
-                ))}
-              </div>
-              {(() => {
-                const pairedKey = selectedRole ? ROLE_PAIR[selectedRole] : undefined;
-                if (!pairedKey) return null;
-                return (
-                  <p className="mt-2 text-xs text-zinc-500">
-                    {ROLE_PAIR_HELPER_PREFIX} {ROLE_LABELS[pairedKey]}
-                  </p>
-                );
-              })()}
-              <FieldError msg={fe.proposer_role} />
-            </fieldset>
+            {/* Seller-first invoice: role is fixed to PENJUAL (copy-id.md §20). */}
+            <input type="hidden" name="proposer_role" value="PENJUAL" />
           </FormSection>
 
-          <FormSection label={RINGKASAN_KESEPAKATAN_HEADING}>
+          <FormSection label={BUAT_SECTION_BARANG}>
             {/* Item title + optional detail — replaces the old single free-text
                 description (UX audit, 2026-07-20). A short required title reads
                 as "name the thing", not "compose a paragraph"; the detail box
@@ -287,7 +240,7 @@ export default function BuatPage() {
             </div>
           </FormSection>
 
-          <FormSection label="Pembayaran">
+          <FormSection label={BUAT_SECTION_REKENING}>
             {/* Rekening (C1) — only Penjual has a destination account to offer
                 at create time. When proposer is Pembeli, the seller supplies
                 this later when joining (see JoinDealForm.tsx, C2). */}
@@ -373,66 +326,10 @@ export default function BuatPage() {
 
           </FormSection>
 
-          {/* Tier */}
-          <fieldset>
-            <legend className="text-sm font-medium text-zinc-700">Tingkatan pencatatan</legend>
-            <div className="mt-2 flex flex-col gap-2">
-              <label
-                key="GRATIS"
-                className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50"
-              >
-                <input
-                  type="radio"
-                  name="tier"
-                  value="GRATIS"
-                  defaultChecked
-                  className="mt-0.5 shrink-0"
-                />
-                <div>
-                  <span className="font-medium text-blue-900">{TIER_LABELS.GRATIS}</span>
-                  <p className="text-zinc-500">{TIER_GRATIS_DESC}</p>
-                </div>
-              </label>
-              {/* Paid tiers — merged into one shared card (UX-audit fix pass,
-                  2026-07-20): two separately bordered/shadowed boxes took
-                  more vertical space than two not-yet-available options
-                  need. Both checkboxes and their `name` attributes are
-                  otherwise untouched — they're the app's pre-launch
-                  per-tier willingness-to-pay signal (feature_interest,
-                  migrations 0012/0016), measured separately on purpose, not
-                  decoration to prune. */}
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 text-xs shadow-sm shadow-zinc-200/50">
-                <div className="px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <label className="flex items-center gap-1 text-zinc-500">
-                      <input type="checkbox" name="interest_tier_lima_ribu" className="shrink-0" />
-                      <span className="font-medium">{TIER_LABELS.LIMA_RIBU}</span>
-                    </label>
-                    <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                      {NOTIFY_ME_LABEL}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_LIMA_RIBU_DESC)}</p>
-                </div>
-                <div className="border-t border-zinc-200 px-2 py-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <label className="flex items-center gap-1 text-zinc-500">
-                      <input type="checkbox" name="interest_tier_bermeterai" className="shrink-0" />
-                      <span className="font-medium">{TIER_LABELS.BERMETERAI}</span>
-                    </label>
-                    <span className="ml-auto rounded-full border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] leading-tight text-zinc-400">
-                      {NOTIFY_ME_LABEL}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-zinc-400">{stripPricePrefix(TIER_BERMETERAI_DESC)}</p>
-                </div>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              {TIER_FOOTER}
-            </p>
-            <FieldError msg={fe.tier} />
-          </fieldset>
+          {/* Seller-first invoice: all deals are free-tier for now (copy-id.md
+              §20). Tier selector + paid-interest signal removed from the UI;
+              backend still accepts the tier field. */}
+          <input type="hidden" name="tier" value="GRATIS" />
 
           {/* Pernyataan — displayed as fine print above the single T&C consent
               checkbox, matching JoinDealForm's 2026-07-20 design. */}
