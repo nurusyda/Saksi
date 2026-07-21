@@ -403,6 +403,16 @@ export const RESUBMIT_BUKTI_HEADING = 'Penjual belum menerima dana';
 export const RESUBMIT_BUKTI_PROMPT =
   'Kalau bukti yang kamu kirim kurang tepat, atau kamu sudah transfer ulang, unggah bukti yang benar di sini.';
 export const RESUBMIT_BUKTI_SUBMIT_LABEL = 'Kirim ulang bukti transfer';
+
+// §31 (2026-07-21) — the merged buyer page. SAKSI-MASTER.md §5's Page 1a
+// names the primary action "Kirim bukti transfer"; that string is reused
+// here verbatim rather than reworded. The money note restates Law 6 in the
+// one place a buyer might otherwise assume SAKSI is holding their payment.
+export const SEND_BUKTI_LABEL = 'Kirim bukti transfer';
+export const BUKTI_FIELD_LABEL = 'Bukti transfer';
+export const SEND_BUKTI_SECTION_HEADING = 'Sudah transfer? Kirim buktinya';
+export const MONEY_NEVER_TOUCHES_SAKSI_NOTE =
+  'Transfer langsung dari m-banking kamu ke rekening di atas. SAKSI tidak menerima atau menahan uangmu, hanya mencatat.';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 

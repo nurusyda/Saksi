@@ -1,99 +1,91 @@
-import { JoinDealForm } from './JoinDealForm';
-import { getDealAccountHistory } from './paymentActions';
+import { JoinAndPayForm } from './JoinAndPayForm';
+import { RekeningCopyCard } from './RekeningCopyCard';
+import { LedgerDetail } from '@/components/LedgerDetail';
+import { getDealAccountHistory, getDealLedgerPublic } from './paymentActions';
 import { Card } from '@/components/ui';
 import {
-  JOIN_FORM_HEADING,
-  JOIN_DEAL_INSTRUCTION,
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
   formatAccountHistoryCounts,
+  SEND_BUKTI_SECTION_HEADING,
+  MONEY_NEVER_TOUCHES_SAKSI_NOTE,
 } from '@/lib/copy';
 import type { JoinDealState } from './actions';
 
-// §26 (2026-07-21) — the buyer's first screen, merged.
+// §31 — the buyer's page, as one page.
 //
-// This used to be a screen of its own: the buyer opened a payment link and
-// the first thing they saw was a bare phone field, before any of the
-// information they came for. The invoice was above it, but the account they
-// were about to pay — and that account's record — only appeared on a
-// *later* screen, after they had handed over a phone number.
+// SAKSI-MASTER.md §5's Page 1a is a single screen: invoice, then rekening +
+// its record + copy, then bukti upload, with "[ Kirim bukti transfer ]"
+// minting the deal event. The record is payment-anchored — nothing is
+// recorded until the buyer has actually paid.
 //
-// That ordering was backwards for the one thing this product exists to do.
-// The forced check (Law 7) is only worth anything if it happens before the
-// buyer commits, and "commit" here starts at the moment they decide to
-// trust the seller, not at the moment they tap upload. So the destination
-// account and its full record are now rendered immediately, server-side,
-// with no gate in front of them at all — masked, because this page is
-// reachable by anyone holding the link.
+// What this replaces diverged from that in a way that mattered. The buyer
+// hit a phone field first, and the account number only appeared on a later
+// screen once they had identified themselves. So the forced check (Law 7)
+// happened *after* the decision to trust the seller rather than before it,
+// which is backwards for the one thing this product exists to do. The
+// account and its record now render immediately, server-side, with no gate,
+// and the phone is collected in the same form as the bukti.
 //
-// The phone field stays, and stays before the *unmasked* number: entering it
-// is what records the buyer as a party to this deal, which is the ledger
-// entry the whole record depends on. But it is now one section inside the
-// page the buyer is already reading, not a wall in front of it.
-//
-// Found in review (2026-07-21): an earlier version of this card repeated the
-// masked account number — InvoiceCard already renders "Rekening tujuan: {bank}
-// {masked}" as one of its own rows, directly above this component in the
-// render tree. Showing the same masked number a second time, under a heading
-// that also read "Rekening tujuan," was exactly the wasted-space problem this
-// merge was supposed to fix. This card's only job is the part InvoiceCard
-// does not cover — the account's history — so it now leads with that.
+// The account number is unmasked here. It is the seller's own, published by
+// them when they sent this link, and it is what the buyer came for — masking
+// it protects nobody and blocks the payment. InvoiceCard's summary row stays
+// masked as a glanceable reference; this is the copyable one.
 export async function BuyerJoinGate({
   token,
   action,
+  rekeningBank,
+  rekeningTujuan,
 }: {
   token: string;
   action: (prev: JoinDealState, formData: FormData) => Promise<JoinDealState>;
+  rekeningBank: string;
+  rekeningTujuan: string;
 }) {
   const history = await getDealAccountHistory(token);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* §29 — given the same structural weight as the invoice (matching
-          header bar, matching radius/border, body text at the same size the
-          invoice's own item line uses). The account's record is half of what
-          this page is for; when it was small grey caption text under a large
-          invoice, the layout was telling the buyer the amount mattered and
-          the history didn't.
+      <RekeningCopyCard bank={rekeningBank} rekening={rekeningTujuan}>
+        <p className="text-sm leading-relaxed text-zinc-800">
+          {history.status === 'found' &&
+            formatAccountHistoryCounts(
+              history.selesaiCount,
+              history.tidakDipenuhiCount,
+              history.sinceLabel,
+            )}
+          {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+          {/* 'idle' means the deal has no rekening set at all — a data
+              problem, not a confirmed-clean account. Unreachable today
+              (createDeal requires one for PENJUAL, the only proposer role
+              since §22) but kept distinct from 'empty' so a regression that
+              does reach it fails loud rather than reading as "belum ada
+              catatan" on a clean account. */}
+          {(history.status === 'error' || history.status === 'idle') &&
+            ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+        </p>
 
-          The sentence itself stays verbatim from formatAccountHistoryCounts
-          — a projection of §2's locked forced-check line. Deliberately NOT
-          split into big per-outcome figures: pulling "14" and "2" out as
-          display numbers would edge toward a scoreboard, and the counts are
-          only legal as counts, never as a rating. No safety colours either,
-          for the same reason — both outcomes render in the same neutral ink. */}
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-200 px-4 py-2.5 sm:px-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">
-            Riwayat rekening ini
-          </p>
-        </div>
-        <div className="px-4 py-3.5 sm:px-5">
-          <p className="text-sm leading-relaxed text-zinc-800">
-            {history.status === 'found' &&
-              formatAccountHistoryCounts(
-                history.selesaiCount,
-                history.tidakDipenuhiCount,
-                history.sinceLabel,
-              )}
-            {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-            {/* 'idle' means the deal itself has no rekening set — a data
-                problem, not a confirmed-clean account. Every reachable DRAF
-                deal has one (createDeal requires it for PENJUAL, the only
-                proposer role since §22), so this branch is not live today; it
-                is kept distinct from 'empty' so a future regression that does
-                reach it fails loud instead of quietly reading as "belum ada
-                catatan" on a clean account. */}
-            {(history.status === 'error' || history.status === 'idle') &&
-              ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
-          </p>
-        </div>
-      </div>
+        {history.status === 'found' && history.ledgerEnabled && (
+          <div className="mt-3">
+            {/* .bind, not an inline arrow. This is a Server Component, so a
+                closure cannot cross to a Client Component — only a bound
+                Server Action serializes. The other three LedgerDetail call
+                sites are all client components, where an arrow is fine; this
+                is the first server-side one. An arrow here would throw
+                "Functions cannot be passed directly to Client Components",
+                and would have stayed hidden until LEDGER_DETAIL_ENABLED was
+                switched on, since ledgerEnabled gates this branch. */}
+            <LedgerDetail onFetch={getDealLedgerPublic.bind(null, token)} />
+          </div>
+        )}
+      </RekeningCopyCard>
 
       <Card>
-        <p className="text-sm font-bold text-zinc-900">{JOIN_FORM_HEADING}</p>
-        <p className="mb-4 mt-1 text-xs leading-relaxed text-zinc-500">{JOIN_DEAL_INSTRUCTION}</p>
-        <JoinDealForm action={action} />
+        <p className="text-sm font-bold text-zinc-900">{SEND_BUKTI_SECTION_HEADING}</p>
+        <p className="mb-4 mt-1 text-xs leading-relaxed text-zinc-500">
+          {MONEY_NEVER_TOUCHES_SAKSI_NOTE}
+        </p>
+        <JoinAndPayForm action={action} />
       </Card>
     </div>
   );

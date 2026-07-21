@@ -832,3 +832,84 @@ initially lived in `paymentActions.ts` and broke the build with 42 cascading
 errors: a `'use server'` module may only export async functions, and one
 exported `const` invalidates every import of that module. `tsc` does not catch
 this; only `next build` does. Plain constants belong outside action files.
+
+## §31 — Buyer flow merged into one page, payment-anchored (2026-07-21)
+
+SAKSI-MASTER.md §5's Page 1a is a **single** screen: invoice → rekening + its
+record + copy → bukti upload, with `[ Kirim bukti transfer ]` minting the deal
+event. The record is payment-anchored; nothing is recorded until the buyer has
+actually paid, and "buyers never register".
+
+What shipped before §31 diverged from that in a way that mattered: the buyer hit
+a phone field first, and the account number only appeared on a later screen once
+they had identified themselves. So the **forced check (Law 7) happened after the
+decision to trust the seller rather than before it** — backwards for the one
+thing this product exists to do.
+
+**Now:** the account number and its record render immediately, server-side, with
+no gate. Phone and bukti are collected in the same form, submitted once, at the
+moment the buyer has transferred.
+
+### The unmasked account number
+
+`RekeningCopyCard` shows `rekening_tujuan` in full. Three reasons this is not a
+disclosure regression:
+
+1. It is the **seller's own** number, published by them when they sent the link.
+   It is the single thing the buyer came for; masking it blocks the payment and
+   protects nobody.
+2. It was **already obtainable by anyone holding the link** — the old phone gate
+   accepted *any* phone (that is what joining was), so typing an arbitrary
+   number revealed it. The wall was friction, not access control.
+3. `InvoiceCard`'s summary row **stays masked** as a glanceable reference. Only
+   the copyable card is unmasked.
+
+### Law 7 is satisfied structurally, not by a disabled button
+
+The old mechanic disabled copy-rekening until an async client-side history fetch
+resolved. The history is now **server-rendered above the button**, so there is no
+window in which copy can be pressed before the record is on screen. The check got
+stricter, not weaker — `COPY_REKENING_DISABLED_LABEL` is no longer needed on this
+surface.
+
+### Chaining, not a third RPC
+
+`joinAndPay` calls `joinDealCore` then `submitBukti`. Both existing RPCs are
+already atomic and already hash-chain correctly; a combined RPC would duplicate
+both and give the chaining a second place to drift. Bukti inputs are validated
+**before** the join — otherwise a missing file would still record a party on the
+deal who never paid. If the join lands and the upload then fails, the deal rests
+at DISEPAKATI and `DisepakatiPanel` is the retry path: degraded, not corrupt.
+`submitBukti` redirects on success (throws `NEXT_REDIRECT`), so it is
+deliberately **not** wrapped in try/catch, which would swallow it.
+
+### Caught in review, before commit
+
+`LedgerDetail`'s `onFetch` must be a **bound** Server Action. `BuyerJoinGate` is
+the first *Server* Component call site (the other three are client components,
+where an inline arrow is fine), and an arrow there is a plain closure that cannot
+cross the boundary — it would throw "Functions cannot be passed directly to
+Client Components". It would have stayed hidden until `LEDGER_DETAIL_ENABLED`
+was switched on, since `ledgerEnabled` gates that branch. Fixed to
+`.bind(null, token)`.
+
+`getDealLedgerPublic` is new: `getDealLedger` gates on being the payer, which a
+first-time visitor cannot satisfy under a payment-anchored flow. Not a new
+disclosure class — `getRekeningLedgerAction` already reads the same ledger for an
+arbitrary typed account with no identity at all, and this variant is strictly
+narrower (resolves the account from a token the caller must already hold).
+Rate-limited per deal and still behind `LEDGER_DETAIL_ENABLED`.
+
+**New copy:** `SEND_BUKTI_LABEL` (verbatim from the master doc's Page 1a),
+`BUKTI_FIELD_LABEL`, `SEND_BUKTI_SECTION_HEADING`,
+`MONEY_NEVER_TOUCHES_SAKSI_NOTE` (restates Law 6 where a buyer might otherwise
+assume SAKSI holds the payment).
+
+### Verified live
+
+A full dispute round was driven against the production database with a seeded
+throwaway deal (created and deleted in the same run): two disputes, two
+re-uploads, hash chain intact across all five events, both bukti rows retained,
+`DANA_BELUM_MASUK` count landing exactly on `PAYMENT_DISPUTE_MAX_ROUNDS`, and the
+deal correctly resting at `DIBAYAR_DIKLAIM` where `confirmFulfillment` cannot
+fire.

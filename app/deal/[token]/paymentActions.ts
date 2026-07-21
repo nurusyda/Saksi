@@ -224,6 +224,41 @@ export async function getDealLedger(token: string, phone: string): Promise<Ledge
 }
 
 // ============================================================
+// getDealLedgerPublic (§31) — the same ledger, for a buyer who has not
+// joined yet.
+//
+// getDealLedger above gates on being the payer, which a first-time visitor
+// cannot satisfy: under the payment-anchored flow they are not a party until
+// they submit their bukti. Gating the account's record behind having already
+// committed would defeat the forced check, which only means anything before
+// the buyer decides to trust the seller.
+//
+// This is not a new disclosure class. app/buat/actions.ts's
+// getRekeningLedgerAction already reads the same ledger for an arbitrary
+// typed bank+rekening with no identity at all, and /cek exposes the same
+// per-account record publicly by design. This variant is strictly narrower:
+// it resolves the account from a deal token the caller must already hold,
+// rather than accepting any account the caller names.
+//
+// Still rate-limited — a capability token must not become an unbounded read.
+// Reuses the per-deal identify limiter rather than adding a fourth limiter
+// table; it counts attempts per deal, which is exactly the bound wanted here.
+// Also gated behind LEDGER_DETAIL_ENABLED via isLedgerDetailEnabled(), same
+// as every other ledger surface, so it renders nothing until GATE 1 clears.
+// ============================================================
+
+export async function getDealLedgerPublic(token: string): Promise<LedgerResult> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
+  if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'empty' };
+
+  if (!isLedgerDetailEnabled()) return { status: 'empty' };
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { status: 'error' };
+
+  return getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
+}
+
+// ============================================================
 // getRekeningForPayer — C3. Blocker found by monster_check: the full
 // rekening was previously passed as a prop from the server component
 // straight into DisepakatiPanel (a client component). Next.js serializes

@@ -10,12 +10,15 @@ import { getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { sendWaMessage } from '@/lib/wa/send';
+import { submitBukti } from './paymentActions';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_SELF_JOIN,
   ERROR_PHONE_INVALID,
   ERROR_PARTY_SAVE_FAILED,
   ERROR_JOIN_FAILED,
+  ERROR_BUKTI_ATTESTATION_REQUIRED,
+  ERROR_BUKTI_FILE_REQUIRED,
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
   formatDisepakatiMessage,
@@ -50,11 +53,14 @@ export type JoinDealState = {
 // The counterpart's join now atomically fires COUNTERPART_JOINED then
 // ACCEPTED in one transaction: DRAF -> DISEPAKATI directly, no manual accept
 // from either party, no DIAJUKAN resting state in the normal path.
-export async function joinDeal(
-  token: string,
-  _prev: JoinDealState,
-  formData: FormData,
-): Promise<JoinDealState> {
+// Everything joining a deal involves, minus the redirect: joinAndPay needs
+// to keep running afterwards (to submit the bukti in the same request), and a
+// redirect() throws, so it cannot live in here. Returns the normalized phone
+// on success so the caller can chain the payment submit without re-parsing
+// what this function already validated.
+type JoinCoreResult = JoinDealState | { phoneE164: string };
+
+async function joinDealCore(token: string, formData: FormData): Promise<JoinCoreResult> {
   const db = supabaseServer();
 
   // Load and verify deal is still in DRAF — earliest possible gate
@@ -218,3 +224,59 @@ export async function joinDeal(
   revalidatePath(`/deal/${token}`);
   redirect(`/deal/${token}`);
 }
+
+// ============================================================
+// joinAndPay (§31) — the buyer's whole first visit, in one submit.
+//
+// SAKSI-MASTER.md §5's Page 1a is a single page: invoice, then rekening +
+// its record + copy, then bukti upload, and "[ Kirim bukti transfer ]" is
+// what mints the deal event — the record is payment-anchored. The two-step
+// join-then-pay flow this replaces was a divergence from that spec: it put a
+// phone wall in front of the account number, so the buyer had to identify
+// themselves before they could even see what they were being asked to pay
+// into, and the forced check (Law 7) happened after the decision to trust
+// rather than before it.
+//
+// Now the account number and its record render immediately (server-side, no
+// gate), and the phone is collected in the same form as the bukti — one
+// submit, at the moment the buyer has actually paid.
+//
+// Two chained RPCs rather than one new combined RPC, deliberately:
+// join_deal_with_event and submit_bukti_with_event are each already atomic
+// and already hash-chain correctly, and a third RPC duplicating both would
+// be a second place for the chaining to drift. If the join lands and the
+// bukti submit then fails (upload error, OCR timeout), the deal is left at
+// DISEPAKATI and the existing DisepakatiPanel renders as the retry path —
+// a degraded but coherent state, not a corrupt one.
+// ============================================================
+
+export async function joinAndPay(
+  token: string,
+  _prev: JoinDealState,
+  formData: FormData,
+): Promise<JoinDealState> {
+  // Validate the bukti inputs BEFORE joining. Without this a missing file or
+  // unchecked attestation would still record the join, leaving a party on the
+  // deal who never paid and never meant to.
+  if (formData.get('attest_bukti') !== 'on') return { error: ERROR_BUKTI_ATTESTATION_REQUIRED };
+  const file = formData.get('bukti_file') as File | null;
+  if (!file || file.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
+
+  const joined = await joinDealCore(token, formData);
+  if (!('phoneE164' in joined)) return joined;
+
+  // submitBukti redirects on success (throws NEXT_REDIRECT, which propagates
+  // through this function untouched — deliberately not wrapped in try/catch,
+  // which would swallow it). It only returns when something went wrong.
+  const bukti = await submitBukti(token, joined.phoneE164, {}, formData);
+
+  // Join landed, payment claim did not. Send them to the deal page anyway:
+  // it now renders DISEPAKATI (rekening + upload), so the upload can be
+  // retried without re-entering the phone or re-joining. Surfacing the
+  // upload error here instead would strand them on a DRAF form for a deal
+  // that is no longer in DRAF.
+  void bukti;
+  revalidatePath(`/deal/${token}`);
+  redirect(`/deal/${token}`);
+}
+

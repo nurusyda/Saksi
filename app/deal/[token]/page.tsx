@@ -18,10 +18,15 @@ import { KedaluwarsaPanel } from './KedaluwarsaPanel';
 import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
 import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
-import { joinDeal } from './actions';
+import { joinAndPay } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
 import { PageShell, SplitLayout, Card } from '@/components/ui';
-import { STATUS_DIAJUKAN, ROLE_LABELS, ROLE_PAIR } from '@/lib/copy';
+import {
+  STATUS_DIAJUKAN,
+  ROLE_LABELS,
+  ROLE_PAIR,
+  ERROR_REKENING_LOAD_FAILED,
+} from '@/lib/copy';
 
 const TERMINAL_STATUSES: string[] = [
   DealStatus.SELESAI,
@@ -143,7 +148,7 @@ export default async function DealPage({
         : null;
   const viewerRoleLabel = viewerRoleKey ? ROLE_LABELS[viewerRoleKey] ?? viewerRoleKey : null;
 
-  const boundJoinDeal = joinDeal.bind(null, token);
+  const boundJoinAndPay = joinAndPay.bind(null, token);
 
   // §23/§26 — event times for DealProgress. Queried here rather than fetched
   // client-side so the timestamps are present in the first paint (no flash of
@@ -206,9 +211,23 @@ export default async function DealPage({
                 <WaitingStatusPoll token={token} knownStatus={DealStatus.DRAF} />
               </Card>
             ) : (
-              /* §26 — rekening + its record + the phone gate, as one section
-                 inside this page rather than a separate screen in front of it. */
-              <BuyerJoinGate token={token} action={boundJoinDeal} />
+              /* §31 — the whole buyer page: account + record + copy, then
+                 phone + bukti in one submit. Rendered only when the deal
+                 actually has a rekening; createDeal requires one for PENJUAL
+                 (the only proposer role since §22), so the fallback below is
+                 defensive rather than a live branch. */
+              deal.rekening_bank && deal.rekening_tujuan ? (
+                <BuyerJoinGate
+                  token={token}
+                  action={boundJoinAndPay}
+                  rekeningBank={deal.rekening_bank}
+                  rekeningTujuan={deal.rekening_tujuan}
+                />
+              ) : (
+                <Card className="bg-zinc-50 text-sm text-zinc-700">
+                  <p>{ERROR_REKENING_LOAD_FAILED}</p>
+                </Card>
+              )
             )}
           </>
         )}
