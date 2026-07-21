@@ -1292,3 +1292,48 @@ screen looking like nothing had happened.
 use will be exhausted by the people it is meant to protect — and when the
 refused read is evidence, the failure mode is not "slow down", it is "your proof
 is gone".
+
+## §41 — Pending feedback on every submit (2026-07-21)
+
+Every submit in this app waits on something genuinely slow: a storage upload, a
+Gemini OCR round-trip, two chained RPCs. A button whose only feedback was
+swapping its text to "Memproses..." reads as frozen — which is what made filling
+a dispute feel like it had hung.
+
+`Spinner` / `PendingContent` in the shared kit, wired into all ten submit
+buttons.
+
+**A spinner, not a percentage.** None of these operations report progress, so a
+bar would have to invent one. A moving indicator says "still working" without
+claiming to know how far along it is — and inventing progress on a product whose
+entire discipline is not overclaiming would be the wrong instinct to indulge,
+even somewhere as small as a button.
+
+## §42 — The goods dispute gets the same two-round loop (2026-07-21, migration 0032)
+
+§30 gave the payment dispute a bounded exchange. The goods side had none: the
+first time a buyer said "barang tidak sesuai" it filed a **report**, creating a
+permanent breach record and starting the 14-day hak jawab clock — even when the
+cause was the sort of thing one message settles (wrong variant shipped, missing
+accessory, still in transit).
+
+Now both sides work the same way. The buyer states the problem
+(`BARANG_TIDAK_SESUAI`), the seller answers (`PENJUAL_JAWAB`), up to
+`GOODS_DISPUTE_MAX_ROUNDS = 2`, all recorded and attributed. The formal report
+path is **untouched** and sits behind the loop — offered only once the rounds are
+spent.
+
+**One RPC, not two.** `record_deal_statement_with_event` generalizes 0029's
+function along the only two axes that differ (required status, event name), and
+`record_dana_belum_masuk_with_event` is **dropped**. Two near-identical
+hash-chaining writers for the same table is precisely how ledger logic drifts —
+so the payment loop was migrated onto the shared function in the same pass and
+re-verified, not left on its own copy.
+
+Statements remain statements: pure self-transitions, no flags row, no status
+change, no publication. Recording that two accounts differ is not adjudicating
+between them.
+
+Verified against production: goods loop across 2 full rounds (4 statements, chain
+intact, status unmoved), **plus** a payment-loop regression check confirming the
+shared RPC did not break the path that had only just started working.

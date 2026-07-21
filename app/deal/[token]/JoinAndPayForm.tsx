@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 import type { JoinDealState } from './actions';
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
-import { ErrorBanner, FieldError, Field, inputClass, buttonClass } from '@/components/ui';
+import { ErrorBanner, FieldError, Field, inputClass, buttonClass, PendingContent } from '@/components/ui';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import {
   ATTESTATIONS,
@@ -35,7 +35,7 @@ function SubmitButton({ ready }: { ready: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={!ready || pending} className={buttonClass.primary}>
-      {pending ? PENDING_SAVE_LABEL : SEND_BUKTI_LABEL}
+      {pending ? <PendingContent label={PENDING_SAVE_LABEL} /> : SEND_BUKTI_LABEL}
     </button>
   );
 }

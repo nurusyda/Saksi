@@ -1,5 +1,7 @@
 'use client';
 
+import { PendingContent } from '@/components/ui';
+
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { lookupAccount, getRekeningLedgerAction, getPhoneLedgerAction, type CekState } from './actions';
@@ -35,7 +37,7 @@ function SubmitButton() {
       disabled={pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? PENDING_DEFAULT_LABEL : CEK_SUBMIT_LABEL}
+      {pending ? <PendingContent label={PENDING_DEFAULT_LABEL} /> : CEK_SUBMIT_LABEL}
     </button>
   );
 }

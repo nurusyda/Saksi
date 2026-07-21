@@ -61,6 +61,49 @@ export function SplitLayout({ main, rail }: { main: ReactNode; rail: ReactNode }
   );
 }
 
+// §41 — every submit in this app waits on something genuinely slow: a
+// storage upload, a Gemini OCR round-trip, two chained RPCs. A button whose
+// only feedback is swapping its text to "Memproses..." reads as frozen,
+// which is what made filling a dispute feel like it had hung.
+//
+// A spinner is the honest signal here, not a percentage bar: none of these
+// operations report progress, so a bar would have to invent one. A moving
+// indicator says "still working" without claiming to know how far along it
+// is — and inventing progress on a page whose whole job is not overclaiming
+// would be the wrong instinct to indulge.
+export function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      className={`h-4 w-4 animate-spin ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Button content while a form action is in flight: spinner + label, with the
+ * label still carrying the meaning. `aria-live` is deliberately absent — the
+ * button's own disabled state already announces the change, and a live region
+ * on every button would talk over the user.
+ */
+export function PendingContent({ label }: { label: string }) {
+  return (
+    <span className="flex items-center justify-center gap-2">
+      <Spinner />
+      {label}
+    </span>
+  );
+}
+
 export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-6">

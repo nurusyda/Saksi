@@ -404,6 +404,38 @@ export const RESUBMIT_BUKTI_PROMPT =
   'Kalau bukti yang kamu kirim kurang tepat, atau kamu sudah transfer ulang, unggah bukti yang benar di sini.';
 export const RESUBMIT_BUKTI_SUBMIT_LABEL = 'Kirim ulang bukti transfer';
 
+// §42 — the goods clarification loop, mirroring the payment one. Neither
+// string assigns fault: the buyer may be right that the wrong thing arrived,
+// the seller may be right that it is the right thing or still in transit.
+// Both are recorded as accounts, and the copy says so.
+export const BARANG_TIDAK_SESUAI_CLAIM_HEADING = 'Barang tidak sesuai?';
+export const BARANG_TIDAK_SESUAI_CLAIM_PROMPT =
+  'Ceritakan apa yang tidak sesuai. Penjual bisa menanggapi dulu sebelum kamu mengajukan laporan resmi.';
+export const BARANG_TIDAK_SESUAI_CLAIM_PLACEHOLDER =
+  'Contoh: Warna yang dikirim biru, sedangkan yang disepakati hitam.';
+export const BARANG_TIDAK_SESUAI_CLAIM_SUBMIT = 'Catat keterangan saya';
+
+export const PENJUAL_JAWAB_HEADING = 'Pembeli bilang barang tidak sesuai';
+export const PENJUAL_JAWAB_PROMPT =
+  'Jelaskan dari sisi kamu. Kalau memang keliru, kamu bisa selesaikan langsung dengan pembeli.';
+export const PENJUAL_JAWAB_PLACEHOLDER =
+  'Contoh: Saya kirim sesuai pesanan, ini nomor resinya. Atau: benar keliru, saya kirim ulang hari ini.';
+export const PENJUAL_JAWAB_SUBMIT = 'Catat tanggapan saya';
+
+export const GOODS_DISPUTE_CONSEQUENCES: readonly string[] = [
+  'Keterangan ini tercatat sebagai pernyataan Anda, bukan putusan SAKSI.',
+  'Pihak lain dapat melihatnya di halaman transaksi ini.',
+  'Kesepakatan tetap berjalan. Status dan batas waktu tidak berubah.',
+  'Ini belum laporan resmi. Kalau tetap tidak selesai, laporan bisa diajukan setelah batas waktu lewat.',
+];
+export const GOODS_DISPUTE_EXHAUSTED_NOTE =
+  'Batas dua kali klarifikasi sudah tercapai. Kedua keterangan tercatat. Kalau masih belum selesai, pihak yang dirugikan dapat mengajukan laporan setelah batas waktu lewat.';
+export const STATEMENT_KIND_LABELS: Record<string, string> = {
+  DANA_BELUM_MASUK: 'Keterangan penjual: dana belum masuk',
+  BARANG_TIDAK_SESUAI: 'Keterangan pembeli: barang tidak sesuai',
+  PENJUAL_JAWAB: 'Tanggapan penjual',
+};
+
 // §31 (2026-07-21) — the merged buyer page. SAKSI-MASTER.md §5's Page 1a
 // names the primary action "Kirim bukti transfer"; that string is reused
 // here verbatim rather than reworded. The money note restates Law 6 in the

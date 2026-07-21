@@ -10,6 +10,7 @@ import {
   DealStatus,
   DealEventName,
   PAYMENT_DISPUTE_MAX_ROUNDS,
+  GOODS_DISPUTE_MAX_ROUNDS,
 } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
@@ -655,11 +656,14 @@ export async function recordDanaBelumMasuk(
     const newHash = hashDeal(canonical);
 
     const { data: rpcRow, error: rpcErr } = await db
-      .rpc('record_dana_belum_masuk_with_event', {
+      .rpc('record_deal_statement_with_event', {
         p_deal_id: deal.id,
         p_actor: actor,
+        p_kind: 'DANA_BELUM_MASUK',
         p_body: body,
         p_body_hash: bodyHash,
+        p_required_status: DealStatus.DIBAYAR_DIKLAIM,
+        p_event: DealEventName.DANA_BELUM_MASUK,
         p_prior_hash: priorHash,
         p_new_hash: newHash,
       })
@@ -1217,4 +1221,198 @@ export async function confirmFulfillment(
   }
 
   return { error: ERROR_CONFIRM_FAILED };
+}
+
+// ============================================================
+// The goods clarification loop (§42) — the mirror of the payment one.
+//
+// Before this, "barang tidak sesuai kesepakatan" went straight to a filed
+// report, so the first time a buyer said "this is not what I ordered" it
+// became a permanent breach record — even when the cause was the kind of
+// thing one message settles: wrong variant, missing accessory, still in
+// transit. Now the two sides exchange first, up to two rounds each, all of
+// it recorded and attributed, and the formal report path stays exactly where
+// it was for when that genuinely fails.
+//
+// Both sides share record_deal_statement_with_event with the payment loop,
+// so the two cannot drift apart.
+// ============================================================
+
+async function countStatements(
+  db: ReturnType<typeof supabaseServer>,
+  dealId: string,
+  event: string,
+): Promise<number> {
+  const { count } = await db
+    .from('deal_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('deal_id', dealId)
+    .eq('event', event);
+  return count ?? 0;
+}
+
+export type GoodsDisputeState = {
+  claimCount: number;
+  roundsLeft: number;
+  /** True when the newest of the two events is the buyer's claim. */
+  awaitingSellerAnswer: boolean;
+};
+
+export async function getGoodsDisputeState(
+  token: string,
+  phone: string,
+): Promise<GoodsDisputeState | null> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
+  if (!deal) return null;
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return null;
+  }
+  if (!whichParty) return null;
+
+  const { data: events } = await db
+    .from('deal_events')
+    .select('event')
+    .eq('deal_id', deal.id)
+    .in('event', [DealEventName.BARANG_TIDAK_SESUAI, DealEventName.PENJUAL_JAWAB])
+    .order('id', { ascending: true });
+
+  const rows = events ?? [];
+  const claimCount = rows.filter((e) => e.event === DealEventName.BARANG_TIDAK_SESUAI).length;
+  return {
+    claimCount,
+    roundsLeft: Math.max(0, GOODS_DISPUTE_MAX_ROUNDS - claimCount),
+    awaitingSellerAnswer: rows[rows.length - 1]?.event === DealEventName.BARANG_TIDAK_SESUAI,
+  };
+}
+
+/**
+ * Shared writer for both goods statements. `side` decides who may file it,
+ * which event lands in the ledger, and which round limit applies — the buyer
+ * opens a round, the seller answers one that is already open.
+ */
+async function recordGoodsStatement(
+  token: string,
+  phone: string,
+  side: 'buyer' | 'seller',
+  formData: FormData,
+): Promise<DanaBelumMasukState> {
+  const db = supabaseServer();
+
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const buyerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  const sellerSlot: WhichParty = buyerSlot === 'proposer' ? 'counterpart' : 'proposer';
+  if (side === 'buyer' && whichParty !== buyerSlot) {
+    return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+  }
+  if (side === 'seller' && whichParty !== sellerSlot) {
+    return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+  }
+
+  const claims = await countStatements(db, deal.id, DealEventName.BARANG_TIDAK_SESUAI);
+  if (side === 'buyer' && claims >= GOODS_DISPUTE_MAX_ROUNDS) {
+    return { error: ERROR_DISPUTE_ROUNDS_EXHAUSTED };
+  }
+  // The seller answers a round the buyer opened; there is nothing to answer
+  // before that.
+  if (side === 'seller' && claims === 0) return { error: ERROR_DEAL_CLOSED };
+
+  const body = (formData.get('body') as string | null)?.trim() ?? '';
+  if (body.length < 10) return { fieldError: ERROR_STATEMENT_TOO_SHORT };
+  if (body.length > 600) return { fieldError: ERROR_STATEMENT_TOO_LONG };
+
+  const event =
+    side === 'buyer' ? DealEventName.BARANG_TIDAK_SESUAI : DealEventName.PENJUAL_JAWAB;
+  const kind = side === 'buyer' ? 'BARANG_TIDAK_SESUAI' : 'PENJUAL_JAWAB';
+
+  try {
+    assertTransition(DealStatus.DIKONFIRMASI_TERIMA, event);
+  } catch {
+    return { error: ERROR_DEAL_CLOSED };
+  }
+
+  const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
+  const bodyHash = createHash('sha256').update(body, 'utf8').digest('hex');
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+    const { data: cur } = await db.from('deals').select('*').eq('id', deal.id).single();
+    if (!cur || cur.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
+
+    const { data: lastEvent } = await db
+      .from('deal_events')
+      .select('new_hash')
+      .eq('deal_id', deal.id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const priorHash = lastEvent?.new_hash ?? null;
+
+    const canonical = buildCanonicalPayload(
+      cur,
+      { name: event, actor, payload: { body_hash: bodyHash } },
+      priorHash,
+    );
+    const newHash = hashDeal(canonical);
+
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('record_deal_statement_with_event', {
+        p_deal_id: deal.id,
+        p_actor: actor,
+        p_kind: kind,
+        p_body: body,
+        p_body_hash: bodyHash,
+        p_required_status: DealStatus.DIKONFIRMASI_TERIMA,
+        p_event: event,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
+      })
+      .maybeSingle();
+
+    if (rpcErr) return { error: ERROR_STATEMENT_SAVE_FAILED };
+    if (rpcRow) {
+      void submitAnchor(newHash);
+      revalidatePath(`/deal/${token}`);
+      return { recorded: true };
+    }
+    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_STATEMENT_SAVE_FAILED };
+  }
+
+  return { error: ERROR_STATEMENT_SAVE_FAILED };
+}
+
+export async function recordBarangTidakSesuai(
+  token: string,
+  phone: string,
+  _prev: DanaBelumMasukState,
+  formData: FormData,
+): Promise<DanaBelumMasukState> {
+  return recordGoodsStatement(token, phone, 'buyer', formData);
+}
+
+export async function recordPenjualJawab(
+  token: string,
+  phone: string,
+  _prev: DanaBelumMasukState,
+  formData: FormData,
+): Promise<DanaBelumMasukState> {
+  return recordGoodsStatement(token, phone, 'seller', formData);
 }

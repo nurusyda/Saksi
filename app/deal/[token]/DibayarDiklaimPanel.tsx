@@ -1,5 +1,7 @@
 'use client';
 
+import { PendingContent } from '@/components/ui';
+
 import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
@@ -75,7 +77,7 @@ function ConfirmReceiptButton() {
       disabled={pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? PENDING_DEFAULT_LABEL : CONFIRM_RECEIPT_LABEL}
+      {pending ? <PendingContent label={PENDING_DEFAULT_LABEL} /> : CONFIRM_RECEIPT_LABEL}
     </button>
   );
 }

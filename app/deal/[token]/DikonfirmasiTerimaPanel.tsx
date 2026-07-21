@@ -1,10 +1,20 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { PendingContent } from '@/components/ui';
+
+import { useActionState, useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { IdentifyPartyGate } from './IdentifyPartyGate';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
-import { identifyParty, confirmFulfillment, type ConfirmActionState } from './paymentActions';
+import {
+  identifyParty,
+  confirmFulfillment,
+  getGoodsDisputeState,
+  type ConfirmActionState,
+  type GoodsDisputeState,
+} from './paymentActions';
+import { GoodsStatementForm } from './GoodsStatementForm';
+import { DealStatements } from './DealStatements';
 import { DealTimeline } from './DealTimeline';
 import { BarangTidakSesuaiModal } from './BarangTidakSesuaiModal';
 import type { WhichParty } from '@/lib/db/party';
@@ -15,6 +25,7 @@ import {
   SHIP_INSTRUCTION,
   BARANG_TIDAK_SESUAI_BUTTON,
   RIWAYAT_HEADING,
+  GOODS_DISPUTE_EXHAUSTED_NOTE,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -31,7 +42,7 @@ function ConfirmFulfillmentButton() {
       disabled={pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? PENDING_DEFAULT_LABEL : CONFIRM_FULFILLMENT_LABEL_JUAL_BELI}
+      {pending ? <PendingContent label={PENDING_DEFAULT_LABEL} /> : CONFIRM_FULFILLMENT_LABEL_JUAL_BELI}
     </button>
   );
 }
@@ -41,6 +52,15 @@ function ConfirmFulfillmentButton() {
 // two no longer each carry their own copy of it.
 function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [goods, setGoods] = useState<GoodsDisputeState | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    getGoodsDisputeState(deal.token, phone)
+      .then((r) => { if (!ignore) setGoods(r); })
+      .catch(() => { if (!ignore) setGoods(null); });
+    return () => { ignore = true; };
+  }, [deal.token, phone]);
   const boundConfirmFulfillment = confirmFulfillment.bind(null, deal.token, phone);
   const initialState: ConfirmActionState = {};
   const [state, formAction] = useActionState(boundConfirmFulfillment, initialState);
@@ -57,13 +77,37 @@ function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string 
         <ConfirmFulfillmentButton />
       </form>
 
-      <button
-        type="button"
-        onClick={() => setModalOpen(true)}
-        className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-      >
-        {BARANG_TIDAK_SESUAI_BUTTON}
-      </button>
+      {/* §42 — clarification before accusation. The buyer states the problem
+          and the seller answers, up to two rounds; only once those are spent
+          does the formal report (a permanent breach record) become the
+          offered action. Before this, the first "barang tidak sesuai" filed
+          a report immediately, even for the kind of mismatch one message
+          settles. */}
+      {goods && goods.roundsLeft > 0 ? (
+        <GoodsStatementForm
+          token={deal.token}
+          phone={phone}
+          side="buyer"
+          roundsLeft={goods.roundsLeft}
+        />
+      ) : (
+        <>
+          {goods && (
+            <p className="rounded-xl border border-muted-amber-line bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600">
+              {GOODS_DISPUTE_EXHAUSTED_NOTE}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            {BARANG_TIDAK_SESUAI_BUTTON}
+          </button>
+        </>
+      )}
+
+      <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
 
       {modalOpen && (
         <BarangTidakSesuaiModal
@@ -77,11 +121,36 @@ function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string 
   );
 }
 
-function PenjualActionPanel({ token }: { token: string }) {
+function PenjualActionPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
+  const [goods, setGoods] = useState<GoodsDisputeState | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    getGoodsDisputeState(deal.token, phone)
+      .then((r) => { if (!ignore) setGoods(r); })
+      .catch(() => { if (!ignore) setGoods(null); });
+    return () => { ignore = true; };
+  }, [deal.token, phone]);
+
   return (
-    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
-      <p>{SHIP_INSTRUCTION}</p>
-      <WaitingStatusPoll token={token} knownStatus={DealStatus.DIKONFIRMASI_TERIMA} />
+    <div className="flex flex-col gap-6">
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 text-sm text-zinc-700">
+        <p>{SHIP_INSTRUCTION}</p>
+        {/* Paused while an answer is being typed, same reasoning as the
+            payment panel: an unannounced refresh mid-compose is worse than
+            a stale screen. */}
+        {!goods?.awaitingSellerAnswer && (
+          <WaitingStatusPoll token={deal.token} knownStatus={DealStatus.DIKONFIRMASI_TERIMA} />
+        )}
+      </div>
+
+      {/* §42 — the buyer has said something is wrong; this is where the
+          seller answers it, before any of it becomes a formal report. */}
+      {goods?.awaitingSellerAnswer && (
+        <GoodsStatementForm token={deal.token} phone={phone} side="seller" />
+      )}
+
+      <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
     </div>
   );
 }
@@ -122,7 +191,7 @@ export function DikonfirmasiTerimaPanel({
           whichParty === payerSlot ? (
             <PembeliActionPanel deal={deal} phone={phone} />
           ) : (
-            <PenjualActionPanel token={deal.token} />
+            <PenjualActionPanel deal={deal} phone={phone} />
           )
         }
       </IdentifyPartyGate>

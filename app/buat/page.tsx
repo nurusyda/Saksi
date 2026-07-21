@@ -15,6 +15,7 @@ import {
   ErrorBanner,
   inputClass,
   buttonClass,
+  PendingContent,
 } from '@/components/ui';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
@@ -53,7 +54,7 @@ function SubmitButton({ allChecked }: { allChecked: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={!allChecked || pending} className={buttonClass.primary}>
-      {pending ? PENDING_SAVE_LABEL : CTA_BUAT_TAGIHAN}
+      {pending ? <PendingContent label={PENDING_SAVE_LABEL} /> : CTA_BUAT_TAGIHAN}
     </button>
   );
 }

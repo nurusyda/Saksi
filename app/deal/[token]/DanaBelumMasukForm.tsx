@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { recordDanaBelumMasuk, type DanaBelumMasukState } from './paymentActions';
-import { Card, ErrorBanner, FieldError, buttonClass, inputClass } from '@/components/ui';
+import { Card, ErrorBanner, FieldError, buttonClass, inputClass, PendingContent } from '@/components/ui';
 import {
   PAYMENT_NOT_RECEIVED_LABEL,
   DANA_BELUM_MASUK_HEADING,
@@ -30,7 +30,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={disabled || pending} className={buttonClass.caution}>
-      {pending ? PENDING_SAVE_LABEL : DANA_BELUM_MASUK_SUBMIT_LABEL}
+      {pending ? <PendingContent label={PENDING_SAVE_LABEL} /> : DANA_BELUM_MASUK_SUBMIT_LABEL}
     </button>
   );
 }

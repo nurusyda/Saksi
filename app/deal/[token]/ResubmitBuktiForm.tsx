@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { resubmitBukti, type SubmitBuktiState } from './paymentActions';
-import { Card, ErrorBanner, buttonClass, inputClass } from '@/components/ui';
+import { Card, ErrorBanner, buttonClass, inputClass, PendingContent } from '@/components/ui';
 import {
   RESUBMIT_BUKTI_HEADING,
   RESUBMIT_BUKTI_PROMPT,
@@ -25,7 +25,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={disabled || pending} className={buttonClass.primary}>
-      {pending ? 'Mengunggah...' : RESUBMIT_BUKTI_SUBMIT_LABEL}
+      {pending ? <PendingContent label="Mengunggah..." /> : RESUBMIT_BUKTI_SUBMIT_LABEL}
     </button>
   );
 }

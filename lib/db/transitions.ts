@@ -92,6 +92,13 @@ export const DealEventName = {
   // see both sides and see that they disagree. Replaces the old
   // WA-nudge-only version of this action, which recorded nothing at all.
   DANA_BELUM_MASUK: 'DANA_BELUM_MASUK',
+  // The goods-side mirror of DANA_BELUM_MASUK (migration 0032). Pembeli says
+  // what is wrong with what arrived; penjual answers. Both are self-
+  // transitions on DIKONFIRMASI_TERIMA and both are STATEMENTS, not reports:
+  // no flags row, no status change, no publication. The formal breach path
+  // (TENGGAT_LEWAT) is unchanged and still sits behind this.
+  BARANG_TIDAK_SESUAI: 'BARANG_TIDAK_SESUAI',
+  PENJUAL_JAWAB: 'PENJUAL_JAWAB',
   // System: deadline sweep's WA reminder (T+2 days past deadline, DIBAYAR_DIKLAIM
   // or DIKONFIRMASI_TERIMA, once only). Self-transition — status unchanged.
   // Targets exactly one party (whichever is expected to act next), not both
@@ -147,6 +154,11 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     // unified quiet terminal outcome, sweep-driven, no report ever filed.
     { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
     { event: DealEventName.NUDGE_SENT, next: DealStatus.DIKONFIRMASI_TERIMA }, // self
+    // §42 — the goods clarification loop, bounded to GOODS_DISPUTE_MAX_ROUNDS
+    // in the action. Self-transitions: stating a problem does not move the
+    // deal, it only records that the two accounts differ.
+    { event: DealEventName.BARANG_TIDAK_SESUAI, next: DealStatus.DIKONFIRMASI_TERIMA }, // self
+    { event: DealEventName.PENJUAL_JAWAB, next: DealStatus.DIKONFIRMASI_TERIMA }, // self
   ],
   [DealStatus.SELESAI]: [],
   [DealStatus.DIBATALKAN_BERSAMA]: [],
@@ -188,6 +200,14 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
 // the UI only reads the derived count.
 // ============================================================
 export const PAYMENT_DISPUTE_MAX_ROUNDS = 2;
+
+// §42 — the goods-side equivalent, same number for the same reason. The
+// buyer states what is wrong, the seller answers, twice at most; after that
+// both actions close and the formal report path (unchanged) is what settles
+// a real disagreement. Before this, the first "barang tidak sesuai" became a
+// permanent breach record immediately, even when the cause was the sort of
+// thing one message clears up.
+export const GOODS_DISPUTE_MAX_ROUNDS = 2;
 
 export class InvalidTransitionError extends Error {
   constructor(current: DealStatus, event: DealEventName) {
