@@ -1337,3 +1337,70 @@ between them.
 Verified against production: goods loop across 2 full rounds (4 statements, chain
 intact, status unmoved), **plus** a payment-loop regression check confirming the
 shared RPC did not break the path that had only just started working.
+
+## §43 — T&C and tier taxonomy caught up to the built system (2026-07-21)
+
+**T&C (`syarat-ketentuan.md`) → v1.1 (DRAF, pending legal review).** Three fixes
+to bring the document in line with what actually exists:
+- **Bagian 4 OTP gate removed.** It required the reporter to verify their phone
+  via OTP; that mechanism was deleted (§25). Reworded to the truth: the reporter
+  is identified as a party already recorded on the deal, and a false report
+  stays permanently attributed to that number. The false claim is gone, not
+  softened.
+- **Bagian 3A added** — the two-round clarification loop (§30 payment, §42 goods)
+  now precedes any formal report. Stated as attributed *statements*, explicitly
+  not reports/verdicts/publication, not moving status or deadline.
+- **Bagian 7 (biaya) reframed** to the master-doc model and current reality:
+  everything is free today; paid tiers add seller convenience/display, never a
+  safety rating; the track record cannot be bought.
+
+The version + body hash derive at runtime (`lib/legal.ts`), so v1.1 records
+automatically for new consents while past consents keep their recorded version.
+Publication (Bagian 4) stays operationally gated pending legal review — the text
+remains as the consent basis.
+
+**Tier copy retired.** `TIER_LABELS` (LIMA_RIBU/BERMETERAI entries),
+`TIER_LIMA_RIBU_DESC`, `TIER_BERMETERAI_DESC`, `TIER_FOOTER`, `NOTIFY_ME_LABEL` —
+all had zero import sites and all described the dead OTP/e-KYC verification
+ladder — are removed. `TIER_GRATIS_DESC` kept (GRATIS is the only live tier).
+The forward model is already the greyed `TOKO_PRO_LOCKED_*` card (§32), the only
+place a price appears.
+
+The `deals.tier` **enum** values LIMA_RIBU/BERMETERAI stay in the schema/flag
+stems/feature_interest deliberately — renaming is a migration, and the new tiers
+don't carry the verification the old flag stems claim, so it's a redesign of
+what a paid tier *means*, deferred to the paid-tier build. `data-model.md`'s tier
+spec now documents this with the master-doc table and a "redesign together, not
+piecemeal" instruction.
+
+## §44 — OpenTimestamps: real implementation, gated off until verified (2026-07-21)
+
+`lib/db/anchor.ts` was a `console.log('[anchor] TODO…')` stub flooding production
+logs. It is now a real, dependency-free implementation: it speaks the OTS
+calendar HTTP protocol directly and hand-builds the `.ots` DetachedTimestampFile
+(`magic ‖ version ‖ sha256-op ‖ digest ‖ calendar-timestamp`), persisting the
+proof onto `deal_events.ots_proof` — the one column migration 0002's append-only
+guard explicitly permits updating.
+
+**Dependency-free on purpose.** Both maintained JS OTS libraries pull
+`bitcore-lib` + the deprecated `request`/`request-promise` chain (tough-cookie
+CVE). Adding a known-vulnerable dependency to a product whose whole thesis is
+integrity is the wrong trade.
+
+**Gated OFF (`OTS_ANCHORING_ENABLED`), and that is not a hedge.** The code was
+written in a sandbox that cannot reach the calendar servers, so the produced
+`.ots` bytes were never checked against real `ots verify`. Shipping an unverified
+crypto artifact as "anchored" would be exactly the overclaim this product
+forbids — "ship the weaker true one". So:
+- while off, `submitAnchor` is a silent no-op — no proof stored,
+  `anchorStatusLabel` stays "Belum dijangkar", nothing user-facing claims OTS;
+- `/api/ots/<new_hash>` serves the stored proof so the acceptance test is
+  runnable: flip the flag on staging, download, `ots verify proof.ots`;
+- only if that passes does the flag go on in production.
+
+The operational integrity guarantee remains the **SHA-256 hash chain** — real,
+test-verified, breaks on any alteration. OTS is *additional external*
+attestation, not the core guarantee. ⚠ CLAUDE.md's stack line
+("SHA-256 + OpenTimestamps…") is the intended architecture; until this flag is
+verified-on, only the SHA-256 half is live — do not repeat the OTS half as a
+current claim in marketing.

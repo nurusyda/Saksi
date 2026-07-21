@@ -50,35 +50,36 @@ export const ROLE_PAIR: Record<string, string | null> = {
 export const ROLE_PAIR_HELPER_PREFIX = 'Pihak lain akan tercatat sebagai:';
 export const COUNTERPART_FALLBACK_LABEL = 'Pihak lain';
 
-// copy-id.md §13 — tier short labels (cross-file: buat/page.tsx + deal/[token]/page.tsx)
-export const TIER_LABELS: Record<string, string> = {
-  GRATIS: 'Gratis',
-  LIMA_RIBU: 'Rp5.000/pihak',
-  BERMETERAI: 'Rp50.000/pihak',
-};
+// §43 (2026-07-21) — the legacy tier-card copy is REMOVED (six exports:
+// TIER_LABELS, TIER_GRATIS_DESC, TIER_LIMA_RIBU_DESC, TIER_BERMETERAI_DESC,
+// TIER_FOOTER, NOTIFY_ME_LABEL). Every one had zero import sites — dead
+// exports — and every one described the original verification ladder that no
+// longer exists: GRATIS · LIMA_RIBU (Rp5.000, both phones verified via WA
+// OTP) · BERMETERAI (Rp50.000, e-KYC + e-meterai).
+//
+// That model is superseded twice. Its verification mechanism, WA OTP, was
+// deleted (§25) — so "Nomor HP kedua pihak terverifikasi (OTP WhatsApp)" is
+// now false. And SAKSI-MASTER.md §6 replaced the ladder with a different
+// product: Akun Saksi (Rp10.000 one-time — phone login, saved rekening, the
+// displayed track-record badge) and Toko Saksi Pro (Rp100.000 one-time —
+// logo on the invoice + a saksi.app/namatoko storefront). The new tiers sell
+// seller convenience and display, NOT counterparty verification.
+//
+// The forward model is already surfaced honestly and is the ONLY place a
+// price appears: the greyed, inert TOKO_PRO_LOCKED_* card (§32) on the
+// riwayat page, which renders as not-yet-available. So the human-facing tier
+// story lives there, correctly, and these dead constants are gone rather than
+// reworded into a second source of truth.
+//
+// The `deals.tier` enum values LIMA_RIBU / BERMETERAI remain as schema CHECK
+// constants (0001), FLAG_BODY_STEM keys, and feature_interest values, left
+// deliberately: renaming a schema enum is a migration, and the new tiers do
+// not carry the verification the old FLAG_BODY_STEM entries claim, so this is
+// a redesign of what a paid tier means — a real product decision that belongs
+// with the paid-tier build, not a find-and-replace done ahead of it. Every
+// deal is GRATIS today and flag publication is gated off, so none of it
+// renders in the meantime. See data-model.md's tier spec for the deferral.
 
-// copy-id.md §6 — tier card descriptions (first line per tier)
-export const TIER_GRATIS_DESC =
-  'Catat kesepakatan. Rekening tujuan terekam dari bukti transfer.';
-
-// DORMANT — not rendered anywhere (the tier selector was removed; every deal
-// is created GRATIS). Flagged §25 (2026-07-21): this string, TIER_LABELS'
-// LIMA_RIBU entry, and FLAG_BODY_STEM.LIMA_RIBU all promise a phone
-// verification whose only implementation (WA OTP) has been removed. Do NOT
-// ship this tier without first rebuilding a verification mechanism — as
-// written, these would be false claims the moment they became reachable.
-export const TIER_LIMA_RIBU_DESC =
-  'Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).';
-
-export const TIER_BERMETERAI_DESC =
-  'Rp50.000/pihak · Identitas terverifikasi (e-KYC) + meterai elektronik + berkas bukti siap diajukan.';
-
-// copy-id.md §6 — shared footer below tier cards
-export const TIER_FOOTER =
-  'Tingkatan menunjukkan verifikasi identitas, bukan keamanan kesepakatan. Laporan selalu gratis di semua tingkatan.';
-
-// copy-id.md §6 — paid-tier disabled cards' notify-me checkbox label
-export const NOTIFY_ME_LABEL = 'Beri tahu saat tersedia.';
 
 // copy-id.md §8 — canonical domain line for badge/share card/footer
 export const CANONICAL_DOMAIN =

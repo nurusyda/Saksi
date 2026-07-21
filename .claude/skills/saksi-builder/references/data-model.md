@@ -329,16 +329,53 @@ GATE 1 (lawyer review) and the T&C gap above both apply, same reasoning as the b
 4. Window closes silent → flag publishes. Rung selection: bukti confirmed by counterpart earlier? rung 1 : rung 0. (Rung 2 reserved for open-banking roadmap.)
 5. Flag lands on identifiers by tier: GRATIS → rekening (masked) + bank; LIMA_RIBU → + phone_hash; BERMETERAI → + verified-identity marker (never the NIK itself).
 
-## Tier spec (locked)
+## Tier spec — SUPERSEDED (§43, 2026-07-21)
+
+⚠ **The table below is the ORIGINAL tier model and is no longer the product
+direction. Do not build against it.** It is kept for context on the existing
+`deals.tier` enum only.
+
+The original ladder priced *counterparty verification for the flag*: GRATIS
+(nothing) → LIMA_RIBU (both phones via WA OTP) → BERMETERAI (Didit e-KYC +
+e-meterai). Two things retired it:
+
+1. **WA OTP was deleted (§25).** The LIMA_RIBU rung's only verification
+   mechanism no longer exists, so its "both phones verified" claim — and the
+   matching `FLAG_BODY_STEM.LIMA_RIBU` line — are false as written.
+2. **SAKSI-MASTER.md §6 replaced the ladder with a different product.** The new
+   tiers sell *seller convenience and display*, not counterparty verification:
+
+   | | Gratis (Rp0) | Akun Saksi (Rp10.000, one-time) | Toko Saksi Pro (Rp100.000, one-time) |
+   |---|---|---|---|
+   | What it is | the whole loop | phone login, saved rekening, displayed track-record badge | logo on invoice + `saksi.app/namatoko` storefront |
+   | Verifies about the other party | nothing | nothing | nothing |
+
+   (e-meterai / e-KYC live on later, separate lines — Saksi Resmi and a future
+   verified tier — not on these two.)
+
+**Enum deferral, deliberate.** The `deals.tier` CHECK values `LIMA_RIBU` /
+`BERMETERAI` (0001), their `FLAG_BODY_STEM` entries, and the `feature_interest`
+values are **left in place**. Renaming them is a migration, and — the real
+reason — the new tiers do not carry the verification the old flag stems claim,
+so redesigning the flag's identity ladder is a genuine product decision (what,
+if anything, does a paid tier verify for a *published* flag?) that belongs with
+the paid-tier build. Doing a find-and-replace ahead of that decision would bake
+a false verification claim into the ledger. Every deal is GRATIS today and flag
+publication is gated off (`FLAGS_PUBLICATION_ENABLED`), so none of this renders
+in the meantime. When paid tiers are built, redesign the enum + flag stems +
+`feature_interest` + T&C §7 **together**, not piecemeal.
+
+<details><summary>Original table (historical)</summary>
 
 | | GRATIS | LIMA_RIBU (Rp5.000/pihak) | BERMETERAI (Rp50.000/pihak) |
 |---|---|---|---|
 | Verifies | nothing about the person | both phones (WA OTP) | legal identity (Didit e-KYC) + phones |
 | Payment | — | Midtrans **QRIS only** | QRIS preferred, VA allowed |
 | Extra artifacts | — | — | e-meterai (mock in demo) + evidence-pack PDF |
-| Everything else | identical: record, hash+OTS, all states, free breach filing, hak jawab, flag, check page, N8 warning | ← | ← |
 
-Fee charged at DISEPAKATI, non-refundable, either party may pay for both (recorded — a seller paying both sides is a good-faith signal). Verification cannot be delegated: money can be paid by one party; OTP/e-KYC cannot.
+Fee charged at DISEPAKATI, non-refundable, either party may pay for both.
+Verification cannot be delegated.
+</details>
 
 ## Profile page (public, per phone_hash or rekening)
 
