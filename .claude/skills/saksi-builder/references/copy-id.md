@@ -1049,3 +1049,27 @@ those with **Akun Saksi (Rp10.000)** and **Toko Saksi Pro (Rp100.000)**. The
 schema, the copy constants, and the master doc must be reconciled in one pass —
 not patched independently — or the notify-me capture will key interest against
 tiers that no longer exist.
+
+## §35 — Riwayat link restored to unconditional (2026-07-21)
+
+§33 hid the landing's riwayat link until the device had recorded tagihan, to
+break a loop where both CTAs resolved to `/buat`. §34 then removed that loop at
+its source — no create button on the riwayat page — which made the condition
+unnecessary.
+
+It was also actively harmful, and shipped that way for one commit. **A page with
+no reachable link is a removed page.** Worse, the people it hid the riwayat from
+are precisely the people looking for it:
+
+- anyone whose tagihan predate `RememberDeal` (§32), since those were never
+  written to `localStorage` — which is every deal created before that commit;
+- anyone who cleared storage, or is on a second browser.
+
+So the link renders unconditionally now, and `MyDealsLink` is deleted — a plain
+`<Link>` in the server-rendered landing does the job with no client island, no
+`localStorage` read, and no hydration step.
+
+**The general lesson, worth keeping:** hiding navigation based on client-side
+state fails open for new users and fails *closed* for exactly the users who need
+the destination. Gate the *content* of a page on what the device knows; do not
+gate whether the page can be reached at all.

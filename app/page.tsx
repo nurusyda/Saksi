@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { MyDealsLink } from './MyDealsLink';
 import {
   CANONICAL_DOMAIN,
   LANDING_HEADING,
   LANDING_SUBHEAD,
   LANDING_STEPS,
   CTA_BUAT_TAGIHAN,
+  CTA_RIWAYAT_TAGIHAN,
 } from '@/lib/copy';
 
 export default function Home() {
@@ -40,10 +40,20 @@ export default function Home() {
           >
             {CTA_BUAT_TAGIHAN}
           </Link>
-          {/* §33 — only renders once this device has tagihan. A newcomer
-              gets one CTA; a returning seller gets the way back to their
-              list. See MyDealsLink for why this is not shown to everyone. */}
-          <MyDealsLink />
+          {/* §35 — always rendered. §33 hid this until the device had
+              recorded tagihan, to break a loop where both CTAs led to /buat.
+              §34 removed that loop at the source (no create button on the
+              riwayat page), so the condition became unnecessary — and
+              actively harmful: a page with no reachable link is a removed
+              page. It also hid the riwayat from anyone whose deals predate
+              RememberDeal, or who cleared storage, which is exactly the
+              person most likely to be looking for it. */}
+          <Link
+            href="/saya"
+            className="flex h-12 items-center justify-center rounded-xl border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50"
+          >
+            {CTA_RIWAYAT_TAGIHAN}
+          </Link>
         </div>
       </main>
 
