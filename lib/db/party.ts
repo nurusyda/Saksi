@@ -13,7 +13,7 @@ export type WhichParty = 'proposer' | 'counterpart';
 // keep doing so here.
 export async function identifyPartyByPhone(
   db: SupabaseClient,
-  deal: { proposer_id: string; counterpart_id: string | null },
+  deal: { id?: string; proposer_id: string; counterpart_id: string | null },
   rawPhone: string,
 ): Promise<WhichParty | null> {
   const phoneE164 = normalizePhone(rawPhone);
@@ -28,6 +28,26 @@ export async function identifyPartyByPhone(
 
   if (proposerParty?.phone_hash === pHash) return 'proposer';
   if (counterpartParty?.phone_hash === pHash) return 'counterpart';
+
+  // §40 — record the MISS, here, so all 16 call sites get correct accounting
+  // from one place.
+  //
+  // The identify limiter exists to stop someone holding a deal token from
+  // guessing phone numbers against it. It was counting every call instead of
+  // every wrong guess, which meant a legitimate party spent the budget just by
+  // looking: the buyer's dispute screen alone costs two reads per render
+  // (getPaymentDisputeState + getDealStatements), the seller's three. Ten per
+  // 15 minutes was gone in three or four page views, after which the party's
+  // own bukti read started returning null and their evidence appeared to
+  // vanish.
+  //
+  // Counting misses instead is both safer and looser: a guesser burns the
+  // budget on their first few wrong numbers, while someone typing their own
+  // number correctly never touches it. Same protection, no collateral damage.
+  if (deal.id) {
+    const { error } = await db.from('identify_attempts').insert({ deal_id: deal.id });
+    if (error) console.error('[identify] failed-attempt insert failed', error.code);
+  }
   return null;
 }
 

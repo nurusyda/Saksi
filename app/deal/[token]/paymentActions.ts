@@ -88,10 +88,13 @@ export async function checkIdentifyRateLimit(
   // rate limit and the original accept_attempts check): two concurrent
   // requests can both pass this count before either inserts, allowing a
   // brief burst over ATTEMPT_LIMIT. Blast radius is small at this threshold.
-  if ((attemptCount ?? 0) >= ATTEMPT_LIMIT) return false;
-  const { error: attemptInsertErr } = await db.from('identify_attempts').insert({ deal_id: dealId });
-  if (attemptInsertErr) console.error('identify_attempts insert failed', attemptInsertErr);
-  return true;
+  //
+  // §40 — counts only; the row is written by identifyPartyByPhone when a
+  // guess actually MISSES. This used to insert unconditionally, so every
+  // legitimate read spent budget and a party could exhaust their own limit
+  // just by reloading (see that function for the full account). Callers are
+  // unchanged: they still gate on this before doing any work.
+  return (attemptCount ?? 0) < ATTEMPT_LIMIT;
 }
 
 // ============================================================
@@ -808,8 +811,13 @@ export async function resubmitBukti(
     if (rpcErr) return { error: ERROR_BUKTI_SAVE_FAILED };
     if (rpcRow) {
       void submitAnchor(newHash);
+      // §40 — redirect, not a bare return. This IS the outermost action (the
+      // form binds it directly), so redirecting here is safe — unlike
+      // joinDealCore, which had to stop doing it (§39). Returning {} left the
+      // answer form on screen looking like nothing had happened, which is
+      // exactly what a payer who had just answered a dispute reported.
       revalidatePath(`/deal/${token}`);
-      return {};
+      redirect(`/deal/${token}`);
     }
     if (attempt === RETRY_LIMIT - 1) return { error: ERROR_BUKTI_SAVE_FAILED };
   }

@@ -1243,3 +1243,52 @@ function was never called.
    missing, or it will silently no-op and be reported as done.
 3. **Distinguish "failed" from "never ran" before theorising.** Three fixes were
    spent on the wrong half of that distinction.
+
+## §40 — The identify limiter charged reads, not guesses (2026-07-21)
+
+One cause, three reported symptoms: a payer answering a dispute got the same
+upload form back instead of progress; retrying said *"terlalu banyak percobaan"*;
+and on the other side **the seller's existing bukti appeared to vanish**.
+
+### What was wrong
+
+`checkIdentifyRateLimit` inserted an `identify_attempts` row on **every call**,
+not on every wrong guess. The limiter exists to stop someone holding a deal
+token from guessing phone numbers against it — but it was billing legitimate
+reads for that protection.
+
+The dispute screens made it acute. One render of the payer's page costs two
+identified reads (`getPaymentDisputeState` + `getDealStatements`); the seller's
+costs three (plus `getBuktiForDisplay`). At 10 per 15 minutes per deal, three or
+four page views exhausted it. Past that:
+
+- `resubmitBukti` refused with `ERROR_TOO_MANY_ATTEMPTS`;
+- `getBuktiForDisplay` returned `null` — so the seller's **already-uploaded**
+  bukti rendered as absent. Nothing was deleted; the read was simply refused.
+
+That last one is the worst of it: a rate limiter made evidence look destroyed.
+
+### The fix
+
+The row is now written by `identifyPartyByPhone` **when a guess actually
+misses** — one place, so all 16 call sites get correct accounting without
+touching any of them. `checkIdentifyRateLimit` only counts.
+
+This is both safer and looser than before: a guesser burns the budget on their
+first wrong numbers, while a party entering their own number correctly never
+touches it. Same protection, no collateral damage.
+
+Verified against production: 8 correct-phone reads cost **0** attempts (was 8);
+3 wrong-phone guesses cost **3**.
+
+`resubmitBukti` also now redirects on success instead of returning `{}` — it is
+the outermost action (the form binds it directly), so redirecting there is safe,
+unlike `joinDealCore` which had to stop (§39). Returning left the answer form on
+screen looking like nothing had happened.
+
+### Rule
+
+**Rate-limit the failure, not the operation.** A limiter that charges successful
+use will be exhausted by the people it is meant to protect — and when the
+refused read is evidence, the failure mode is not "slow down", it is "your proof
+is gone".
