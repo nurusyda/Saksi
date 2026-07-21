@@ -66,7 +66,10 @@ async function wasFonnteSendAccepted(resp: Response, masked: string): Promise<bo
 
   const accepted = typeof body === 'object' && body !== null && (body as { status?: unknown }).status === true;
   if (!accepted) {
-    console.error(`[wa] Fonnte rejected send for ${masked}`);
+    // `reason` is a short error code (e.g. "insufficient quota", "token
+    // invalid", "unknown user") — never the message/phone, safe to log.
+    const reason = typeof body === 'object' && body !== null ? (body as { reason?: unknown }).reason : undefined;
+    console.error(`[wa] Fonnte rejected send for ${masked}: ${typeof reason === 'string' ? reason : 'no reason given'}`);
   }
   return accepted;
 }

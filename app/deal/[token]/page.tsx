@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -31,6 +32,50 @@ import {
   TIER_LABELS,
   RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
+
+const TERMINAL_STATUSES: string[] = [
+  DealStatus.SELESAI,
+  DealStatus.TIDAK_DIPENUHI,
+  DealStatus.SENGKETA,
+  DealStatus.DIBATALKAN_BERSAMA,
+  DealStatus.TIDAK_DILANJUTKAN,
+  DealStatus.KEDALUWARSA,
+  DealStatus.DIKEMBALIKAN_PENUH,
+  DealStatus.DIKEMBALIKAN_SEBAGIAN,
+];
+
+// Link-preview metadata (2026-07-21) — when a deal link is pasted into WA,
+// the preview card previously fell back to the root layout's generic
+// "SAKSI" title, giving the recipient no idea what they were opening.
+// item_desc is already a public-safe deals_public column (data-model.md),
+// same exposure category as what /cek and the flag pages already show — no
+// new disclosure here, just surfacing it earlier in the flow. Own minimal
+// query (not the full row the page component fetches below) since
+// generateMetadata runs as a separate function pass with its own params.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const db = supabaseServer();
+  const { data: deal } = await db
+    .from('deals')
+    .select('item_desc, status')
+    .eq('token', token)
+    .single();
+
+  if (!deal) return {};
+
+  const title = `Kesepakatan: ${deal.item_desc}`;
+  const description = TERMINAL_STATUSES.includes(deal.status)
+    ? 'Kesepakatan telah selesai. Klik untuk melihat catatan di SAKSI.'
+    : deal.status === DealStatus.DRAF
+      ? 'Diajukan. Klik untuk menyepakati di SAKSI.'
+      : 'Kesepakatan sedang berjalan. Klik untuk melihat status di SAKSI.';
+
+  return { title, description, openGraph: { title, description } };
+}
 
 export default async function DealPage({
   params,
