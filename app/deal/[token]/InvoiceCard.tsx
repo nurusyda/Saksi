@@ -1,5 +1,6 @@
 import { formatRp, formatDeadlineWib } from '@/lib/format';
 import { maskRekening } from '@/lib/db/accountHistory';
+import { CopyAmountButton } from './CopyAmountButton';
 import {
   INVOICE_EYEBROW,
   INVOICE_WITNESS_MARK,
@@ -58,15 +59,22 @@ export function InvoiceCard({
       </div>
 
       <div className="px-4 py-3.5 sm:px-5">
-        <p className="text-[11px] text-zinc-500">{INVOICE_FOR_LABEL}</p>
-        <p className="mb-1.5 mt-0.5 text-sm font-bold leading-snug text-zinc-900">{itemDesc}</p>
-
-        {/* §29 — was 3xl/4xl. Still the largest thing in the card (it is the
-            number the buyer is acting on) but no longer shouting over the
-            account history, which matters just as much. */}
-        <p className="text-2xl font-extrabold tracking-tight text-zinc-900">
-          {formatRp(amountIdr)}
+        {/* §36 — "Untuk" and the item were 11px/sm against a 2xl nominal, so
+            what the buyer is paying FOR read as a caption on what they are
+            paying. They are not a label and a headline; they are two halves
+            of the same fact. Item is up to base and the eyebrow to xs, which
+            closes the gap without letting the item outweigh the nominal. */}
+        <p className="text-xs font-semibold text-zinc-500">{INVOICE_FOR_LABEL}</p>
+        <p className="mb-2 mt-1 text-base font-bold leading-snug text-zinc-900 sm:text-lg">
+          {itemDesc}
         </p>
+
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-2xl font-extrabold tracking-tight text-zinc-900">
+            {formatRp(amountIdr)}
+          </p>
+          <CopyAmountButton amountIdr={amountIdr} />
+        </div>
 
         <dl className="mt-2.5 flex flex-col">
           <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">

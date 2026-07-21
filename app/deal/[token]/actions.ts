@@ -19,6 +19,7 @@ import {
   ERROR_JOIN_FAILED,
   ERROR_BUKTI_ATTESTATION_REQUIRED,
   ERROR_BUKTI_FILE_REQUIRED,
+  ERROR_BUKTI_UPLOAD_FAILED,
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
   formatDisepakatiMessage,
@@ -262,6 +263,34 @@ export async function joinAndPay(
   const file = formData.get('bukti_file') as File | null;
   if (!file || file.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
 
+  // Re-buffer the upload into a fresh in-memory File before doing any
+  // database work, and hand THAT to submitBukti.
+  //
+  // Why (production bug, 2026-07-21): joinAndPay was landing the join and
+  // then failing the payment claim, silently, on every real attempt — Vercel
+  // logs showed the join's two anchors and the DISEPAKATI nudge, then a 303,
+  // with no BUKTI_UPLOADED anchor in the same request. The buyer was dropped
+  // on the DISEPAKATI screen, uploaded a second time, and only that second
+  // bukti was ever recorded. The distinguishing factor against the standalone
+  // upload path (which always worked) is that here roughly a second of awaited
+  // DB round-trips happens between the request body arriving and the file
+  // being read, and a request-scoped File is not guaranteed to survive that
+  // intact. Reading it once, immediately, removes the dependency entirely.
+  //
+  // It also fixes the ordering: everything that can fail on the input now
+  // fails before the first write, so a bad upload can no longer leave a
+  // joined party on a deal they never paid for.
+  let buffered: File;
+  try {
+    buffered = new File([await file.arrayBuffer()], file.name || 'bukti.jpg', {
+      type: file.type || 'application/octet-stream',
+    });
+  } catch {
+    return { error: ERROR_BUKTI_UPLOAD_FAILED };
+  }
+  if (buffered.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
+  formData.set('bukti_file', buffered);
+
   const joined = await joinDealCore(token, formData);
   if (!('phoneE164' in joined)) return joined;
 
@@ -270,12 +299,14 @@ export async function joinAndPay(
   // which would swallow it). It only returns when something went wrong.
   const bukti = await submitBukti(token, joined.phoneE164, {}, formData);
 
-  // Join landed, payment claim did not. Send them to the deal page anyway:
-  // it now renders DISEPAKATI (rekening + upload), so the upload can be
-  // retried without re-entering the phone or re-joining. Surfacing the
-  // upload error here instead would strand them on a DRAF form for a deal
-  // that is no longer in DRAF.
-  void bukti;
+  // Join landed, payment claim did not. The deal is no longer DRAF, so this
+  // form's own page will not render again — the retry has to happen on the
+  // DISEPAKATI screen, which shows the same rekening card and upload field
+  // minus the phone. Log the reason: this used to redirect silently, which is
+  // how the double-upload bug above stayed invisible in production.
+  if (bukti.error) {
+    console.error(`[joinAndPay] join succeeded but bukti failed for ${token}: ${bukti.error}`);
+  }
   revalidatePath(`/deal/${token}`);
   redirect(`/deal/${token}`);
 }

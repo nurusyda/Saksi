@@ -17,17 +17,14 @@ import {
 } from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
 import { LedgerDetail } from '@/components/LedgerDetail';
+import { RekeningCopyCard } from './RekeningCopyCard';
 import {
   FORCED_CHECK_EMPTY_STATE,
   ERROR_ACCOUNT_HISTORY_UNAVAILABLE,
-  formatAccountHistory,
-  COPY_REKENING_DISABLED_LABEL,
-  COPY_REKENING_ENABLED_LABEL,
-  COPY_REKENING_COPIED_LABEL,
+  formatAccountHistoryCounts,
   BUKTI_ATTESTATION,
   WAITING_FOR_PAYMENT_PROOF,
   ERROR_REKENING_LOAD_FAILED,
-  REKENING_TUJUAN_LABEL,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -57,14 +54,6 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
   // serialized into the initial payload regardless of client-side gating).
   const [rekening, setRekening] = useState<RekeningForPayer | 'loading' | 'error'>('loading');
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
-  // Bug found by monster_check: an earlier version stored the button label
-  // itself in state, seeded to the disabled-state label and only advanced
-  // on the user's own click — so it stayed on "disabled" even after the
-  // history resolved, backwards from copy-id.md §2's disabled -> enabled
-  // contract. Fixed by deriving the label from render state below instead
-  // of syncing it via an effect (justCopied is the only thing that's
-  // actually transient here).
-  const [justCopied, setJustCopied] = useState(false);
   const [attested, setAttested] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -92,27 +81,6 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
     };
   }, [deal.token]);
 
-  // Bug found by monster_check: 'error' counted as "resolved," so a
-  // transient lookup failure unlocked the copy button with the payer never
-  // having actually seen any history — exactly the technical-failure
-  // bypass the ERROR_ACCOUNT_HISTORY_UNAVAILABLE comment in lib/copy.ts
-  // already warns against for the empty-state line. The forced-check
-  // guard must stay locked on error too, not just show the error text.
-  const historyResolved = history.status === 'found' || history.status === 'empty';
-  const copyButtonState = !historyResolved ? 'idle' : justCopied ? 'copied' : 'ready';
-  const copyLabel = {
-    idle: COPY_REKENING_DISABLED_LABEL,
-    copied: COPY_REKENING_COPIED_LABEL,
-    ready: COPY_REKENING_ENABLED_LABEL,
-  }[copyButtonState];
-
-  const copyRekening = () => {
-    if (!historyResolved || rekening === 'loading' || rekening === 'error') return;
-    void navigator.clipboard.writeText(rekening.rekeningTujuan);
-    setJustCopied(true);
-    setTimeout(() => setJustCopied(false), 1500);
-  };
-
   const boundSubmitBukti = submitBukti.bind(null, deal.token, phone);
   const initialState: SubmitBuktiState = {};
   const [state, formAction] = useActionState(boundSubmitBukti, initialState);
@@ -133,18 +101,17 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-1 text-sm font-medium text-zinc-700">{REKENING_TUJUAN_LABEL}</p>
-        <p className="mb-3 text-base font-medium text-zinc-900">
-          {rekening.rekeningBank} {rekening.rekeningTujuan}
-        </p>
-
-        <p className="mb-3 text-xs text-zinc-500" aria-live="polite">
+      {/* §36 — the same RekeningCopyCard the merged buyer page uses. This
+          screen is where a buyer lands if the one-shot join+pay could not
+          complete the payment claim, so it has to read as the same page
+          continuing, not a different second form asking for the same thing.
+          The only difference is the phone field, which is gone because the
+          buyer is already identified by this point. */}
+      <RekeningCopyCard bank={rekening.rekeningBank} rekening={rekening.rekeningTujuan}>
+        <p className="text-sm leading-relaxed text-zinc-800" aria-live="polite">
           {history.status === 'idle' && 'Memeriksa riwayat rekening...'}
           {history.status === 'found' &&
-            formatAccountHistory(
-              rekening.rekeningBank,
-              history.rekeningMasked,
+            formatAccountHistoryCounts(
               history.selesaiCount,
               history.tidakDipenuhiCount,
               history.sinceLabel,
@@ -154,20 +121,11 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
         </p>
 
         {history.status === 'found' && history.ledgerEnabled && (
-          <div className="mb-3">
+          <div className="mt-3">
             <LedgerDetail onFetch={() => getDealLedger(deal.token, phone)} />
           </div>
         )}
-
-        <button
-          type="button"
-          onClick={copyRekening}
-          disabled={!historyResolved}
-          className="flex h-10 w-full items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {copyLabel}
-        </button>
-      </div>
+      </RekeningCopyCard>
 
       <form action={formAction} className="flex flex-col gap-4 rounded-xl border border-zinc-200 p-5">
         {state.error && (

@@ -874,6 +874,14 @@ export const INVOICE_WITNESS_MARK = 'Saksi menyaksikan transaksi ini';
 export const INVOICE_LOCKED_NOTE = 'Link dari penjual · terkunci';
 export const INVOICE_NUMBER_LABEL = 'No. tagihan';
 export const INVOICE_FOR_LABEL = 'Untuk';
+// §36 — the amount is copyable too. A buyer typing a nominal by hand into
+// m-banking is a transposition error waiting to happen, and a mismatched
+// nominal is exactly what the OCR check then flags and what the penjual then
+// disputes. Copying digits removes a whole class of avoidable dispute.
+// Copies raw digits (no "Rp", no separators) because that is what a banking
+// app's amount field accepts.
+export const COPY_AMOUNT_LABEL = 'Salin nominal';
+export const COPY_AMOUNT_COPIED_LABEL = 'Nominal tersalin';
 
 export const BUAT_HEADING = 'Buat Tagihan';
 export const BUAT_INTRO =

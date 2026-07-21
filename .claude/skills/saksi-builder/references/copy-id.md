@@ -1073,3 +1073,62 @@ So the link renders unconditionally now, and `MyDealsLink` is deleted — a plai
 state fails open for new users and fails *closed* for exactly the users who need
 the destination. Gate the *content* of a page on what the device knows; do not
 gate whether the page can be reached at all.
+
+## §36 — joinAndPay silent-failure fix, and invoice legibility (2026-07-21)
+
+### The bug (production, found in Vercel logs)
+
+`joinAndPay` was landing the join and then silently failing the payment claim,
+on every real attempt. One request logged the join's two anchors and the
+DISEPAKATI nudge, then a 303 — with **no `BUKTI_UPLOADED` anchor in that same
+request**. The buyer was dropped on the DISEPAKATI screen, uploaded a second
+time, and only that second bukti was ever recorded. From the seller's side no
+payment claim appeared at all until the second upload.
+
+**Cause.** `submitBukti` re-read `bukti_file` from the same `FormData` *after*
+roughly a second of awaited DB round-trips (the join RPC, party upsert, session
+cookie, WA nudge). A request-scoped `File` is not guaranteed to survive that
+intact, and the standalone upload path — which always worked — reads it
+immediately on arrival.
+
+**Fix.** Re-buffer the upload into a fresh in-memory `File` at the very top of
+`joinAndPay`, before any database work, and hand that to `submitBukti`. Removes
+the dependency entirely, and fixes the ordering as a side effect: everything
+that can fail on the input now fails *before* the first write, so a bad upload
+can no longer leave a joined party on a deal they never paid for.
+
+**And it no longer fails silently.** The bukti-failure branch logs the reason
+before redirecting. Swallowing it is exactly how this stayed invisible in
+production — every layer reported success.
+
+### The "two identical pages" confusion
+
+Even fixed, a failed payment claim still lands the buyer on the DISEPAKATI
+screen, which was a visually different second form asking for the same thing.
+`DisepakatiPanel` now renders the same `RekeningCopyCard` as the merged buyer
+page, so it reads as the same page continuing rather than a new one. The only
+difference is the missing phone field — correct, since the buyer is already
+identified by then. The now-duplicated copy-button state
+(`justCopied`/`historyResolved`/`copyLabel`) moved into `RekeningCopyCard` with
+it.
+
+### Invoice legibility
+
+- **"Untuk" + item were too small against the nominal.** At 11px/sm under a 2xl
+  amount, *what* the buyer is paying for read as a caption on *how much*. They
+  are not label-and-headline; they are two halves of one fact. Item up to
+  base/lg, eyebrow to xs — gap closed without letting the item outweigh the
+  nominal.
+- **`CopyAmountButton`.** The rekening had a copy button; the amount did not, so
+  the one value a buyer retyped by hand was the one where a typo is both easy
+  and expensive — a transposed digit produces a bukti whose nominal does not
+  match, which the OCR check flags and the penjual then disputes. An entire
+  avoidable dispute created by manual entry. Copies **raw digits**, no "Rp" and
+  no separators, because that is what a banking app's amount field accepts.
+
+### On the reported "dana belum masuk" hang
+
+Verified against production after the §30 grants landed: the RPC completes in
+**121 ms** and the statement persists. The hang predated migration 0030 —
+`deal_statements` was permission-denied, so the action failed after its retry
+loop. Nothing further to fix; retry on current prod.
