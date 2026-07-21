@@ -1204,3 +1204,42 @@ misleading. Reason codes carry no PII: token and status only.
 **Standing lesson:** when a fix does not take, stop patching the mechanism and
 delete the dependency. And never let a claim path fail without a log — "the
 data says otherwise" is not a debugging tool anyone should need twice.
+
+## §39 — The actual bug: joinDealCore still redirected (2026-07-21)
+
+`joinDealCore` ended with `redirect()`. `redirect()` throws `NEXT_REDIRECT`, so
+that exception unwound straight out of `joinAndPay` — **the bukti code after the
+call never executed, on any request, ever.** The join committed, the payment
+claim was never even attempted, and the buyer was bounced to the DISEPAKATI
+screen to upload a second time. That is the entire "two pages" bug.
+
+### Why it survived three fixes
+
+§36 (re-buffer the upload), §37 (collapse the two screens), §38 (remove the
+FormData re-read) all worked on code **downstream of a throw**. None of them
+could ever have run. The edit that was meant to remove this redirect — made back
+when `joinDealCore` was extracted — silently did not match its target, and
+unlike the other replacements in that same script it carried **no `assert`**. It
+reported success and changed nothing.
+
+### The evidence was there the whole time
+
+Every log dump showed the same shape: the join's two anchors, the DISEPAKATI
+nudge, then nothing. I read that silence as "the claim failed quietly" and went
+looking for a quiet failure. It actually meant "the claim never ran". The
+distinction matters: a failure has a reason code to find, an unreached line has
+none — and §38's reason-code logging is what finally made the difference legible,
+because after it shipped the *absence* of any `[bukti]` code could only mean the
+function was never called.
+
+### Rules taken from this
+
+1. **`redirect()` in a helper is a control-flow trap.** It does not return, it
+   throws. Any function that might be composed into a larger action must
+   `return` and let the outermost caller redirect. `joinDealCore` now does, and
+   says so.
+2. **A scripted edit without an assertion is not an edit.** Every
+   search-and-replace against source must fail loudly when its pattern is
+   missing, or it will silently no-op and be reported as done.
+3. **Distinguish "failed" from "never ran" before theorising.** Three fixes were
+   spent on the wrong half of that distinction.

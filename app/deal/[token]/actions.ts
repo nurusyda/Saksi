@@ -222,8 +222,22 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
     formatDisepakatiMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
   );
 
-  revalidatePath(`/deal/${token}`);
-  redirect(`/deal/${token}`);
+  // §39 — returns, does NOT redirect. redirect() throws NEXT_REDIRECT, and
+  // when this function still ended with one, that exception unwound straight
+  // out of joinAndPay: the bukti code after the call never executed, on any
+  // request, ever. That is the whole "two pages" bug — the join committed,
+  // the payment claim was never even attempted, and the buyer was bounced to
+  // the DISEPAKATI screen to upload a second time.
+  //
+  // It survived three fix attempts (§36 re-buffering, §37 collapsing the
+  // screens, §38 removing the FormData re-read) because all three worked on
+  // code downstream of a throw. The logs said so plainly the whole time —
+  // the join's two anchors and the DISEPAKATI nudge, then nothing — and I
+  // read the silence as "the claim failed quietly" rather than "the claim
+  // never ran".
+  //
+  // Any caller that wants a redirect must do it itself, AFTER its own work.
+  return { phoneE164 };
 }
 
 // ============================================================
