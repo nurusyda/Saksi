@@ -9,11 +9,14 @@ import {
   identifyParty,
   getBuktiForDisplay,
   confirmReceipt,
+  getPaymentDisputeState,
   type BuktiDisplay,
   type ConfirmActionState,
+  type PaymentDisputeState,
 } from './paymentActions';
 import { DanaBelumMasukForm } from './DanaBelumMasukForm';
 import { DealStatements } from './DealStatements';
+import { ResubmitBuktiForm } from './ResubmitBuktiForm';
 import { DeadlineLapseReportModal } from './DeadlineLapseReportModal';
 import type { WhichParty } from '@/lib/db/party';
 import { getTodayWib } from '@/lib/format';
@@ -26,6 +29,7 @@ import {
   DEADLINE_LAPSE_REPORT_BUTTON,
   ERROR_BUKTI_LOAD_FAILED,
   REKENING_TUJUAN_LABEL,
+  DISPUTE_ROUNDS_EXHAUSTED_NOTE,
 } from '@/lib/copy';
 
 // TIDAK_KONSISTEN interpolates the actual mismatched field names (copy-id.md
@@ -78,6 +82,24 @@ function ConfirmReceiptButton() {
 
 function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   const [bukti, setBukti] = useState<BuktiDisplay | null | 'loading' | 'error'>('loading');
+  const [dispute, setDispute] = useState<PaymentDisputeState | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    getPaymentDisputeState(deal.token, phone)
+      .then((r) => {
+        if (!ignore) setDispute(r);
+      })
+      .catch(() => {
+        // Non-fatal: the round counter is presentation. recordDanaBelumMasuk
+        // re-checks the limit server-side, so a failed read here can only
+        // show the form when it should be hidden, never bypass the limit.
+        if (!ignore) setDispute(null);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [deal.token, phone]);
 
   useEffect(() => {
     let ignore = false;
@@ -155,7 +177,16 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
         <ConfirmReceiptButton />
       </form>
 
-      <DanaBelumMasukForm token={deal.token} phone={phone} />
+      {/* §30 — the protest form closes once both rounds are used. The deal
+          keeps running to its deadline either way; what stops is adding more
+          statements, not the kesepakatan itself. */}
+      {dispute && dispute.roundsLeft <= 0 ? (
+        <p className="rounded-xl border border-muted-amber-line bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600">
+          {DISPUTE_ROUNDS_EXHAUSTED_NOTE}
+        </p>
+      ) : (
+        <DanaBelumMasukForm token={deal.token} phone={phone} roundsLeft={dispute?.roundsLeft} />
+      )}
 
       <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
     </div>
@@ -170,6 +201,21 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
 // that would just bounce with ERROR_DEADLINE_NOT_PASSED).
 function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [dispute, setDispute] = useState<PaymentDisputeState | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    getPaymentDisputeState(deal.token, phone)
+      .then((r) => {
+        if (!ignore) setDispute(r);
+      })
+      .catch(() => {
+        if (!ignore) setDispute(null);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [deal.token, phone]);
   // Strict `<`, matching breachActions.deadlineHasPassed: the counterpart
   // gets the full calendar day of the deadline itself before this is shown.
   const deadlinePassed = deal.deadline < getTodayWib();
@@ -191,6 +237,14 @@ function PembeliWaitingPanel({ deal, phone }: { deal: DealSummary; phone: string
           where they are waiting, not only in a WA message that may never
           have arrived. */}
       <DealStatements token={deal.token} phone={phone} proposerRole={deal.proposer_role} />
+
+      {/* §30 — only when the penjual has actually disputed AND it is the
+          payer's turn to answer. Without the awaitingPayerAnswer check this
+          would still offer a re-upload right after the payer already sent
+          one, i.e. inviting them to answer themselves. */}
+      {dispute && dispute.awaitingPayerAnswer && dispute.roundsLeft >= 0 && dispute.disputeCount > 0 && (
+        <ResubmitBuktiForm token={deal.token} phone={phone} roundsLeft={dispute.roundsLeft} />
+      )}
 
       {deadlinePassed && (
         <button

@@ -759,3 +759,76 @@ but it is exactly what was asked for (remove the "Simpan link ini" card from
 the middle of the buyer's page), and the buyer's own copy of the link already
 persists in the WhatsApp thread that delivered it to them, which
 `DealLinkCard` never was the only source of. Checked, not reverted.
+
+## §29 — Create-form deadline box removed; invoice/riwayat rebalanced (2026-07-21)
+
+`BUAT_DEADLINE_LABEL` / `BUAT_DEADLINE_NOTE` (added §27) are **retired**. On a
+form whose whole job is "make a bill and send it", a box explaining what
+happens when the deadline lapses reads as a warning about failure before the
+seller has done anything. The deadline still shows where it is load-bearing —
+on the invoice the buyer reads (`formatDeadlineWib`), where it tells them how
+long they have rather than what goes wrong.
+
+The invoice was also scaled down (amount 3xl/4xl → 2xl, tighter rows) and the
+account-history card given matching structural weight — same header bar, same
+radius/border, body text at the invoice's own item-line size. The record is
+half of what the buyer's page is for; as small grey caption text under a large
+invoice, the layout said the amount mattered and the history didn't.
+
+The history sentence stays **verbatim** from `formatAccountHistoryCounts` and
+is deliberately NOT split into big per-outcome figures. Pulling "14" and "2"
+out as display numbers edges toward a scoreboard, and these are only legal as
+counts, never as a rating (Law 4). No safety colours either — both outcomes
+render in the same neutral ink.
+
+## §30 — Bounded payment-dispute loop (2026-07-21, migration 0031)
+
+§24 gave the penjual a way to say "dana belum masuk / bukti salah" and put it
+on the record. It gave the pembeli no way to answer. The disagreement could be
+stated once and then sat there until the deadline lapsed — the wrong shape for
+the most common real cause of this dispute, which is not fraud but a mistake:
+the wrong screenshot attached, a transfer to an old account, a payment still
+in flight.
+
+**The loop.** Penjual disputes → pembeli uploads a corrected bukti → penjual
+confirms or disputes again. `PAYMENT_DISPUTE_MAX_ROUNDS = 2`
+(`lib/db/transitions.ts`), enforced server-side in `recordDanaBelumMasuk` and
+`resubmitBukti`; the UI only reads the derived count and hides the buttons.
+
+**Why two.** One round clears almost every honest mistake. Past two, further
+rounds stop being clarification and become the parties repeating themselves,
+which the record does not need more of.
+
+**Why no new terminal state.** At the limit both actions close and the deal
+runs to its deadline with both accounts on the record. The existing breach path
+(report → 14-day hak jawab → **klaim berbeda**) is what settles a real
+disagreement, and it is already built, already the agreed mechanism, and — as
+of migration 0030 — now actually reachable. Inventing a second, parallel route
+into SENGKETA would have meant a `flags` row created outside the breach
+pipeline, i.e. two different meanings for the same status.
+
+**Ledger shape.** Every bukti is INSERTed, never updated: the earlier one stays.
+A reader has to be able to see that a first bukti was disputed and what
+replaced it, not only the version that finally stuck. `BUKTI_UPLOADED` becomes
+a legal self-transition on `DIBAYAR_DIKLAIM` (the deal does not walk backwards
+to DISEPAKATI — the payment claim already exists).
+
+`resubmit_bukti_with_event` is a separate RPC rather than a loosened
+`submit_bukti_with_event`: that one's UPDATE is guarded on
+`status = 'DISEPAKATI'` and widening it would let a re-upload silently re-enter
+the first-payment path.
+
+**New copy:** `ERROR_DISPUTE_ROUNDS_EXHAUSTED`,
+`DISPUTE_ROUNDS_EXHAUSTED_NOTE`, `formatDisputeRoundsLeft`,
+`RESUBMIT_BUKTI_HEADING`, `_PROMPT`, `_SUBMIT_LABEL`. None assign fault in
+either direction — the seller may be right that the money is not there, or the
+buyer may be right that the wrong file got attached, and the copy assumes
+neither. The forgery attestation is re-collected on every re-upload: each file
+carries its own attestation, and reusing the first upload's consent for a
+different file would be wrong.
+
+**Note for future work — `'use server'` export constraint.** `PAYMENT_DISPUTE_MAX_ROUNDS`
+initially lived in `paymentActions.ts` and broke the build with 42 cascading
+errors: a `'use server'` module may only export async functions, and one
+exported `const` invalidates every import of that module. `tsc` does not catch
+this; only `next build` does. Plain constants belong outside action files.

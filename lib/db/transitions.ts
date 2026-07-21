@@ -134,6 +134,11 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.KEDALUWARSA_LAPSED, next: DealStatus.KEDALUWARSA },
     { event: DealEventName.NUDGE_SENT, next: DealStatus.DIBAYAR_DIKLAIM }, // self
     { event: DealEventName.DANA_BELUM_MASUK, next: DealStatus.DIBAYAR_DIKLAIM }, // self
+    // Re-upload in answer to a DANA_BELUM_MASUK (migration 0031). Self, not a
+    // re-entry from DISEPAKATI: the payment claim already exists and the deal
+    // does not walk backwards. Bounded to 2 rounds in paymentActions.ts —
+    // the state machine allows the edge, the action decides how often.
+    { event: DealEventName.BUKTI_UPLOADED, next: DealStatus.DIBAYAR_DIKLAIM }, // self
   ],
   [DealStatus.DIKONFIRMASI_TERIMA]: [
     { event: DealEventName.FULFILLMENT_CONFIRMED, next: DealStatus.SELESAI },
@@ -157,6 +162,32 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
     { event: DealEventName.SENGKETA_KADALUARSA, next: DealStatus.TIDAK_DIPENUHI },
   ],
 };
+
+// ============================================================
+// Payment-dispute round limit (§30).
+//
+// The penjual says the money did not arrive; the pembeli answers with a
+// corrected bukti; the penjual confirms or says it again. Two rounds, then
+// both actions close and the deal runs to its deadline with both accounts on
+// the record.
+//
+// Two is deliberate. The overwhelmingly common cause of this dispute is a
+// mistake, not fraud — the wrong screenshot attached, a transfer to an old
+// account, a payment still in flight — and one round clears almost all of
+// those. Past two, further rounds stop being clarification and become the
+// parties repeating themselves, which the record does not need more of.
+//
+// Nothing new happens at the limit: the existing breach path (report ->
+// 14-day hak jawab -> klaim berbeda) is what settles a real disagreement once
+// the deadline lapses. That is why this loop needs no new terminal status.
+//
+// Lives here rather than in paymentActions.ts because that file is
+// 'use server' and may only export async functions — and because this is a
+// statement about how often a transition may fire, which is state-machine
+// policy, not action detail. Enforced in recordDanaBelumMasuk/resubmitBukti;
+// the UI only reads the derived count.
+// ============================================================
+export const PAYMENT_DISPUTE_MAX_ROUNDS = 2;
 
 export class InvalidTransitionError extends Error {
   constructor(current: DealStatus, event: DealEventName) {

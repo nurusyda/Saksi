@@ -14,6 +14,7 @@ import {
   DANA_BELUM_MASUK_RECORDED,
   PENDING_SAVE_LABEL,
   MODAL_CLOSE_LABEL,
+  formatDisputeRoundsLeft,
 } from '@/lib/copy';
 
 // §24 (2026-07-21) — the penjual's side of "Dana belum masuk / bukti salah".
@@ -36,7 +37,16 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
 
 const initialState: DanaBelumMasukState = {};
 
-export function DanaBelumMasukForm({ token, phone }: { token: string; phone: string }) {
+export function DanaBelumMasukForm({
+  token,
+  phone,
+  roundsLeft,
+}: {
+  token: string;
+  phone: string;
+  /** Undefined while the count is still loading, or if the read failed. */
+  roundsLeft?: number;
+}) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState('');
   const bound = recordDanaBelumMasuk.bind(null, token, phone);
@@ -97,6 +107,10 @@ export function DanaBelumMasukForm({ token, phone }: { token: string; phone: str
         </ul>
 
         <SubmitButton disabled={body.trim().length < 10} />
+
+        {typeof roundsLeft === 'number' && (
+          <p className="text-xs text-zinc-500">{formatDisputeRoundsLeft(roundsLeft)}</p>
+        )}
       </form>
     </Card>
   );

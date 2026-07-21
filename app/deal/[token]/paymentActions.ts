@@ -5,7 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { randomUUID, createHash } from 'crypto';
 import { supabaseServer } from '@/lib/supabase/server';
 import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
-import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
+import {
+  assertTransition,
+  DealStatus,
+  DealEventName,
+  PAYMENT_DISPUTE_MAX_ROUNDS,
+} from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
@@ -31,6 +36,7 @@ import {
   ERROR_STATEMENT_TOO_SHORT,
   ERROR_STATEMENT_TOO_LONG,
   ERROR_STATEMENT_SAVE_FAILED,
+  ERROR_DISPUTE_ROUNDS_EXHAUSTED,
   formatBuktiUploadedMessage,
   formatReceiptConfirmedMessage,
 } from '@/lib/copy';
@@ -461,6 +467,42 @@ export async function getBuktiForDisplay(token: string, phone: string): Promise<
 // is unchanged and still gated on the deadline actually lapsing.
 // ============================================================
 
+// ============================================================
+// The payment-dispute round limit (§30).
+//
+// The penjual says the money did not arrive; the pembeli answers with a
+// corrected bukti; the penjual confirms or says it again. Two rounds, then
+// both actions close.
+//
+// Two is deliberate. The overwhelmingly common cause of this dispute is a
+// mistake, not fraud — the wrong screenshot attached, a transfer to an old
+// account, a payment still in flight — and one round is enough to clear
+// almost all of those. Past two, further rounds stop being clarification and
+// become the two parties repeating themselves, which the record does not
+// need more of. When the limit is reached the deal simply sits with both
+// accounts on it until the deadline lapses, at which point the existing
+// breach path (report -> 14-day hak jawab -> klaim berbeda) takes over. That
+// path already exists, is already the agreed way a genuine disagreement gets
+// settled, and reusing it is why this loop needs no new terminal state.
+// ============================================================
+// (PAYMENT_DISPUTE_MAX_ROUNDS lives in lib/db/transitions.ts — a 'use server'
+// module may only export async functions, so a plain constant cannot be
+// exported from here. It belongs next to the state machine anyway: it is the
+// policy for how many times the DANA_BELUM_MASUK self-transition may fire.)
+
+/** How many times the payee has already disputed this deal's payment. */
+async function countPaymentDisputes(
+  db: ReturnType<typeof supabaseServer>,
+  dealId: string,
+): Promise<number> {
+  const { count } = await db
+    .from('deal_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('deal_id', dealId)
+    .eq('event', DealEventName.DANA_BELUM_MASUK);
+  return count ?? 0;
+}
+
 export type DanaBelumMasukState = { recorded?: boolean; error?: string; fieldError?: string };
 
 export async function recordDanaBelumMasuk(
@@ -487,6 +529,12 @@ export async function recordDanaBelumMasuk(
 
   const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
   if (whichParty !== payeeSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+
+  // Round limit, checked server-side — the client hides the button once the
+  // limit is reached, but that is presentation, not enforcement.
+  if ((await countPaymentDisputes(db, deal.id)) >= PAYMENT_DISPUTE_MAX_ROUNDS) {
+    return { error: ERROR_DISPUTE_ROUNDS_EXHAUSTED };
+  }
 
   const body = (formData.get('body') as string | null)?.trim() ?? '';
   if (body.length < 10) return { fieldError: ERROR_STATEMENT_TOO_SHORT };
@@ -546,6 +594,176 @@ export async function recordDanaBelumMasuk(
   }
 
   return { error: ERROR_STATEMENT_SAVE_FAILED };
+}
+
+// ============================================================
+// resubmitBukti (§30, migration 0031) — the pembeli's answer to a payment
+// dispute. Mirrors submitBukti exactly (same attestation gate, same OCR
+// consistency check, same retry-with-prior-hash loop); the differences are
+// the eligible status (DIBAYAR_DIKLAIM, not DISEPAKATI), the RPC it calls,
+// and that it is only offered while a dispute is open and rounds remain.
+//
+// The earlier bukti is kept, never overwritten — a reader has to be able to
+// see that a first bukti was disputed and what replaced it.
+// ============================================================
+
+export async function resubmitBukti(
+  token: string,
+  phone: string,
+  _prev: SubmitBuktiState,
+  formData: FormData,
+): Promise<SubmitBuktiState> {
+  const db = supabaseServer();
+
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+  if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return { error: ERROR_PHONE_INVALID };
+  }
+  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+
+  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
+  if (whichParty !== payerSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+
+  // Only answerable if there is actually something to answer. Without this a
+  // payer could re-upload unprompted, which is not what this path is for.
+  const disputeCount = await countPaymentDisputes(db, deal.id);
+  if (disputeCount === 0) return { error: ERROR_DEAL_CLOSED };
+  if (disputeCount > PAYMENT_DISPUTE_MAX_ROUNDS) {
+    return { error: ERROR_DISPUTE_ROUNDS_EXHAUSTED };
+  }
+
+  if (formData.get('attest_bukti') !== 'on') return { error: ERROR_BUKTI_ATTESTATION_REQUIRED };
+
+  const file = formData.get('bukti_file') as File | null;
+  if (!file || file.size === 0) return { error: ERROR_BUKTI_FILE_REQUIRED };
+
+  try {
+    assertTransition(DealStatus.DIBAYAR_DIKLAIM, DealEventName.BUKTI_UPLOADED);
+  } catch {
+    return { error: ERROR_DEAL_CLOSED };
+  }
+
+  const uploaded = await uploadBuktiImage(db, deal.id, file);
+  if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
+
+  const { ocrResult, verdict } = await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
+    amount_idr: Number(deal.amount_idr),
+    rekening_tujuan: deal.rekening_tujuan,
+    rekening_bank: deal.rekening_bank,
+    deadline: deal.deadline,
+  });
+
+  const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+    const { data: cur } = await db.from('deals').select('*').eq('id', deal.id).single();
+    if (!cur || cur.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
+
+    const { data: lastEvent } = await db
+      .from('deal_events')
+      .select('new_hash')
+      .eq('deal_id', deal.id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const priorHash = lastEvent?.new_hash ?? null;
+
+    // Self-transition: status is already DIBAYAR_DIKLAIM and stays there, so
+    // the canonical payload hashes the deal as it stands (no virtual status).
+    const canonical = buildCanonicalPayload(
+      cur,
+      { name: DealEventName.BUKTI_UPLOADED, actor, payload: null },
+      priorHash,
+    );
+    const newHash = hashDeal(canonical);
+
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('resubmit_bukti_with_event', {
+        p_bukti_id: randomUUID(),
+        p_deal_id: deal.id,
+        p_uploader: actor,
+        p_storage_path: uploaded.storagePath,
+        p_attested: true,
+        p_ocr_result: ocrResult,
+        p_ocr_verdict: verdict,
+        p_actor: actor,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
+      })
+      .maybeSingle();
+
+    if (rpcErr) return { error: ERROR_BUKTI_SAVE_FAILED };
+    if (rpcRow) {
+      void submitAnchor(newHash);
+      revalidatePath(`/deal/${token}`);
+      return {};
+    }
+    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_BUKTI_SAVE_FAILED };
+  }
+
+  return { error: ERROR_BUKTI_SAVE_FAILED };
+}
+
+// ============================================================
+// getPaymentDisputeState — what each side needs to render the loop: how many
+// rounds have been used, and whether this deal is currently waiting on the
+// payer to answer. Party-gated and rate-limited like every other read here.
+// ============================================================
+
+export type PaymentDisputeState = {
+  disputeCount: number;
+  roundsLeft: number;
+  /** True when the newest event is a dispute, i.e. the payer owes an answer. */
+  awaitingPayerAnswer: boolean;
+};
+
+export async function getPaymentDisputeState(
+  token: string,
+  phone: string,
+): Promise<PaymentDisputeState | null> {
+  const db = supabaseServer();
+  const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
+  if (!deal) return null;
+
+  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
+
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, phone);
+  } catch {
+    return null;
+  }
+  if (!whichParty) return null;
+
+  // Only DANA_BELUM_MASUK and BUKTI_UPLOADED matter for whose turn it is;
+  // other events (nudges) must not flip the turn, so they are filtered out
+  // rather than "take the last event of any kind".
+  const { data: events } = await db
+    .from('deal_events')
+    .select('event')
+    .eq('deal_id', deal.id)
+    .in('event', [DealEventName.DANA_BELUM_MASUK, DealEventName.BUKTI_UPLOADED])
+    .order('id', { ascending: true });
+
+  const rows = events ?? [];
+  const disputeCount = rows.filter((e) => e.event === DealEventName.DANA_BELUM_MASUK).length;
+  const last = rows[rows.length - 1]?.event;
+
+  return {
+    disputeCount,
+    roundsLeft: Math.max(0, PAYMENT_DISPUTE_MAX_ROUNDS - disputeCount),
+    awaitingPayerAnswer: last === DealEventName.DANA_BELUM_MASUK,
+  };
 }
 
 // ============================================================

@@ -381,6 +381,28 @@ export const STATEMENT_FROM_PEMBELI_LABEL = 'Keterangan dari pembeli';
 export const ERROR_STATEMENT_TOO_SHORT = 'Tulis keterangan minimal 10 karakter.';
 export const ERROR_STATEMENT_TOO_LONG = 'Maksimal 600 karakter.';
 export const ERROR_STATEMENT_SAVE_FAILED = 'Gagal mencatat keterangan. Coba lagi.';
+
+// §30 (2026-07-21) — the bounded payment-dispute loop. Two rounds of
+// "dana belum masuk" -> corrected bukti, then both actions close. The copy
+// states what happens next without predicting an outcome or assigning fault:
+// the deal keeps running, both accounts stay on the record, and the existing
+// deadline/report path is what settles it if they still disagree.
+export const ERROR_DISPUTE_ROUNDS_EXHAUSTED =
+  'Batas dua kali klarifikasi sudah tercapai untuk kesepakatan ini.';
+export const DISPUTE_ROUNDS_EXHAUSTED_NOTE =
+  'Kedua keterangan sudah tercatat dan tidak bisa ditambah lagi. Kesepakatan tetap berjalan sampai batas waktu. Setelah batas waktu lewat, pihak yang dirugikan dapat mengajukan laporan.';
+export function formatDisputeRoundsLeft(roundsLeft: number): string {
+  return `Sisa ${roundsLeft} kali klarifikasi.`;
+}
+
+// Payer's side of the loop — answering a "dana belum masuk" with a corrected
+// bukti. Never phrased as an accusation in either direction: the seller may
+// be right (the money genuinely is not there) or the buyer may be (the wrong
+// file got attached). The copy assumes neither.
+export const RESUBMIT_BUKTI_HEADING = 'Penjual belum menerima dana';
+export const RESUBMIT_BUKTI_PROMPT =
+  'Kalau bukti yang kamu kirim kurang tepat, atau kamu sudah transfer ulang, unggah bukti yang benar di sini.';
+export const RESUBMIT_BUKTI_SUBMIT_LABEL = 'Kirim ulang bukti transfer';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 
