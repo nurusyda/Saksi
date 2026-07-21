@@ -786,11 +786,10 @@ export const BUAT_SECTION_DATA = 'Data kamu';
 export const BUAT_SECTION_BARANG = 'Barang & harga';
 export const BUAT_SECTION_REKENING = 'Rekening pembayaran kamu';
 
-// §27 (2026-07-21) — the auto-derived window, finally stated. It was already
-// creation + 7 days server-side (getDefaultDeadlineWib) but was never shown
-// anywhere, so neither party knew the window they were in. The note explains
-// what lapsing actually enables, and deliberately does not promise a refund
-// or any automatic consequence, because there is none.
-export const BUAT_DEADLINE_LABEL = 'Batas waktu kesepakatan';
-export const BUAT_DEADLINE_NOTE =
-  'Dihitung otomatis 7 hari sejak tagihan dibuat. Setelah lewat batas ini, pihak yang dirugikan dapat mengajukan laporan.';
+// BUAT_DEADLINE_LABEL / BUAT_DEADLINE_NOTE retired §29 (2026-07-21). §27 added
+// them to state the auto-derived window on the create form. Removed on review:
+// on a form whose whole job is "make a bill and send it", a box explaining
+// what happens when the deadline lapses reads as a warning about failure
+// before the seller has done anything. The deadline is still shown where it is
+// actually load-bearing — on the invoice the buyer reads (formatDeadlineWib),
+// where it tells them how long they have rather than what goes wrong.

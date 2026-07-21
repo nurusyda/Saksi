@@ -39,7 +39,7 @@ export function InvoiceCard({
   kategoriLabel?: string | null;
 }) {
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+    <div className="mb-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
       {/* §27 — one line, not a stacked block. The eyebrow, the locked-link
           note and the kategori chip are all chrome; giving them two rows of
           their own pushed the amount (the only thing a buyer scans for)
@@ -57,38 +57,41 @@ export function InvoiceCard({
         )}
       </div>
 
-      <div className="px-4 py-4 sm:px-5">
-        <p className="text-xs text-zinc-500">{INVOICE_FOR_LABEL}</p>
-        <p className="mb-2 mt-0.5 text-base font-bold leading-snug text-zinc-900">{itemDesc}</p>
+      <div className="px-4 py-3.5 sm:px-5">
+        <p className="text-[11px] text-zinc-500">{INVOICE_FOR_LABEL}</p>
+        <p className="mb-1.5 mt-0.5 text-sm font-bold leading-snug text-zinc-900">{itemDesc}</p>
 
-        <p className="text-3xl font-extrabold tracking-tight text-zinc-900 sm:text-4xl">
+        {/* §29 — was 3xl/4xl. Still the largest thing in the card (it is the
+            number the buyer is acting on) but no longer shouting over the
+            account history, which matters just as much. */}
+        <p className="text-2xl font-extrabold tracking-tight text-zinc-900">
           {formatRp(amountIdr)}
         </p>
 
-        <dl className="mt-3 flex flex-col">
-          <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-2 text-sm">
+        <dl className="mt-2.5 flex flex-col">
+          <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">
             <dt className="shrink-0 text-zinc-600">Batas waktu</dt>
             {/* The exact instant the window closes, not a bare date — see
                 formatDeadlineWib for why 23.59 is the true cutoff. */}
             <dd className="text-right font-semibold text-zinc-900">{formatDeadlineWib(deadline)}</dd>
           </div>
           {rekeningBank && rekeningTujuan && (
-            <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-2 text-sm">
+            <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">
               <dt className="text-zinc-600">{REKENING_TUJUAN_LABEL}</dt>
               <dd className="text-right font-semibold text-zinc-900">
                 {rekeningBank} {maskRekening(rekeningTujuan)}
               </dd>
             </div>
           )}
-          <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-2 text-sm">
+          <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">
             <dt className="text-zinc-600">{INVOICE_NUMBER_LABEL}</dt>
             <dd className="text-right font-semibold text-zinc-900">SAKSI-{token}</dd>
           </div>
         </dl>
       </div>
 
-      <div className="border-t border-zinc-200 bg-witness-soft px-4 py-2.5 sm:px-5">
-        <p className="flex items-center gap-2 text-xs font-semibold text-witness">
+      <div className="border-t border-zinc-200 bg-witness-soft px-4 py-2 sm:px-5">
+        <p className="flex items-center gap-2 text-[11px] font-semibold text-witness">
           <span aria-hidden="true">👁</span>
           {INVOICE_WITNESS_MARK}
         </p>

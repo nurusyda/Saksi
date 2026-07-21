@@ -18,7 +18,6 @@ import {
 } from '@/components/ui';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
-import { getDefaultDeadlineWib, formatDeadlineWib } from '@/lib/format';
 import {
   ATTESTATIONS,
   ITEM_TITLE_LABEL,
@@ -36,8 +35,6 @@ import {
   BUAT_SECTION_DATA,
   BUAT_SECTION_BARANG,
   BUAT_SECTION_REKENING,
-  BUAT_DEADLINE_LABEL,
-  BUAT_DEADLINE_NOTE,
   CTA_BUAT_TAGIHAN,
 } from '@/lib/copy';
 
@@ -95,23 +92,6 @@ export default function BuatPage() {
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
   const [proposerPhone, setProposerPhone] = usePersistedPhone();
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
-
-  // §27 — the deadline was already auto-derived server-side (creation + 7
-  // days, getDefaultDeadlineWib) but was never shown, so a seller had no way
-  // to know what window they were committing their buyer to. Computed here
-  // with the same function the server uses, purely for display. Deferred to
-  // an effect because it reads the clock: rendering it during SSR would bake
-  // the server's "today" into static HTML.
-  const [deadlinePreview, setDeadlinePreview] = useState('');
-  useEffect(() => {
-    // Reading the clock is the "subscribe to an external system" case this
-    // rule carves out, and it has to happen after mount: /buat is statically
-    // prerendered, so a lazy useState initializer would bake the BUILD date's
-    // +7 days into the HTML and then disagree with the client on hydration.
-    // Fires once, empty dep array — no cascade.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDeadlinePreview(getDefaultDeadlineWib());
-  }, []);
 
   useEffect(() => {
     if (!effectiveBank || !rekening) {
@@ -211,17 +191,6 @@ export default function BuatPage() {
             <input type="hidden" name="amount_idr" value={rawNominal} />
           </Field>
 
-          {/* Stated, not editable: the server derives this itself and would
-              ignore a submitted value. Showing it read-only tells the seller
-              the exact instant the window closes without implying they can
-              change it here. */}
-          <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-3">
-            <p className="text-xs font-semibold text-zinc-700">{BUAT_DEADLINE_LABEL}</p>
-            <p className="mt-1 text-sm font-bold text-zinc-900">
-              {deadlinePreview ? formatDeadlineWib(deadlinePreview) : '—'}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500">{BUAT_DEADLINE_NOTE}</p>
-          </div>
         </FormSection>
 
         <FormSection label={BUAT_SECTION_REKENING}>

@@ -49,30 +49,46 @@ export async function BuyerJoinGate({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-zinc-400">
-          Riwayat rekening ini
-        </p>
+      {/* §29 — given the same structural weight as the invoice (matching
+          header bar, matching radius/border, body text at the same size the
+          invoice's own item line uses). The account's record is half of what
+          this page is for; when it was small grey caption text under a large
+          invoice, the layout was telling the buyer the amount mattered and
+          the history didn't.
 
-        <p className="mt-2 text-sm leading-relaxed text-zinc-700">
-          {history.status === 'found' &&
-            formatAccountHistoryCounts(
-              history.selesaiCount,
-              history.tidakDipenuhiCount,
-              history.sinceLabel,
-            )}
-          {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-          {/* 'idle' means the deal itself has no rekening set — a data
-              problem, not a confirmed-clean account. Every reachable DRAF
-              deal has one (createDeal requires it for PENJUAL, the only
-              proposer role since §22), so this branch is not live today; it
-              is kept distinct from 'empty' so a future regression that does
-              reach it fails loud instead of quietly reading as "belum ada
-              catatan" on a clean account. */}
-          {(history.status === 'error' || history.status === 'idle') &&
-            ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
-        </p>
-      </Card>
+          The sentence itself stays verbatim from formatAccountHistoryCounts
+          — a projection of §2's locked forced-check line. Deliberately NOT
+          split into big per-outcome figures: pulling "14" and "2" out as
+          display numbers would edge toward a scoreboard, and the counts are
+          only legal as counts, never as a rating. No safety colours either,
+          for the same reason — both outcomes render in the same neutral ink. */}
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+        <div className="border-b border-zinc-200 px-4 py-2.5 sm:px-5">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">
+            Riwayat rekening ini
+          </p>
+        </div>
+        <div className="px-4 py-3.5 sm:px-5">
+          <p className="text-sm leading-relaxed text-zinc-800">
+            {history.status === 'found' &&
+              formatAccountHistoryCounts(
+                history.selesaiCount,
+                history.tidakDipenuhiCount,
+                history.sinceLabel,
+              )}
+            {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+            {/* 'idle' means the deal itself has no rekening set — a data
+                problem, not a confirmed-clean account. Every reachable DRAF
+                deal has one (createDeal requires it for PENJUAL, the only
+                proposer role since §22), so this branch is not live today; it
+                is kept distinct from 'empty' so a future regression that does
+                reach it fails loud instead of quietly reading as "belum ada
+                catatan" on a clean account. */}
+            {(history.status === 'error' || history.status === 'idle') &&
+              ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+          </p>
+        </div>
+      </div>
 
       <Card>
         <p className="text-sm font-bold text-zinc-900">{JOIN_FORM_HEADING}</p>
