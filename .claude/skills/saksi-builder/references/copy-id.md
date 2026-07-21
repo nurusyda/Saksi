@@ -971,3 +971,27 @@ The **Toko Saksi Pro** upsell renders greyed and inert (no button, no handler):
 it must not look purchasable while there is nothing to purchase, and its copy
 says the track record stays free and cannot be bought — paying never buys
 reputation (SAKSI-MASTER.md §6.2).
+
+## §33 — Landing/`/saya` CTA loop removed (2026-07-21)
+
+§32 put "Buat Tagihan" and "Tagihan saya" side by side on the landing page as
+if they were siblings. They are not, and the result was a loop: a first-time
+visitor tapped "Tagihan saya", landed on an empty page whose only action was
+"+ Buat Tagihan", and arrived at `/buat` — the same destination as the other
+button. Two CTAs resolving to one place reads as a duplicate, not a choice.
+
+**The relationship, corrected.** `/saya` is the seller's home and *contains*
+the create button (SAKSI-MASTER.md §5's S1 Beranda). The landing is the
+explainer for someone who does not yet know what SAKSI is. One contains the
+other; they are not alternatives.
+
+**Two changes:**
+- `MyDealsLink` renders the landing's "Tagihan saya" **only when this device
+  has tagihan**. A newcomer gets exactly one CTA; a returning seller gets the
+  way back to their list. (SSR renders nothing — `useMyDeals`'
+  `getServerSnapshot` returns `[]` — and it appears after hydration, which is
+  what `useSyncExternalStore` is for, so no hydration mismatch.)
+- On `/saya`, the create button moves **inside** the empty state instead of
+  sitting above it. Rendering both put a card saying "nothing here" directly
+  under a button saying "make one" — the same message twice, and it made the
+  page look like a detour on the way to `/buat` rather than the home it is.

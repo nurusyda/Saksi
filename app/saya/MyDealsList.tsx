@@ -101,15 +101,25 @@ export function MyDealsList() {
         </Card>
       )}
 
-      <Link href="/buat" className={buttonClass.primary}>
-        + {CTA_BUAT_TAGIHAN}
-      </Link>
+      {/* §33 — the create button moves inside the empty state rather than
+          sitting above it. Rendering both meant an empty page whose card
+          said "nothing here" directly under a button that said "make one",
+          i.e. the same message twice, and made this page look like a
+          detour on the way to /buat rather than the home it is. */}
+      {total > 0 && (
+        <Link href="/buat" className={buttonClass.primary}>
+          + {CTA_BUAT_TAGIHAN}
+        </Link>
+      )}
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {total === 0 ? (
         <Card>
           <p className="text-sm text-zinc-600">{SAYA_EMPTY_STATE}</p>
+          <Link href="/buat" className={`mt-4 ${buttonClass.primary}`}>
+            + {CTA_BUAT_TAGIHAN}
+          </Link>
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
