@@ -17,7 +17,6 @@ import {
   type SubmitBuktiState,
 } from './paymentActions';
 import type { WhichParty } from '@/lib/db/party';
-import { formatRp } from '@/lib/format';
 import { LedgerDetail } from '@/components/LedgerDetail';
 import {
   FORCED_CHECK_EMPTY_STATE,
@@ -29,7 +28,6 @@ import {
   BUKTI_ATTESTATION,
   WAITING_FOR_PAYMENT_PROOF,
   ERROR_REKENING_LOAD_FAILED,
-  RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -221,18 +219,12 @@ export function DisepakatiPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Ringkasan Kesepakatan is public deal info, not PII (unlike rekening
-          and bukti below) — hoisted above the gate, same reasoning as
-          DikonfirmasiTerimaPanel's timeline hoist, so this screen isn't
-          blank while identity resolves. */}
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          {RINGKASAN_KESEPAKATAN_HEADING}
-        </p>
-        <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
-        <p className="text-sm text-zinc-600">{formatRp(deal.amount_idr)}</p>
-      </div>
-
+      {/* copy-id.md §21: the item/amount summary this used to repeat here is
+          already shown once, above this panel, by page.tsx's top-level
+          summary card (every status renders it). Removing the duplicate
+          means a freshly-joined payer's IdentifyPartyGate short-circuit
+          lands directly on PaymentForm — rekening/history/copy/bukti,
+          nothing else above it. */}
       <IdentifyPartyGate action={boundIdentify} initialWhichParty={initialWhichParty}>
         {(whichParty, phone) =>
           whichParty === payerSlot ? (

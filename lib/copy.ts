@@ -166,12 +166,26 @@ export const N8_REFUND_WARNING =
 // copy-id.md §11 — landing page subheading + meta description (must be identical)
 export const LANDING_TAGLINE = 'Percaya itu baik. Tercatat lebih baik.';
 
-// copy-id.md §12 — deal join flow
-export const JOIN_FORM_HEADING =
-  'Masukkan nomor HP Anda untuk bergabung sebagai pihak penerima.';
+// copy-id.md §21 — deal join flow (supersedes §12's heading/instruction).
+// Code review (2026-07-21): the create form defaulting proposer_role to
+// PENJUAL (§20) does NOT make the counterpart always PEMBELI at the data
+// layer — app/buat/actions.ts still accepts a PEMBELI-proposed deal, in
+// which case the counterpart joining here is PENJUAL, not PEMBELI. Both
+// JOIN_FORM_HEADING and JOIN_DEAL_INSTRUCTION below are kept role-neutral
+// (never name a specific role) so they stay correct for either case,
+// instead of the previous revision's JOIN_DEAL_INSTRUCTION, which hardcoded
+// "pihak pembeli" and was factually wrong for the PEMBELI-proposed branch.
+export const JOIN_FORM_HEADING = 'Masukkan nomor HP kamu untuk melihat rekening pembayaran.';
 
 export const JOIN_DEAL_INSTRUCTION =
-  'Nomor HP yang Anda masukkan akan tercatat sebagai pihak dalam kesepakatan ini. Centang semua pernyataan di bawah untuk melanjutkan.';
+  'Nomor HP kamu akan tercatat sebagai pihak dalam kesepakatan ini. Centang pernyataan di bawah untuk melanjutkan.';
+
+// Only accurate when this joiner is the payer (the common, only-reachable-
+// via-UI case). See JoinDealForm.tsx's needsRekening branch for why the
+// PEMBELI-proposed case (joiner is the seller, not the payer) uses the
+// second, role-neutral label instead.
+export const JOIN_SUBMIT_LABEL = 'Lihat Rekening & Bayar';
+export const JOIN_SUBMIT_LABEL_NEEDS_REKENING = 'Bergabung ke Kesepakatan';
 
 export const STATUS_DIAJUKAN =
   'Kedua pihak tercatat. Menunggu persetujuan kedua pihak.';

@@ -29,7 +29,6 @@ import {
   ROLE_LABELS,
   ROLE_PAIR,
   COUNTERPART_FALLBACK_LABEL,
-  TIER_LABELS,
   RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
@@ -193,10 +192,6 @@ export default async function DealPage({
             <p>
               <span className="font-medium">Peran pihak penerima:</span>{' '}
               {counterpartRoleLabel}
-            </p>
-            <p>
-              <span className="font-medium">Tier:</span>{' '}
-              {TIER_LABELS[deal.tier] ?? deal.tier}
             </p>
           </div>
         </div>

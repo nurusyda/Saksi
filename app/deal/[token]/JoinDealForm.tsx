@@ -3,13 +3,20 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { JoinDealState } from './actions';
-import { ATTESTATIONS, PHONE_FIELD_LABEL, PHONE_FORMAT_HINT, PENDING_SAVE_LABEL } from '@/lib/copy';
+import {
+  ATTESTATIONS,
+  PHONE_FIELD_LABEL,
+  PHONE_FORMAT_HINT,
+  PENDING_SAVE_LABEL,
+  JOIN_SUBMIT_LABEL,
+  JOIN_SUBMIT_LABEL_NEEDS_REKENING,
+} from '@/lib/copy';
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
 
-function SubmitButton({ allChecked }: { allChecked: boolean }) {
+function SubmitButton({ allChecked, label }: { allChecked: boolean; label: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -17,35 +24,51 @@ function SubmitButton({ allChecked }: { allChecked: boolean }) {
       disabled={!allChecked || pending}
       className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {pending ? PENDING_SAVE_LABEL : 'Bergabung ke Kesepakatan'}
+      {pending ? PENDING_SAVE_LABEL : label}
     </button>
   );
 }
 
 const initialState: JoinDealState = {};
 
+// copy-id.md §21. Code review (2026-07-21) caught that the create form
+// hardcoding proposer_role to PENJUAL (§20) does NOT close off PEMBELI at
+// the data or backend layer: app/buat/actions.ts's validRoles still accepts
+// it, and app/deal/[token]/actions.ts still requires rekening_tujuan/
+// rekening_bank from the counterpart whenever deal.proposer_role ===
+// 'PEMBELI' (C2 — the proposer never had a rekening to give at create time
+// in that case). A prior version of this component deleted the
+// needsRekening branch outright on the premise that it was unreachable —
+// false: any PEMBELI-proposed DRAF row (pre-existing, or created by any
+// non-UI caller) would land on this form with no way to supply the required
+// fields and no way to join. Restored: needsRekening must stay a real,
+// gated branch, not deleted UI for a state the backend still permits.
 export function JoinDealForm({
   action,
   needsRekening = false,
 }: {
   action: (prev: JoinDealState, formData: FormData) => Promise<JoinDealState>;
   // C2 — true when this deal's proposer is Pembeli, meaning the counterpart
-  // joining here is Penjual and must supply the destination account (the
-  // proposer never had one to give at create time).
+  // joining here is Penjual and must supply the destination account.
   needsRekening?: boolean;
 }) {
   const [state, formAction] = useActionState(action, initialState);
   const [tcChecked, setTcChecked] = useState(false);
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
-  // Written to sessionStorage on change — with the accept step folded away
-  // (2026-07-20), joining now finalizes DISEPAKATI immediately, so this is
-  // the counterpart's only phone entry before every later screen; it has to
-  // populate the same store IdentifyPartyGate reads to skip re-asking.
   const [phone, setPhone] = usePersistedPhone();
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
 
   const fe = state.fieldErrors ?? {};
+
+  // The "Lihat Rekening & Bayar" framing (§21) is only accurate when this
+  // joiner is the payer — i.e. the common, only-reachable-via-UI case where
+  // the proposer already supplied a rekening at create time. In the
+  // needsRekening branch the joiner is the SELLER supplying a rekening for
+  // someone else (the proposer) to pay later, not paying themselves — so
+  // that case keeps the original, role-neutral label instead of claiming
+  // "& Bayar" for an action this joiner isn't about to take.
+  const submitLabel = needsRekening ? JOIN_SUBMIT_LABEL_NEEDS_REKENING : JOIN_SUBMIT_LABEL;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -128,6 +151,13 @@ export function JoinDealForm({
         </div>
       )}
 
+      {/* Consent (copy-id.md §4/§21): content unchanged, restored to a
+          readable, accessible presentation after a prior pass over-shrank
+          it (text-zinc-400 at 11px, ~2.5:1 contrast — below WCAG AA's 4.5:1
+          for text this size) and dropped the fieldset's accessible group
+          name. text-zinc-500/text-xs matches the contrast level already
+          used for hints and field errors elsewhere in this form, which
+          passes AA. */}
       <fieldset className="flex flex-col gap-3">
         <legend className="text-sm font-medium text-zinc-700">Pernyataan</legend>
         <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs text-zinc-500">
@@ -148,7 +178,7 @@ export function JoinDealForm({
         <PrivacyLink />
       </fieldset>
 
-      <SubmitButton allChecked={tcChecked} />
+      <SubmitButton allChecked={tcChecked} label={submitLabel} />
     </form>
   );
 }

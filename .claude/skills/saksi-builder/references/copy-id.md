@@ -383,3 +383,70 @@ something it doesn't, violating the one invariant.
 
 Server contract unchanged (all form field names identical). Engine, state
 machine, anchoring, and the invariant untouched.
+
+---
+
+## §21 — Buyer join-and-pay flow simplification (2026-07, corrected 2026-07-21
+after code review)
+
+**Decision & scope.** The create form now defaults `proposer_role` to `PENJUAL`
+(§20), so the **only UI-reachable path** to a DRAF deal's join screen is one where
+the counterpart joining is the payer. **This does NOT make PEMBELI-proposed deals
+impossible** — an earlier draft of this section claimed it did and shipped UI that
+deleted the counterpart's ability to complete that path; that was wrong and was
+caught in review before merge. `app/buat/actions.ts`'s `validRoles` still accepts
+`PEMBELI`, and `app/deal/[token]/actions.ts` still requires
+`rekening_tujuan`/`rekening_bank` from the counterpart whenever
+`deal.proposer_role === 'PEMBELI'` (C2 — the proposer never had a rekening to give
+at create time in that case). **What actually shipped: the `needsRekening` branch
+is kept, fully functional, gated exactly as before** — this section only changes
+copy and layout on top of it, for the common (only-reachable-via-UI) case where
+`needsRekening` is false: **(1) masukkan nomor HP, (2) langsung lihat rekening
+tujuan + riwayatnya + tombol salin, (3) kirim bukti pembayaran.**
+
+**This supersedes §12's join-form heading/instruction** (kept there verbatim for
+historical reference; the new strings are what ships). Both are **role-neutral on
+purpose** — neither names a specific role — so they read correctly whether the
+joiner ends up in the `needsRekening` branch or not:
+- `JOIN_FORM_HEADING` → `'Masukkan nomor HP kamu untuk melihat rekening
+  pembayaran.'`
+- `JOIN_DEAL_INSTRUCTION` → `'Nomor HP kamu akan tercatat sebagai pihak dalam
+  kesepakatan ini. Centang pernyataan di bawah untuk melanjutkan.'` (corrected —
+  the first version of this string hardcoded "pihak pembeli," which is wrong when
+  the joiner is actually PENJUAL, i.e. exactly the `needsRekening` case.)
+- New: `JOIN_SUBMIT_LABEL = 'Lihat Rekening & Bayar'` — used only when
+  `!needsRekening` (this joiner is about to pay). `JOIN_SUBMIT_LABEL_NEEDS_REKENING
+  = 'Bergabung ke Kesepakatan'` — the original, role-neutral label, used when
+  `needsRekening` is true (this joiner is the seller supplying a rekening, not
+  paying — "& Bayar" would be inaccurate for them).
+
+**Structural changes (no copy, but changes what's on screen — recorded here since
+they're part of the same decision):**
+- `JoinDealForm.tsx`: the `needsRekening` prop and its bank/rekening input branch
+  (with field-error display) are **restored, unchanged from the original
+  implementation** — not deleted. The `ATTESTATIONS` fine print + single
+  `attest_tc` checkbox + `PrivacyLink` are kept **verbatim** (§4's consent
+  requirement is untouched) with the `<legend>Pernyataan</legend>` accessible group
+  name intact and at the app's existing `text-xs text-zinc-500` contrast level
+  (matches hints/errors elsewhere, passes WCAG AA) — a since-reverted intermediate
+  draft had dropped the legend and recolored this to `text-zinc-400`/11px
+  (~2.5:1 contrast, fails AA); that regression did not ship.
+- `DisepakatiPanel.tsx`: the small duplicate "Ringkasan Kesepakatan" card
+  (item_desc + amount) is removed from this panel — `page.tsx`'s top-level summary
+  card already shows the same two facts (plus rekening/deadline/roles) once, above
+  this panel, for every status. Removing the repeat means a freshly-joined payer's
+  `IdentifyPartyGate` short-circuit (via the existing party-session cookie +
+  persisted phone — unchanged) lands directly on the rekening/history/copy/bukti
+  `PaymentForm`, with nothing above it but the page's single existing summary. This
+  part of the change is unaffected by the correction above — it doesn't touch the
+  `needsRekening` question either way.
+- `page.tsx` top summary card: the `Tier: {TIER_LABELS[deal.tier]}` line is
+  removed (tier is now always `GRATIS` per §20 — a line that always reads "Tier:
+  Gratis" is noise, not information). The `Peran pengaju` / `Peran pihak penerima`
+  lines are kept (they tell the buyer which side they are). The `needsRekening`
+  prop is passed to `JoinDealForm` exactly as before
+  (`deal.proposer_role === 'PEMBELI'`).
+
+Server contract, state machine, the atomic `join_deal_with_event` RPC, hash
+chaining, and anchoring are all **untouched** — this section changes presentation
+only, on top of a fully-intact backend contract.
