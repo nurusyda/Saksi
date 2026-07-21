@@ -913,3 +913,61 @@ re-uploads, hash chain intact across all five events, both bukti rows retained,
 `DANA_BELUM_MASUK` count landing exactly on `PAYMENT_DISPUTE_MAX_ROUNDS`, and the
 deal correctly resting at `DIBAYAR_DIKLAIM` where `confirmFulfillment` cannot
 fire.
+
+## §32 — Seller home (`/saya`), device-scoped (2026-07-21)
+
+SAKSI-MASTER.md §5's **S1 Beranda** — the one screen of the four-screen seller
+flow that had never been built. The gap was not cosmetic: identity is phone-only
+with no accounts, so **a seller who lost a deal link had lost that deal**, with
+no index to recover it from.
+
+### Why device-local, and not "type your phone to see your deals"
+
+A deal token is a **capability**: whoever holds it can open the deal, read the
+rekening, upload a bukti, file a dispute. A phone-keyed "my deals" would hand
+out capabilities to anyone who typed a number — an enumeration oracle far worse
+than the count-only one `/cek` already accepts, because the payload is *access*
+rather than statistics. Proving possession of the phone would fix it, and that
+needed the OTP §25 removed for good reasons.
+
+So until there is real auth, the only safe key for "my deals" is the device that
+created them. `lib/sellerDeals.ts` keeps the list in `localStorage`;
+`RememberDeal` writes an entry on the deal page when the `saksi_proposer_` cookie
+says the viewer is the creator (not at the end of the create form — `createDeal`
+redirects server-side, so there is no client moment left there).
+
+**Stated plainly, not buried.** `SAYA_DEVICE_NOTE` says the list lives on this
+device, is not an account, and disappears with the browser. Same discipline as
+the forced-check empty state: the honest weaker sentence beats the reassuring
+stronger one. Calling this "your account" would promise storage the app cannot
+keep.
+
+### Local index, live truth
+
+Tokens come from the browser; statuses come from the server, because a cached
+status goes stale the moment the buyer acts. `getMyDealsSummary` returns only
+what the deal page already shows to anyone holding the same token (item, amount,
+status, deadline, created_at), so it discloses nothing possession did not already
+grant. Bounded by the shared `ip_hash` lookup budget and a hard cap of 100 tokens
+per call — the risk here is bulk submission of harvested tokens, not guessing
+(nanoid(21)).
+
+**Queries `deals`, not `deals_public`** — verified against the live DB that
+`deals_public`'s `where status != 'DRAF'` drops exactly the freshly-created,
+not-yet-opened tagihan a seller most needs to find again. The explicit six-column
+select is therefore the security boundary on this surface and **must never grow
+to include `rekening_tujuan` or any party id**; if more is ever needed, add a
+view with the right shape instead of widening the select. Confirmed live: DRAF
+row returned, six columns, no rekening in the payload.
+
+### Law 4 on the record display
+
+Counts per outcome only (`formatSayaRecord`), never a score or badge. Status
+chips use **one neutral style for every state** — a green "Selesai" beside a red
+"Tidak dipenuhi" would be a safety colour on a record, which Law 4 forbids. The
+words carry the meaning.
+
+The **Toko Saksi Pro** upsell renders greyed and inert (no button, no handler):
+it must not look purchasable while there is nothing to purchase, and its copy
+says the track record stays free and cannot be bought — paying never buys
+reputation (SAKSI-MASTER.md §6.2).

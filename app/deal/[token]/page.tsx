@@ -7,6 +7,7 @@ import { DealLinkCard } from './DealLinkCard';
 import { DealProgress } from './DealProgress';
 import { InvoiceCard } from './InvoiceCard';
 import { BuyerJoinGate } from './BuyerJoinGate';
+import { RememberDeal } from './RememberDeal';
 import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
@@ -178,6 +179,18 @@ export default async function DealPage({
 
   const main = (
     <>
+      {/* §32 — seller-side only: records this tagihan into the creator's own
+          browser list so /saya can find it if the link is lost. Renders
+          nothing; gated on the proposer cookie so a buyer never accumulates
+          the seller's deals. */}
+      {isProposer && (
+        <RememberDeal
+          token={token}
+          itemDesc={deal.item_desc}
+          amountIdr={Number(deal.amount_idr)}
+        />
+      )}
+
       <DealProgress status={deal.status} events={progressEvents ?? []} />
 
         {/* §23 — the summary is now presented as a tagihan. Same fields, same

@@ -413,6 +413,62 @@ export const BUKTI_FIELD_LABEL = 'Bukti transfer';
 export const SEND_BUKTI_SECTION_HEADING = 'Sudah transfer? Kirim buktinya';
 export const MONEY_NEVER_TOUCHES_SAKSI_NOTE =
   'Transfer langsung dari m-banking kamu ke rekening di atas. SAKSI tidak menerima atau menahan uangmu, hanya mencatat.';
+
+// ============================================================
+// §32 (2026-07-21) — seller home (SAKSI-MASTER.md §5's S1 Beranda).
+//
+// The device-local note is load-bearing, not a disclaimer to bury: this list
+// is an index over links this browser has seen, NOT an account. Saying so
+// plainly is what keeps "Tagihan saya" from reading as a promise of
+// durable storage the app cannot keep. Same discipline as the forced-check
+// empty state — the honest weaker sentence beats the reassuring stronger one.
+// ============================================================
+export const SAYA_HEADING = 'Tagihan saya';
+export const SAYA_INTRO = 'Tagihan yang kamu buat dari perangkat ini.';
+export const SAYA_DEVICE_NOTE =
+  'Daftar ini disimpan di perangkat ini saja, bukan akun. Kalau kamu ganti HP atau hapus data browser, daftarnya hilang. Simpan juga link tagihannya.';
+export const SAYA_EMPTY_STATE = 'Belum ada tagihan yang dibuat dari perangkat ini.';
+export const SAYA_REFRESH_FAILED = 'Status terbaru tidak dapat dimuat. Coba lagi nanti.';
+export const SAYA_RATE_LIMITED = 'Terlalu banyak permintaan. Coba lagi dalam beberapa menit.';
+export const SAYA_FORGET_LABEL = 'Hapus dari daftar';
+export const SAYA_FORGET_NOTE = 'Menghapus dari daftar ini tidak menghapus catatan kesepakatannya.';
+export const CTA_LIHAT_TAGIHAN_SAYA = 'Tagihan saya';
+
+// Track-record summary. Counts per outcome only — never a score, never a
+// badge, never a safety colour (Law 4). "Tercatat" not "berhasil": the
+// number is what the ledger holds, not a compliment.
+export const SAYA_RECORD_HEADING = 'Rekam jejak dari perangkat ini';
+export function formatSayaRecord(total: number, selesai: number, berjalan: number): string {
+  return `${total} tagihan tercatat · ${selesai} selesai · ${berjalan} berjalan`;
+}
+
+// Status chips. Neutral wording, matching the record lines in §7 — no chip
+// asserts fault, and "Tidak dipenuhi" is the record's own term for the state,
+// not a verdict this screen is adding.
+export const SAYA_STATUS_LABELS: Record<string, string> = {
+  DRAF: 'Menunggu pembeli',
+  DIAJUKAN: 'Menunggu',
+  DISEPAKATI: 'Menunggu pembayaran',
+  DIBAYAR_DIKLAIM: 'Perlu kamu konfirmasi',
+  DIKONFIRMASI_TERIMA: 'Menunggu pembeli terima',
+  SELESAI: 'Selesai',
+  TIDAK_DIPENUHI: 'Tidak dipenuhi',
+  SENGKETA: 'Klaim berbeda',
+  DIBATALKAN_BERSAMA: 'Dibatalkan bersama',
+  TIDAK_DILANJUTKAN: 'Tidak dilanjutkan',
+  KEDALUWARSA: 'Kedaluwarsa',
+  DIKEMBALIKAN_PENUH: 'Dikembalikan penuh',
+  DIKEMBALIKAN_SEBAGIAN: 'Dikembalikan sebagian',
+};
+
+// Locked upsell (SAKSI-MASTER.md §6.1). Shown greyed and inert — it must not
+// look purchasable while there is nothing to purchase. States what it would
+// unlock and nothing about trust: paying never buys a track record.
+export const TOKO_PRO_LOCKED_TITLE = 'Toko Saksi Pro';
+export const TOKO_PRO_LOCKED_PRICE = 'Rp100.000 · sekali bayar';
+export const TOKO_PRO_LOCKED_DESC =
+  'Nanti: logo kamu di tagihan, dan link toko sendiri (saksi.app/namatoko). Rekam jejakmu tetap gratis dan tidak bisa dibeli.';
+export const TOKO_PRO_LOCKED_BADGE = 'Belum tersedia';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 

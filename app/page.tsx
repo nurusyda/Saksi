@@ -5,6 +5,7 @@ import {
   LANDING_SUBHEAD,
   LANDING_STEPS,
   CTA_BUAT_TAGIHAN,
+  CTA_LIHAT_TAGIHAN_SAYA,
 } from '@/lib/copy';
 
 export default function Home() {
@@ -32,12 +33,20 @@ export default function Home() {
           ))}
         </ol>
 
-        <div className="mt-10">
+        <div className="mt-10 flex flex-col gap-3">
           <Link
             href="/buat"
             className="flex h-12 items-center justify-center rounded-xl bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover"
           >
             {CTA_BUAT_TAGIHAN}
+          </Link>
+          {/* §32 — the way back to a tagihan whose link was lost. Secondary
+              on purpose: creating is the primary act, this is recovery. */}
+          <Link
+            href="/saya"
+            className="flex h-12 items-center justify-center rounded-xl border border-zinc-300 bg-white px-6 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-50"
+          >
+            {CTA_LIHAT_TAGIHAN_SAYA}
           </Link>
         </div>
       </main>
