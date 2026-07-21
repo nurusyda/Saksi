@@ -411,9 +411,12 @@ export const RESUBMIT_BUKTI_SUBMIT_LABEL = 'Kirim ulang bukti transfer';
 // Both are recorded as accounts, and the copy says so.
 export const BARANG_TIDAK_SESUAI_CLAIM_HEADING = 'Barang tidak sesuai?';
 export const BARANG_TIDAK_SESUAI_CLAIM_PROMPT =
-  'Ceritakan apa yang tidak sesuai. Penjual bisa menanggapi dulu sebelum kamu mengajukan laporan resmi.';
+  'Ceritakan apa yang tidak sesuai. Ini untuk barang yang jelas berbeda dari kesepakatan atau tidak dikirim sama sekali, bukan selisih kecil. Penjual bisa menanggapi dulu sebelum kamu mengajukan laporan resmi.';
+// Deliberately a serious example, not a trivial one: the wrong PRODUCT, or
+// nothing delivered at all. A color-shade nitpick as the example would invite
+// exactly the low-stakes complaints this record should not be filled with.
 export const BARANG_TIDAK_SESUAI_CLAIM_PLACEHOLDER =
-  'Contoh: Warna yang dikirim biru, sedangkan yang disepakati hitam.';
+  'Contoh: Saya bayar iPhone 11, yang datang iPhone 6. Atau: sudah bayar paket PO, sampai sekarang barang tidak dikirim.';
 export const BARANG_TIDAK_SESUAI_CLAIM_SUBMIT = 'Catat keterangan saya';
 
 export const PENJUAL_JAWAB_HEADING = 'Pembeli bilang barang tidak sesuai';
