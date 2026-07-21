@@ -320,6 +320,12 @@ export const PAYMENT_NOT_RECEIVED_ACK =
 // shown unconditionally, even when the WA send failed. This is the honest
 // counterpart for that case.
 export const ERROR_NOTIFY_SEND_FAILED = 'Gagal mengirim notifikasi. Coba lagi.';
+// 2026-07-21: separate from ERROR_NOTIFY_SEND_FAILED above on purpose — that
+// string frames this as a retriable failure ("coba lagi"), which is false
+// while the WA channel itself is down; retrying sends the same request into
+// the same outage. Neutral, not an error state in the UI (no red styling).
+export const PAYMENT_NOT_RECEIVED_UNDELIVERED =
+  'Percobaan mengirim notifikasi WA ke pembeli tidak berhasil. Kesepakatan tetap berjalan; hubungi pembeli langsung jika perlu.';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';
 

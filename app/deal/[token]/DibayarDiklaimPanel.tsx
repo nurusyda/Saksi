@@ -24,6 +24,7 @@ import {
   CONFIRM_RECEIPT_LABEL,
   PAYMENT_NOT_RECEIVED_LABEL,
   PAYMENT_NOT_RECEIVED_ACK,
+  PAYMENT_NOT_RECEIVED_UNDELIVERED,
   OCR_AUTHENTICITY_DISCLAIMER,
   WAITING_FOR_RECEIPT_CONFIRMATION,
   DEADLINE_LAPSE_REPORT_BUTTON,
@@ -183,6 +184,9 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
         </p>
       )}
       {notifyState.sent && <p className="text-xs text-zinc-500">{PAYMENT_NOT_RECEIVED_ACK}</p>}
+      {notifyState.undelivered && (
+        <p className="text-xs text-zinc-500">{PAYMENT_NOT_RECEIVED_UNDELIVERED}</p>
+      )}
     </div>
   );
 }

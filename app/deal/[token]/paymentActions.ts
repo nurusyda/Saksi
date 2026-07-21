@@ -31,7 +31,6 @@ import {
   formatBuktiUploadedMessage,
   formatReceiptConfirmedMessage,
   formatPaymentNotReceivedMessage,
-  ERROR_NOTIFY_SEND_FAILED,
 } from '@/lib/copy';
 
 // Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
@@ -449,7 +448,7 @@ export async function getBuktiForDisplay(token: string, phone: string): Promise<
 // that pipeline early.
 // ============================================================
 
-export type NotifyNotReceivedState = { sent?: boolean; error?: string };
+export type NotifyNotReceivedState = { sent?: boolean; undelivered?: boolean; error?: string };
 
 export async function notifyPaymentNotReceived(
   token: string,
@@ -492,7 +491,7 @@ export async function notifyPaymentNotReceived(
     formatPaymentNotReceivedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
   );
 
-  return sent ? { sent: true } : { error: ERROR_NOTIFY_SEND_FAILED };
+  return sent ? { sent: true } : { undelivered: true };
 }
 
 // ============================================================
