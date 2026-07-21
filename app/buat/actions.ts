@@ -12,7 +12,7 @@ import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import { getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
-import { getTodayWib } from '@/lib/format';
+import { getDefaultDeadlineWib } from '@/lib/format';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_RATE_LIMIT,
@@ -67,7 +67,10 @@ export async function createDeal(
   const amountRaw = (formData.get('amount_idr') as string | null) ?? '';
   const rekeningTujuanRaw = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
   const rekeningBankRaw = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
-  const deadline = (formData.get('deadline') as string | null)?.trim() ?? '';
+  // Auto-derived (2026-07-21 simplification pass), no longer a form field —
+  // see getDefaultDeadlineWib. PERPANJANGAN remains the witnessed way to
+  // change it after creation.
+  const deadline = getDefaultDeadlineWib();
   const tier = (formData.get('tier') as string | null) ?? 'GRATIS';
 
   // Attestation gate — must pass before any field validation or DB write
@@ -114,12 +117,6 @@ export async function createDeal(
   if (rekeningRequired && !rekeningBankRaw) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
   const rekeningTujuan = rekeningRequired ? rekeningTujuanRaw : null;
   const rekeningBank = rekeningRequired ? rekeningBankRaw : null;
-
-  if (!deadline) {
-    fieldErrors.deadline = 'Batas waktu wajib diisi.';
-  } else if (deadline <= getTodayWib()) {
-    fieldErrors.deadline = 'Batas waktu harus di masa depan.';
-  }
 
   // Only GRATIS is selectable in the UI (paid tiers have no radio input at all,
   // Phase 0.6) — reject anything else server-side too, since a direct form POST

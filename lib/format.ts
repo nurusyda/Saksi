@@ -60,3 +60,13 @@ export function getTomorrowWib(): string {
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   return new Date(Date.now() + WIB_OFFSET_MS + ONE_DAY_MS).toISOString().slice(0, 10);
 }
+
+// Auto-derived deadline (2026-07-21 simplification pass) — the create form
+// no longer asks for a manual date. 7 days from creation; PERPANJANGAN
+// already exists as the witnessed way to extend it if that's wrong for a
+// given deal, so a fixed default doesn't need to fit every case perfectly.
+export function getDefaultDeadlineWib(): string {
+  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  return new Date(Date.now() + WIB_OFFSET_MS + SEVEN_DAYS_MS).toISOString().slice(0, 10);
+}

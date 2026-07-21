@@ -7,7 +7,6 @@ import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
 import { LedgerDetail } from '@/components/LedgerDetail';
 import { BANK_OPTIONS, BANK_OTHER_VALUE, BANK_OTHER_LABEL } from '@/lib/banks';
-import { getTomorrowWib } from '@/lib/format';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import {
   ATTESTATIONS,
@@ -117,21 +116,12 @@ export default function BuatPage() {
   const [rawNominal, setRawNominal] = useState('');
   const [rekening, setRekening] = useState('');
   const [history, setHistory] = useState<AccountHistoryDisplay>({ status: 'idle' });
-  const [minDeadline, setMinDeadline] = useState<string | undefined>(undefined);
   // Written to sessionStorage on change, same as IdentifyPartyGate's phone
   // field — with the accept step folded away (2026-07-20), this is the only
   // place the proposer's phone is ever typed, so it has to populate the
   // same store IdentifyPartyGate reads to skip re-asking on later screens.
   const [proposerPhone, setProposerPhone] = usePersistedPhone();
   const effectiveBank = bank === BANK_OTHER_VALUE ? customBank : bank;
-
-  // Computed client-side (not inline at render) so the WIB "tomorrow" the
-  // date picker enforces matches getTodayWib()'s server-side check exactly —
-  // a local-clock Date() here would drift for non-WIB browsers and could
-  // also disagree between SSR and hydration.
-  useEffect(() => {
-    setMinDeadline(getTomorrowWib());
-  }, []);
 
   useEffect(() => {
     if (!effectiveBank || !rekening) {
@@ -381,24 +371,6 @@ export default function BuatPage() {
               </>
             )}
 
-            {/* Deadline */}
-            <div>
-              <label className="block text-sm font-medium text-zinc-700" htmlFor="deadline">
-                Batas waktu pembayaran
-              </label>
-              {/* DRAFT — not yet in copy-id.md. Review wording after seeing in context. */}
-              <p className="text-xs text-zinc-500">
-                Tanggal terakhir pembayaran atau pemenuhan kesepakatan harus terjadi.
-              </p>
-              <input
-                id="deadline"
-                name="deadline"
-                type="date"
-                min={minDeadline}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"
-              />
-              <FieldError msg={fe.deadline} />
-            </div>
           </FormSection>
 
           {/* Tier */}
