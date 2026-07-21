@@ -44,8 +44,18 @@ const initialState: JoinDealState = {};
 
 export function JoinAndPayForm({
   action,
+  mode = 'join',
 }: {
   action: (prev: JoinDealState, formData: FormData) => Promise<JoinDealState>;
+  /**
+   * 'join' — deal is DRAF, this submit joins and pays in one go.
+   * 'pay'  — deal is already DISEPAKATI (the party exists), only the bukti is
+   *          left. The phone field stays either way: there is no session, so
+   *          it is what identifies the submitter. The T&C block does NOT,
+   *          because that consent was already given and recorded at join —
+   *          re-collecting it would imply the first one did not count.
+   */
+  mode?: 'join' | 'pay';
 }) {
   const [state, formAction] = useActionState(action, initialState);
   const [phone, setPhone] = usePersistedPhone();
@@ -54,7 +64,9 @@ export function JoinAndPayForm({
   const [file, setFile] = useState<File | null>(null);
 
   const fe = state.fieldErrors ?? {};
-  const ready = Boolean(file) && tcChecked && buktiChecked && phone.trim().length > 0;
+  const needsTc = mode === 'join';
+  const ready =
+    Boolean(file) && buktiChecked && phone.trim().length > 0 && (!needsTc || tcChecked);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -100,6 +112,7 @@ export function JoinAndPayForm({
         <span>{BUKTI_ATTESTATION}</span>
       </label>
 
+      {needsTc && (
       <fieldset className="flex flex-col gap-2.5 border-t border-zinc-100 pt-4">
         <legend className="sr-only">Pernyataan</legend>
         <ol className="flex list-decimal flex-col gap-1 pl-5 text-[11px] leading-relaxed text-zinc-500">
@@ -119,6 +132,7 @@ export function JoinAndPayForm({
         </label>
         <PrivacyLink />
       </fieldset>
+      )}
 
       <FieldError msg={fe.attest_tc} />
       <SubmitButton ready={ready} />

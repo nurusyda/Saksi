@@ -36,11 +36,14 @@ export async function BuyerJoinGate({
   action,
   rekeningBank,
   rekeningTujuan,
+  mode = 'join',
 }: {
   token: string;
   action: (prev: JoinDealState, formData: FormData) => Promise<JoinDealState>;
   rekeningBank: string;
   rekeningTujuan: string;
+  /** See JoinAndPayForm — 'join' at DRAF, 'pay' once the party exists. */
+  mode?: 'join' | 'pay';
 }) {
   const history = await getDealAccountHistory(token);
 
@@ -85,7 +88,7 @@ export async function BuyerJoinGate({
         <p className="mb-4 mt-1 text-xs leading-relaxed text-zinc-500">
           {MONEY_NEVER_TOUCHES_SAKSI_NOTE}
         </p>
-        <JoinAndPayForm action={action} />
+        <JoinAndPayForm action={action} mode={mode} />
       </Card>
     </div>
   );

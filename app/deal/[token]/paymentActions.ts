@@ -632,6 +632,31 @@ export async function recordDanaBelumMasuk(
 }
 
 // ============================================================
+// submitBuktiFromForm (§37) — same payment claim, phone read from the form
+// instead of bound by the caller.
+//
+// The buyer's page is now a single shape (rekening + record + copy + phone +
+// bukti) whether the deal is DRAF or DISEPAKATI. At DRAF it joins and pays in
+// one submit (joinAndPay); at DISEPAKATI the party already exists, so only the
+// bukti is left — but the form still carries the phone, because there is no
+// session and submitBukti has to re-derive which party is submitting.
+//
+// That is what lets IdentifyPartyGate disappear from the payer's path: the
+// phone field IS the identification, collected in the same form as the thing
+// it authorizes, rather than as a separate screen in front of it.
+// ============================================================
+
+export async function submitBuktiFromForm(
+  token: string,
+  _prev: SubmitBuktiState,
+  formData: FormData,
+): Promise<SubmitBuktiState> {
+  const phone = (formData.get('counterpart_phone') as string | null)?.trim() ?? '';
+  if (!phone) return { error: ERROR_PHONE_INVALID };
+  return submitBukti(token, phone, {}, formData);
+}
+
+// ============================================================
 // resubmitBukti (§30, migration 0031) — the pembeli's answer to a payment
 // dispute. Mirrors submitBukti exactly (same attestation gate, same OCR
 // consistency check, same retry-with-prior-hash loop); the differences are

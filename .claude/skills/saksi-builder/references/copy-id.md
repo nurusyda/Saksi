@@ -1132,3 +1132,39 @@ Verified against production after the §30 grants landed: the RPC completes in
 **121 ms** and the statement persists. The hang predated migration 0030 —
 `deal_statements` was permission-denied, so the action failed after its retry
 loop. Nothing further to fix; retry on current prod.
+
+## §37 — One buyer page, phone-less variant deleted (2026-07-21)
+
+§36 tried to stop the buyer ever *reaching* the second upload screen, by fixing
+the silent bukti failure that sent them there. That was necessary but not
+sufficient: the second screen still existed, so any path that reached it —
+a failed claim, a reopened link, a stale session — put the buyer in front of
+what looked like the same page asking for the same thing twice.
+
+**The second screen is gone.** `DisepakatiPanel` is deleted. The buyer now sees
+one page shape at DRAF and DISEPAKATI alike: rekening + record + copy, then
+phone + bukti.
+
+**Keeping the phone field is what made that possible.** There is no session, so
+the phone is what identifies the submitter to `submitBukti`. The old DISEPAKATI
+screen collected it on a separate `IdentifyPartyGate` screen *before* showing
+the form, which is precisely the wall §31 removed at DRAF — it had simply
+survived one state later. Collecting it inside the form removes both the wall
+and the second screen at once. `submitBuktiFromForm` reads it from the form
+rather than taking it bound.
+
+**What differs by mode:** `JoinAndPayForm` takes `mode`. At DRAF (`'join'`) it
+joins and pays in one submit and collects T&C consent. At DISEPAKATI (`'pay'`)
+the party already exists and that consent is already recorded, so the T&C block
+is hidden — re-collecting it would imply the first one did not count. The bukti
+forgery attestation is collected **both** times, because each uploaded file
+carries its own.
+
+**Payer vs payee** is decided by the proposer cookie, the same heuristic the
+DRAF branch already used. A seller on a device without that cookie sees the pay
+form and is rejected server-side (`ERROR_WRONG_PARTY_PEMBELI_ONLY`) — identical
+to DRAF's long-standing behaviour, not a new gap.
+
+Verified against production: a deal seeded at DISEPAKATI accepts a bukti through
+`submit_bukti_with_event`, advances to DIBAYAR_DIKLAIM, and records exactly one
+bukti row.

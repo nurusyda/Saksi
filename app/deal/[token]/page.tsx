@@ -8,7 +8,6 @@ import { DealProgress } from './DealProgress';
 import { InvoiceCard } from './InvoiceCard';
 import { BuyerJoinGate } from './BuyerJoinGate';
 import { RememberDeal } from './RememberDeal';
-import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
 import { DikonfirmasiTerimaPanel } from './DikonfirmasiTerimaPanel';
 import { TidakDipenuhiPanel } from './TidakDipenuhiPanel';
@@ -20,6 +19,7 @@ import { DikembalikanPenuhPanel } from './DikembalikanPenuhPanel';
 import { DikembalikanSebagianPanel } from './DikembalikanSebagianPanel';
 import { WaitingStatusPoll } from './WaitingStatusPoll';
 import { joinAndPay } from './actions';
+import { submitBuktiFromForm } from './paymentActions';
 import { getPartySession } from '@/lib/db/partySession';
 import { PageShell, SplitLayout, Card } from '@/components/ui';
 import {
@@ -27,6 +27,7 @@ import {
   ROLE_LABELS,
   ROLE_PAIR,
   ERROR_REKENING_LOAD_FAILED,
+  WAITING_FOR_PAYMENT_PROOF,
 } from '@/lib/copy';
 
 const TERMINAL_STATUSES: string[] = [
@@ -150,6 +151,7 @@ export default async function DealPage({
   const viewerRoleLabel = viewerRoleKey ? ROLE_LABELS[viewerRoleKey] ?? viewerRoleKey : null;
 
   const boundJoinAndPay = joinAndPay.bind(null, token);
+  const boundSubmitBukti = submitBuktiFromForm.bind(null, token);
 
   // §23/§26 — event times for DealProgress. Queried here rather than fetched
   // client-side so the timestamps are present in the first paint (no flash of
@@ -258,17 +260,39 @@ export default async function DealPage({
           </div>
         )}
 
-        {deal.status === DealStatus.DISEPAKATI && (
-          <DisepakatiPanel
-            deal={{
-              token,
-              item_desc: deal.item_desc,
-              amount_idr: Number(deal.amount_idr),
-              proposer_role: deal.proposer_role,
-            }}
-            initialWhichParty={partySession}
-          />
-        )}
+        {/* §37 — the buyer sees ONE page, at DRAF and at DISEPAKATI alike:
+            rekening + record + copy, then phone + bukti. Previously
+            DISEPAKATI rendered a second, phone-less upload form behind
+            IdentifyPartyGate, so any buyer who landed here (which happened
+            whenever the one-shot join+pay could not finish the claim) met
+            what looked like the same page asking for the same thing twice.
+            The phone field is what identifies the submitter — there is no
+            session — so keeping it is what lets that second screen go.
+
+            Payer vs payee is decided by the proposer cookie, the same
+            heuristic the DRAF branch above already uses. A seller on a
+            device without that cookie sees the pay form and is rejected
+            server-side (ERROR_WRONG_PARTY_PEMBELI_ONLY); that is the same
+            behaviour DRAF has always had, not a new gap. */}
+        {deal.status === DealStatus.DISEPAKATI &&
+          (isProposer ? (
+            <Card className="bg-zinc-50 text-sm text-zinc-700">
+              <p>{WAITING_FOR_PAYMENT_PROOF}</p>
+              <WaitingStatusPoll token={token} knownStatus={DealStatus.DISEPAKATI} />
+            </Card>
+          ) : deal.rekening_bank && deal.rekening_tujuan ? (
+            <BuyerJoinGate
+              token={token}
+              action={boundSubmitBukti}
+              rekeningBank={deal.rekening_bank}
+              rekeningTujuan={deal.rekening_tujuan}
+              mode="pay"
+            />
+          ) : (
+            <Card className="bg-zinc-50 text-sm text-zinc-700">
+              <p>{ERROR_REKENING_LOAD_FAILED}</p>
+            </Card>
+          ))}
 
         {deal.status === DealStatus.DIBAYAR_DIKLAIM && (
           <DibayarDiklaimPanel

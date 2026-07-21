@@ -247,8 +247,10 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
 // and already hash-chain correctly, and a third RPC duplicating both would
 // be a second place for the chaining to drift. If the join lands and the
 // bukti submit then fails (upload error, OCR timeout), the deal is left at
-// DISEPAKATI and the existing DisepakatiPanel renders as the retry path —
-// a degraded but coherent state, not a corrupt one.
+// DISEPAKATI, where §37's same single buyer page renders again (phone +
+// bukti, minus the T&C already given) as the retry path — a degraded but
+// coherent state, not a corrupt one, and no longer a visibly different
+// screen.
 // ============================================================
 
 export async function joinAndPay(
