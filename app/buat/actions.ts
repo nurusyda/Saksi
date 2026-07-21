@@ -88,11 +88,18 @@ export async function createDeal(
     fieldErrors.proposer_phone = ERROR_PHONE_INVALID;
   }
 
-  // Only jual-beli roles are selectable in the UI (deal-type gating) — reject
-  // anything else server-side too, since a hand-crafted POST could otherwise
-  // still create a sewa-menyewa/pinjam-meminjam/lainnya deal the UI no longer
-  // offers. Backend/schema/ROLE_PAIR/state machine unchanged.
-  const validRoles = ['PENJUAL', 'PEMBELI'];
+  // SAKSI is a seller-invoice tool (copy-id.md §20/§22): the proposer is
+  // always PENJUAL. This used to accept PEMBELI too "defensively" — that
+  // was the root cause of a 2026-07-21 code-review finding (a UI change
+  // deleted the counterpart's ability to complete a PEMBELI-proposed join,
+  // while this validation still silently allowed creating one). Rather than
+  // keep patching the UI around a backend door left open for a case the
+  // product doesn't use, the door is closed here: PEMBELI-proposed deals are
+  // no longer created, full stop. This makes "every counterpart is the
+  // payer" (assumed by ~14 call sites across paymentActions.ts,
+  // breachActions.ts, the deadline-sweep cron, and every status panel) an
+  // enforced invariant instead of a UI default with a false premise.
+  const validRoles = ['PENJUAL'];
   if (!validRoles.includes(proposerRole)) fieldErrors.proposer_role = 'Pilih peran Anda.';
 
   if (itemTitle.length < 2) fieldErrors.item_title = 'Wajib diisi.';

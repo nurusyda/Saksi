@@ -1,13 +1,18 @@
 import { DealStatus } from '@/lib/db/transitions';
 import { PROGRESS_STEP_LABELS } from '@/lib/copy';
 
-// UX-audit fix pass (2026-07-20) — the audit found no progress indicator
-// anywhere across the deal lifecycle: a party landing mid-flow (e.g. from a
-// WA nudge, or reopening the link days later) had no way to see where the
-// deal stood relative to the whole loop. Six nodes, one per DealStatus this
-// page actually renders a panel for (page.tsx's allowed-status list) —
-// exit states like KEDALUWARSA never reach here, so DONE_COUNT has no entry
-// for them and the stepper simply doesn't render (see the null guard below).
+// §23 (2026-07-21) — rebuilt as the mockup's vertical "dot-dot" stepper.
+//
+// The horizontal 6-node version this replaces packed six labels into ~390px,
+// which forced 10px type and left each step no room to say anything. Vertical
+// gives every step a full line, which matters because this page is the
+// accountability surface: if either side is later accused of scamming, this is
+// the record that gets shown. It has to be readable, and it has to be obvious
+// which steps have actually happened.
+//
+// Node set and mapping are unchanged — same six PROGRESS_STEP_LABELS, same
+// DONE_COUNT per status, same null guard for exit states (KEDALUWARSA and
+// friends never reach this page, so they have no entry and render nothing).
 const DONE_COUNT: Partial<Record<string, number>> = {
   [DealStatus.DRAF]: 1,
   [DealStatus.DIAJUKAN]: 2,
@@ -21,41 +26,55 @@ export function DealProgressStepper({ status }: { status: string }) {
   const doneCount = DONE_COUNT[status];
   if (doneCount === undefined) return null;
 
+  const last = PROGRESS_STEP_LABELS.length - 1;
+
   return (
-    <div className="mb-6 flex items-start" aria-hidden="true">
+    <ol className="mb-6 rounded-2xl border border-zinc-200 bg-white px-5 py-5">
       {PROGRESS_STEP_LABELS.map((label, i) => {
         const done = i < doneCount;
         const current = i === doneCount && doneCount < PROGRESS_STEP_LABELS.length;
+
         return (
-          <div key={label} className="flex flex-1 flex-col items-center last:flex-none">
-            <div className="flex w-full items-center">
-              <div
+          <li key={label} className="relative pb-5 pl-8 last:pb-0">
+            {/* Rail to the next node. Solid once passed, faint ahead. */}
+            {i < last && (
+              <span
+                aria-hidden="true"
                 className={
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ' +
-                  (done
-                    ? 'bg-zinc-900 text-white'
-                    : current
-                      ? 'border-2 border-zinc-900 text-zinc-900'
-                      : 'border border-zinc-300 text-zinc-400')
+                  'absolute bottom-0 left-[8px] top-[18px] w-0.5 ' +
+                  (done ? 'bg-witness' : 'bg-zinc-200')
                 }
-              >
-                {i + 1}
-              </div>
-              {i < PROGRESS_STEP_LABELS.length - 1 && (
-                <div className={'mx-1 h-0.5 flex-1 ' + (done ? 'bg-zinc-900' : 'bg-zinc-200')} />
-              )}
-            </div>
+              />
+            )}
+
+            <span
+              aria-hidden="true"
+              className={
+                'absolute left-0 top-0.5 grid h-[18px] w-[18px] place-items-center rounded-full border-2 text-[10px] font-extrabold ' +
+                (done
+                  ? 'border-witness bg-witness text-white'
+                  : current
+                    ? 'border-witness bg-white ring-4 ring-witness-soft'
+                    : 'border-zinc-300 bg-white')
+              }
+            >
+              {done ? '✓' : ''}
+            </span>
+
             <p
               className={
-                'mt-1 text-center text-[10px] leading-tight ' +
-                (done || current ? 'font-medium text-zinc-700' : 'text-zinc-400')
+                'text-sm leading-tight ' +
+                (done || current ? 'font-bold text-zinc-900' : 'font-semibold text-zinc-400')
               }
             >
               {label}
             </p>
-          </div>
+            {current && (
+              <p className="mt-0.5 text-xs font-semibold text-witness">Sedang di tahap ini</p>
+            )}
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }

@@ -166,26 +166,17 @@ export const N8_REFUND_WARNING =
 // copy-id.md §11 — landing page subheading + meta description (must be identical)
 export const LANDING_TAGLINE = 'Percaya itu baik. Tercatat lebih baik.';
 
-// copy-id.md §21 — deal join flow (supersedes §12's heading/instruction).
-// Code review (2026-07-21): the create form defaulting proposer_role to
-// PENJUAL (§20) does NOT make the counterpart always PEMBELI at the data
-// layer — app/buat/actions.ts still accepts a PEMBELI-proposed deal, in
-// which case the counterpart joining here is PENJUAL, not PEMBELI. Both
-// JOIN_FORM_HEADING and JOIN_DEAL_INSTRUCTION below are kept role-neutral
-// (never name a specific role) so they stay correct for either case,
-// instead of the previous revision's JOIN_DEAL_INSTRUCTION, which hardcoded
-// "pihak pembeli" and was factually wrong for the PEMBELI-proposed branch.
+// copy-id.md §22 — deal join flow (supersedes §12's heading/instruction).
+// app/buat/actions.ts now only accepts PENJUAL as a proposer_role (closed
+// 2026-07-21) — the counterpart joining here is therefore always the payer,
+// as an enforced fact, not a UI assumption. One label, no role-neutral
+// hedging needed.
 export const JOIN_FORM_HEADING = 'Masukkan nomor HP kamu untuk melihat rekening pembayaran.';
 
 export const JOIN_DEAL_INSTRUCTION =
-  'Nomor HP kamu akan tercatat sebagai pihak dalam kesepakatan ini. Centang pernyataan di bawah untuk melanjutkan.';
+  'Nomor HP kamu akan tercatat sebagai pihak pembeli. Centang pernyataan di bawah untuk melanjutkan.';
 
-// Only accurate when this joiner is the payer (the common, only-reachable-
-// via-UI case). See JoinDealForm.tsx's needsRekening branch for why the
-// PEMBELI-proposed case (joiner is the seller, not the payer) uses the
-// second, role-neutral label instead.
 export const JOIN_SUBMIT_LABEL = 'Lihat Rekening & Bayar';
-export const JOIN_SUBMIT_LABEL_NEEDS_REKENING = 'Bergabung ke Kesepakatan';
 
 export const STATUS_DIAJUKAN =
   'Kedua pihak tercatat. Menunggu persetujuan kedua pihak.';
@@ -234,11 +225,20 @@ export const PENDING_SAVE_LABEL = 'Mencatat...';
 // PENDING_DEFAULT_LABEL above.
 export const RIWAYAT_HEADING = 'Riwayat';
 
-// Cross-file duplicated "ringkasan kesepakatan" (deal summary) card heading —
-// found by monster_check (2026-07-21): independently typed in
-// app/deal/[token]/page.tsx, DisepakatiPanel.tsx, and app/buat/page.tsx (the
-// last one added by this pass), same Law 3 category as RIWAYAT_HEADING above.
-export const RINGKASAN_KESEPAKATAN_HEADING = 'Ringkasan Kesepakatan';
+// RINGKASAN_KESEPAKATAN_HEADING retired (§23, 2026-07-21, found by monster
+// check): the deal summary card it labelled was replaced by InvoiceCard.tsx,
+// which has no equivalent section heading. Confirmed zero remaining call
+// sites (page.tsx was the last one) before removal — its own comment's claim
+// of three call sites was already stale at HEAD; DisepakatiPanel.tsx/
+// buat/page.tsx never actually used it.
+
+// Cross-file duplicated "Rekening tujuan" field label — found by monster
+// check (2026-07-21): independently typed in InvoiceCard.tsx and
+// DisepakatiPanel.tsx (same destination-account label, same purpose), and in
+// DibayarDiklaimPanel.tsx's OCR field-match row (same string, adjacent
+// purpose — naming which field is being compared). Same Law 3 category as
+// RIWAYAT_HEADING above.
+export const REKENING_TUJUAN_LABEL = 'Rekening tujuan';
 
 // Validation errors — not in copy-id.md; in copy.ts because both action files use them
 export const ERROR_PHONE_INVALID =
@@ -324,7 +324,13 @@ export const ERROR_WRONG_PARTY_PENJUAL_ONLY = 'Hanya pihak penjual yang dapat me
 
 // C4 — Penjual's DIBAYAR_DIKLAIM page
 export const CONFIRM_RECEIPT_LABEL = 'Konfirmasi uang diterima';
-export const PAYMENT_NOT_RECEIVED_LABEL = 'Dana belum masuk';
+// Widened 2026-07-21 (copy-id.md §23): was 'Dana belum masuk'. The action has
+// always covered two distinct situations — the money genuinely has not landed,
+// and the uploaded bukti does not match this deal — and the old label named
+// only the first, so a penjual looking at a wrong/mismatched bukti had no
+// obvious control. Still not an accusation and still writes no deal_events
+// row; PAYMENT_NOT_RECEIVED_ACK's wording is unchanged and remains accurate.
+export const PAYMENT_NOT_RECEIVED_LABEL = 'Dana belum masuk / bukti salah';
 // Not in copy-id.md (added with the WA-nudge wiring) — must not say
 // "dicatat"/"tercatat" here: unlike the rest of C4, this tap writes nothing
 // to deal_events. Only a best-effort notification goes out.
@@ -662,7 +668,12 @@ export const PROGRESS_STEP_LABELS: readonly string[] = [
 
 // ROADMAP.md's own note: this link text is a suggestion, not legal-adjacent
 // locked copy, same category as other low-stakes UI chrome approved inline.
-export const LEDGER_DETAIL_LINK_LABEL = 'Lihat detail lengkap';
+// Renamed 2026-07-21 (copy-id.md §23): was 'Lihat detail lengkap', which did
+// not say what the detail was *about*. Under the locked-link flow the buyer
+// never types a rekening themselves, so this expander is the only place they
+// can inspect the destination account's own record — the label has to name
+// the rekening, or it reads as "more detail about this invoice".
+export const LEDGER_DETAIL_LINK_LABEL = 'Lihat detail lengkap history rekening';
 export const LEDGER_EMPTY_STATE = 'Belum ada riwayat lengkap untuk ditampilkan.';
 export const ERROR_LEDGER_UNAVAILABLE = 'Riwayat lengkap tidak dapat dimuat saat ini. Coba lagi.';
 
@@ -725,6 +736,16 @@ export const LANDING_STEPS: readonly { title: string; body: string }[] = [
 ];
 export const CTA_BUAT_TAGIHAN = 'Buat Tagihan';
 export const CTA_CEK_REKENING = 'Cek Rekening';
+
+// §23 — locked-invoice presentation. UI chrome, not legally adjacent (same
+// category as PENDING_DEFAULT_LABEL): these label an invoice, they don't
+// assert anything about the parties. The witness mark deliberately states
+// what SAKSI does (records) and never what the deal is (safe).
+export const INVOICE_EYEBROW = 'Tagihan · SAKSI';
+export const INVOICE_WITNESS_MARK = 'Saksi menyaksikan transaksi ini';
+export const INVOICE_LOCKED_NOTE = 'Link dari penjual · terkunci';
+export const INVOICE_NUMBER_LABEL = 'No. tagihan';
+export const INVOICE_FOR_LABEL = 'Untuk';
 
 export const BUAT_HEADING = 'Buat Tagihan';
 export const BUAT_INTRO =

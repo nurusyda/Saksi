@@ -33,7 +33,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
       {pending ? PENDING_DEFAULT_LABEL : CEK_SUBMIT_LABEL}
     </button>
@@ -63,7 +63,9 @@ export function CekForm() {
             setPhone('');
           }}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            mode === 'rekening' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-50'
+            mode === 'rekening'
+              ? 'bg-witness-soft font-semibold text-witness'
+              : 'text-zinc-600 hover:bg-zinc-50'
           }`}
         >
           {CEK_REKENING_TAB_LABEL}
@@ -75,7 +77,9 @@ export function CekForm() {
             setRekening('');
           }}
           className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            mode === 'phone' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-50'
+            mode === 'phone'
+              ? 'bg-witness-soft font-semibold text-witness'
+              : 'text-zinc-600 hover:bg-zinc-50'
           }`}
         >
           {CEK_PHONE_TAB_LABEL}

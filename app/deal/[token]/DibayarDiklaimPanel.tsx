@@ -29,6 +29,7 @@ import {
   WAITING_FOR_RECEIPT_CONFIRMATION,
   DEADLINE_LAPSE_REPORT_BUTTON,
   ERROR_BUKTI_LOAD_FAILED,
+  REKENING_TUJUAN_LABEL,
 } from '@/lib/copy';
 
 // TIDAK_KONSISTEN interpolates the actual mismatched field names (copy-id.md
@@ -72,7 +73,7 @@ function ConfirmReceiptButton() {
     <button
       type="submit"
       disabled={pending}
-      className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
       {pending ? PENDING_DEFAULT_LABEL : CONFIRM_RECEIPT_LABEL}
     </button>
@@ -85,7 +86,7 @@ function NotReceivedButton() {
     <button
       type="submit"
       disabled={pending}
-      className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-12 w-full items-center justify-center rounded-lg border border-muted-amber-line bg-white px-6 text-sm font-medium text-muted-amber transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {pending ? PENDING_DEFAULT_LABEL : PAYMENT_NOT_RECEIVED_LABEL}
     </button>
@@ -157,7 +158,7 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
           <div className="mb-4">
             <FieldMatchRow label="Nominal" match={bukti.ocrResult.amount_match} />
             <FieldMatchRow label="Tanggal" match={bukti.ocrResult.date_ok} />
-            <FieldMatchRow label="Rekening tujuan" match={bukti.ocrResult.rekening_match} />
+            <FieldMatchRow label={REKENING_TUJUAN_LABEL} match={bukti.ocrResult.rekening_match} />
             <FieldMatchRow label="Bank" match={bukti.ocrResult.bank_match} />
           </div>
         )}

@@ -35,7 +35,7 @@ export default function Home() {
         <div className="mt-10">
           <Link
             href="/buat"
-            className="flex h-12 items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700"
+            className="flex h-12 items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover"
           >
             {CTA_BUAT_TAGIHAN}
           </Link>

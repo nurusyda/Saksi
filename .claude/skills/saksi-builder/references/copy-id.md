@@ -450,3 +450,121 @@ they're part of the same decision):**
 Server contract, state machine, the atomic `join_deal_with_event` RPC, hash
 chaining, and anchoring are all **untouched** — this section changes presentation
 only, on top of a fully-intact backend contract.
+
+---
+
+## §22 — PENJUAL-only enforced at the data layer (2026-07-21, supersedes §21's
+`needsRekening` restoration)
+
+**What changed and why.** §21's fix kept `needsRekening` alive because, at the
+time, `app/buat/actions.ts`'s `validRoles` still accepted `PEMBELI` — so a
+PEMBELI-proposed deal was a real, creatable state, and deleting the counterpart's
+only way to complete one (as an earlier draft had done) was a genuine bug, not
+cleanup. That was the correct fix **given that constraint**. But the constraint
+itself was never a decision anyone had actually made for this product — SAKSI is,
+by every doc in `docs/01-PRODUCT-THESIS-AND-RESEARCH.md` through
+`docs/07-CURRENT-APP-AND-CHANGES.md`, a **seller-invoice tool**: the seller always
+proposes, the counterpart is always the payer. `validRoles` accepting `PEMBELI`
+was inherited from an earlier, more generic "kesepakatan between any two roles"
+design that predates the tagihan pivot, and kept being defended defensively
+(§20's UI default, §21's restored branch) instead of ever being closed at the
+source.
+
+**The actual fix:** `app/buat/actions.ts`'s `validRoles` is now `['PENJUAL']`
+only. A hand-crafted POST can no longer create a PEMBELI-proposed deal, so "the
+counterpart joining a deal is always the payer" is now **true by construction**,
+not a UI default hoping the backend agrees. This is the invariant roughly 14 call
+sites across `paymentActions.ts`, `breachActions.ts`, the deadline-sweep cron, and
+every status panel already silently assumed via
+`deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart'` ternaries — those
+are left as-is (they now always resolve the same branch; harmless, mechanical
+verbosity, not a correctness issue, and not touched in this pass to avoid a
+wide, hard-to-verify sweep through the legally-sensitive breach pipeline for no
+behavioral gain).
+
+**Consequence — `JoinDealForm.tsx`'s `needsRekening` branch is now genuinely,
+permanently dead** (not "unreachable via the only UI path today," but
+structurally impossible to reach at all) **and has been removed for real**, this
+time correctly: `needsRekening` prop, the bank/rekening input branch, its field
+errors, and the `BANK_OPTIONS`/`BANK_OTHER_VALUE` imports are all gone. `page.tsx`
+no longer passes `needsRekening` to `JoinDealForm`. `app/deal/[token]/actions.ts`'s
+`joinDeal` no longer has a `counterpartSuppliesRekening` branch — `rekeningTujuan`/
+`rekeningBank` are always `null` going into the RPC, which already fell back to
+the deal's existing rekening in that case (unchanged RPC behavior).
+
+**Copy simplified to match — one label, not two:**
+- `JOIN_FORM_HEADING` unchanged from §21: `'Masukkan nomor HP kamu untuk melihat
+  rekening pembayaran.'`
+- `JOIN_DEAL_INSTRUCTION` → `'Nomor HP kamu akan tercatat sebagai pihak pembeli.
+  Centang pernyataan di bawah untuk melanjutkan.'` — now correctly names the role
+  (§21 had deliberately kept this role-neutral because the PEMBELI-proposed case
+  was still real at the time; now it isn't, so naming the role is accurate again).
+- `JOIN_SUBMIT_LABEL = 'Lihat Rekening & Bayar'` — the only submit label; §21's
+  `JOIN_SUBMIT_LABEL_NEEDS_REKENING` fallback is removed, nothing reaches that
+  branch anymore.
+
+**What this resolves, plainly:** every prior pass on this flow (§20, §21) treated
+the old repo's generic role-pair machinery as ground truth to work around,
+producing a cycle of delete-the-UI-branch → code review catches the backend still
+permits it → restore-the-branch-defensively. §22 breaks that cycle by making the
+actual product decision (seller-only) real at the one place — `validRoles` — that
+everything else was silently assuming, instead of continuing to patch around a
+door that was never supposed to be open.
+
+Server contract for the reachable path, state machine, the atomic
+`join_deal_with_event` RPC, hash chaining, and anchoring are all still
+**untouched**. The `proposer_role` column, `ROLE_LABELS`, and `ROLE_PAIR` are
+left in place (harmless — `ROLE_LABELS`/`ROLE_PAIR` still carry
+`PEMBERI_PINJAMAN`/`PEMINJAM`/`PEMILIK`/`PENYEWA` entries for the gated
+`pinjam-meminjam`/`sewa-menyewa` designs in `data-model.md`, which remain
+explicitly deferred, not part of the active/validated role set).
+
+## §23 — Locked-invoice presentation pass (2026-07-21)
+
+Interface-only pass. The state machine, the server contract, the hash/anchor
+layer, and the tier spec are all **untouched**. Two locked strings widen, and
+the buyer's deal surface is re-presented as an invoice rather than a summary.
+
+### The two string changes
+
+- `PAYMENT_NOT_RECEIVED_LABEL`: `'Dana belum masuk'` →
+  **`'Dana belum masuk / bukti salah'`**.
+  The action already covered two situations — money that never landed, and a
+  bukti that does not match this deal — but named only the first, leaving a
+  penjual looking at a mismatched bukti with no obvious control. Still not an
+  accusation, still writes no `deal_events` row, and `PAYMENT_NOT_RECEIVED_ACK`
+  is unchanged and remains accurate for both readings.
+
+- `LEDGER_DETAIL_LINK_LABEL`: `'Lihat detail lengkap'` →
+  **`'Lihat detail lengkap history rekening'`**.
+  Under the locked-link flow the buyer never types a rekening themselves, so
+  this expander is the only route to the destination account's own record. The
+  old label did not say what the detail was *about* and read as "more detail
+  about this invoice". Naming the rekening is what makes the forced-check
+  meaningful when the buyer never performed a lookup of their own.
+
+### Why the invoice framing (not new claims)
+
+The link is created and locked by the penjual; the buyer edits nothing. The
+protection that a cold rekening-lookup used to provide is therefore moved onto
+the invoice itself: the destination account's record is surfaced directly under
+**Rekening tujuan**, at the moment of payment, expandable via the renamed link
+above.
+
+This adds no new assertion. `formatAccountHistory` and
+`FORCED_CHECK_EMPTY_STATE` are reused verbatim, and the empty state stays
+neutral — "Belum ada riwayat di SAKSI. Ini bukan jaminan aman." — never "aman".
+An invoice that looks like a real tagihan must not become an invoice that
+*vouches* for anyone: the presentation changed, the claims did not.
+
+### New UI chrome (not legally adjacent, same category as §12's approved-inline labels)
+
+- `INVOICE_EYEBROW = 'Tagihan · SAKSI'`
+- `INVOICE_WITNESS_MARK = 'Saksi menyaksikan transaksi ini'`
+- `INVOICE_LOCKED_NOTE = 'Link dari penjual · terkunci'`
+- `INVOICE_NUMBER_LABEL = 'No. tagihan'`
+- `INVOICE_FOR_LABEL = 'Untuk'`
+
+The witness mark states what SAKSI is doing (recording), never what the deal
+is (safe). "Menyaksikan" is the whole product in one word and carries no
+guarantee.

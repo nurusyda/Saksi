@@ -86,19 +86,15 @@ export async function joinDeal(
     fieldErrors.counterpart_phone = ERROR_PHONE_INVALID;
   }
 
-  // C2 — when the proposer's role was Pembeli, the counterpart is Penjual
-  // and must supply the destination account here (the proposer never had
-  // one to give at create time). Not required in the other direction: a
-  // Penjual-proposed deal already has its rekening set from CREATE.
-  const counterpartSuppliesRekening = deal.proposer_role === 'PEMBELI';
-  let rekeningTujuan: string | null = null;
-  let rekeningBank: string | null = null;
-  if (counterpartSuppliesRekening) {
-    rekeningTujuan = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
-    rekeningBank = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
-    if (!rekeningTujuan) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
-    if (!rekeningBank) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
-  }
+  // C2, retired 2026-07-21: this used to collect a rekening from the
+  // counterpart when the proposer's role was Pembeli (the proposer had none
+  // to give at create time). createDeal now only accepts PENJUAL as a
+  // proposer role, so every deal already has its rekening set from CREATE —
+  // the counterpart never supplies one here. Passed through as null; the RPC
+  // falls back to the deal's existing rekening (see virtualDealAfterJoin
+  // below), unchanged from before this simplification.
+  const rekeningTujuan: string | null = null;
+  const rekeningBank: string | null = null;
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 

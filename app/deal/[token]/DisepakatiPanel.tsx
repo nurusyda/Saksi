@@ -28,6 +28,7 @@ import {
   BUKTI_ATTESTATION,
   WAITING_FOR_PAYMENT_PROOF,
   ERROR_REKENING_LOAD_FAILED,
+  REKENING_TUJUAN_LABEL,
 } from '@/lib/copy';
 
 interface DealSummary {
@@ -43,7 +44,7 @@ function SubmitBuktiButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="flex h-12 w-full items-center justify-center rounded-lg bg-zinc-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-12 w-full items-center justify-center rounded-lg bg-witness px-6 text-sm font-semibold text-white transition-colors hover:bg-witness-hover disabled:cursor-not-allowed disabled:opacity-40"
     >
       {pending ? 'Mengunggah...' : 'Kirim bukti transfer'}
     </button>
@@ -134,7 +135,7 @@ function PaymentForm({ deal, phone }: { deal: DealSummary; phone: string }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 p-5">
-        <p className="mb-1 text-sm font-medium text-zinc-700">Rekening tujuan</p>
+        <p className="mb-1 text-sm font-medium text-zinc-700">{REKENING_TUJUAN_LABEL}</p>
         <p className="mb-3 text-base font-medium text-zinc-900">
           {rekening.rekeningBank} {rekening.rekeningTujuan}
         </p>

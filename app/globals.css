@@ -1,22 +1,68 @@
 @import "tailwindcss";
 
+/* Saksi design system (2026-07-21) — the palette from the agreed mockup.
+   Calm, high-trust, one accent. The accent is a deep teal ("witness"), never
+   alarm red: SAKSI states facts, it never raises an alarm about a person. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #ffffff;
+  --ink: #1b1a17;
+  --ink-2: #6b6660;
+  --ink-3: #9c968e;
+  --line: #e6e3dd;
+  --line-2: #d8d4cc;
+  --field: #faf9f7;
+  --witness: #0e6e63;
+  --witness-hover: #0a5851;
+  --witness-soft: #e4f0ee;
+  /* Muted, deliberately non-alarm. Used for "belum diterima" / "dana belum
+     masuk" actions, which are neutral reports, not accusations. */
+  --muted-amber: #9a6b12;
+  --muted-amber-line: #e7d9bc;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
   color-scheme: light;
 }
 
+/* The zinc scale is remapped onto the warm neutrals above rather than
+   rewritten at ~200 call sites. Every existing `zinc-*` class keeps working
+   and simply lands on the Saksi palette. Steps stay monotonic so existing
+   text-hierarchy choices survive the swap. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+
+  --color-zinc-50: var(--field);
+  --color-zinc-100: #f1efea;
+  --color-zinc-200: var(--line);
+  --color-zinc-300: var(--line-2);
+  --color-zinc-400: var(--ink-3);
+  /* #857f77 measured 3.96:1 on white — fails WCAG AA's 4.5:1 for normal text.
+     This repo has fixed exactly this class of regression before (copy-id.md
+     §21: a since-reverted draft dropped to ~2.5:1 on zinc-400/11px). 39
+     call sites use text-zinc-500 for hints/labels/errors, several of them
+     explicitly commented "passes WCAG AA" — #78726b restores 4.75:1 while
+     staying in the same warm-neutral family. */
+  --color-zinc-500: #78726b;
+  --color-zinc-600: var(--ink-2);
+  --color-zinc-700: #565049;
+  --color-zinc-800: #2e2b27;
+  --color-zinc-900: var(--ink);
+
+  --color-witness: var(--witness);
+  --color-witness-hover: var(--witness-hover);
+  --color-witness-soft: var(--witness-soft);
+  --color-muted-amber: var(--muted-amber);
+  --color-muted-amber-line: var(--muted-amber-line);
+
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { DealStatus } from '@/lib/db/transitions';
 import { DealLinkCard } from './DealLinkCard';
 import { DealProgressStepper } from './DealProgressStepper';
+import { InvoiceCard } from './InvoiceCard';
 import { JoinDealForm } from './JoinDealForm';
 import { DisepakatiPanel } from './DisepakatiPanel';
 import { DibayarDiklaimPanel } from './DibayarDiklaimPanel';
@@ -20,16 +21,12 @@ import { WaitingStatusPoll } from './WaitingStatusPoll';
 import { LiveIndicator } from './LiveIndicator';
 import { joinDeal } from './actions';
 import { getPartySession } from '@/lib/db/partySession';
-import { formatRp, formatDate } from '@/lib/format';
-import { maskRekening } from '@/lib/db/accountHistory';
 import {
   JOIN_FORM_HEADING,
   JOIN_DEAL_INSTRUCTION,
   STATUS_DIAJUKAN,
   ROLE_LABELS,
   ROLE_PAIR,
-  COUNTERPART_FALLBACK_LABEL,
-  RINGKASAN_KESEPAKATAN_HEADING,
 } from '@/lib/copy';
 
 const TERMINAL_STATUSES: string[] = [
@@ -121,10 +118,10 @@ export default async function DealPage({
     notFound();
   }
 
+  // §23: counterpartRoleLabel retired with the old summary card — the invoice
+  // no longer prints both roles. counterpartRoleKey stays: viewerRoleLabel
+  // below still needs it to name the viewer's own side.
   const counterpartRoleKey = ROLE_PAIR[deal.proposer_role];
-  const counterpartRoleLabel = counterpartRoleKey
-    ? (ROLE_LABELS[counterpartRoleKey] ?? COUNTERPART_FALLBACK_LABEL)
-    : COUNTERPART_FALLBACK_LABEL;
 
   const shareUrl = `https://saksi.app/deal/${token}`;
 
@@ -163,38 +160,22 @@ export default async function DealPage({
 
         <DealProgressStepper status={deal.status} />
 
-        {/* Deal summary card */}
-        <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            {RINGKASAN_KESEPAKATAN_HEADING}
-          </p>
-          <p className="mb-1 text-base font-medium text-zinc-900">{deal.item_desc}</p>
-          <div className="mt-3 flex flex-col gap-1 text-sm text-zinc-600">
-            <p>
-              <span className="font-medium">Nominal:</span> {formatRp(deal.amount_idr)}
-            </p>
-            {/* Masked — this card renders for anyone with the link, before
-                any party identity is confirmed. Full number only appears
-                post-identification (DisepakatiPanel and friends). */}
-            {deal.rekening_tujuan && deal.rekening_bank && (
-              <p>
-                <span className="font-medium">Rekening tujuan:</span> {deal.rekening_bank}{' '}
-                {maskRekening(deal.rekening_tujuan)}
-              </p>
-            )}
-            <p>
-              <span className="font-medium">Batas waktu:</span> {formatDate(deal.deadline)}
-            </p>
-            <p>
-              <span className="font-medium">Peran pengaju:</span>{' '}
-              {ROLE_LABELS[deal.proposer_role] ?? deal.proposer_role}
-            </p>
-            <p>
-              <span className="font-medium">Peran pihak penerima:</span>{' '}
-              {counterpartRoleLabel}
-            </p>
-          </div>
-        </div>
+        {/* §23 — the summary is now presented as a tagihan. Same fields, same
+            masking rule; the two "Peran ..." lines are dropped because the
+            flow is seller-only and enforced as such at the data layer (§22),
+            so both roles are already implied by the invoice itself. */}
+        <InvoiceCard
+          itemDesc={deal.item_desc}
+          amountIdr={Number(deal.amount_idr)}
+          deadline={deal.deadline}
+          token={token}
+          rekeningBank={deal.rekening_bank}
+          rekeningTujuan={deal.rekening_tujuan}
+        />
+        {/* No kategori badge: the mockup's Reguler/PO chip has no column
+            behind it (deal-type gating was removed, §6a) and the deadline is
+            auto-derived at creation. Faking the chip would put a label on the
+            invoice that nothing in the record supports. */}
 
         {/* Persistent deal link — every status, not just DRAF (UX-audit fix:
             identity is phone-only with no session, so this URL is the only
@@ -234,7 +215,7 @@ export default async function DealPage({
                 <p className="mb-4 text-xs text-zinc-500">
                   {JOIN_DEAL_INSTRUCTION}
                 </p>
-                <JoinDealForm action={boundJoinDeal} needsRekening={deal.proposer_role === 'PEMBELI'} />
+                <JoinDealForm action={boundJoinDeal} />
               </div>
             )}
           </>
