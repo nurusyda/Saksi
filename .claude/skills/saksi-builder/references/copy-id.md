@@ -1404,3 +1404,63 @@ attestation, not the core guarantee. ⚠ CLAUDE.md's stack line
 ("SHA-256 + OpenTimestamps…") is the intended architecture; until this flag is
 verified-on, only the SHA-256 half is live — do not repeat the OTS half as a
 current claim in marketing.
+
+## §45 — Literal lifecycle names + fair-attribution rekening history (2026-07-22)
+
+The deal-lifecycle state model reworked around realistic partial-completion,
+and the account-history engine reworked around fair attribution. This is the
+"assume both parties are bad people" trust redesign the operator approved.
+
+**Literal state names** (`SAYA_STATUS_LABELS`, `PROGRESS_STEP_LABELS`):
+- `DIBAYAR_DIKLAIM` → **"Pembeli klaim membayar"** (was "Perlu kamu
+  konfirmasi"). It is a *claim*, not a settled fact — "sudah dibayar" wrongly
+  implied the process was done. Anyone who sees the chip can read the truth off
+  it without inference.
+- `DIKONFIRMASI_TERIMA` → **"Pembayaran diterima"** (was "Menunggu pembeli
+  terima"). Seller confirmed the money landed — the *realistic* success, not a
+  provisional waiting state. Most deals rest here and never reach the gold.
+- `SELESAI` → **"Barang diterima"** (was "Selesai"). Buyer confirmed goods — the
+  gold terminal. "Selesai" retired for implying conclusion.
+- Stepper final node "Selesai" → "Barang diterima"; node 5 → "Pembayaran
+  diterima".
+
+**Fair-attribution history** (`lib/db/accountHistory.ts`, `AccountHistory`).
+Outcomes are now computed from **status + events**, not status alone:
+- `berhasilCount` — money confirmed received (RECEIPT_CONFIRMED → DIKONFIRMASI_
+  TERIMA, or SELESAI). A seller confirming receipt is them vouching against
+  their own interest, so it is a robust positive signal. Also counts a deal that
+  timed out (KEDALUWARSA) *after* receipt was confirmed — success no longer
+  decays to "kedaluwarsa".
+- `klaimBarangCount` — buyer disputed the goods (BARANG_TIDAK_SESUAI) or a
+  published breach flag. Reflects on the **seller**.
+- `belumDikonfirmasiCount` — buyer paid, seller neither confirmed nor disputed,
+  and it timed out. The **naughty-seller signal** that used to be invisible
+  (it sat silently as "tidak dipenuhi", staining nobody). A seller who actually
+  thinks no money came routes to the payment-dispute bucket instead (they tap
+  "dana belum masuk"), so this bucket isolates genuine seller-ghosting.
+- `klaimPembayaranCount` — seller disputed the payment (DANA_BELUM_MASUK).
+  Reflects on the **BUYER's payment**, NOT the seller's honesty. **Excluded
+  from the seller's rekening card** (`formatAccountHistory`/`...Counts`) — an
+  honest seller is never stained by a buyer's payment dispute. Shown only on the
+  `/cek` phone lookup (`formatAccountHistoryFull`), where a number can be the
+  payer and the bucket is a true signal about its own conduct.
+
+Verified against production (30 non-DRAF deals): payment-dispute-only rekening
+show all-zero seller buckets; goods disputes surface; seller-confirmed counts as
+berhasil. Retired the verdict word "Tidak dipenuhi" and the catch-all
+"Kedaluwarsa" from the primary rekening card.
+
+**Deferred (not built this pass), noted so the next session doesn't assume done:**
+- Images on both sides of every dispute (approved point #5) — needs the
+  statement/evidence UI extended to all three statement types.
+- `/cek` per-role attribution — the phone view still pools a number's seller-
+  role and buyer-role deals; each bucket label is literally true, but a buyer in
+  a seller-ghosted deal sees "belum dikonfirmasi penjual" on their own lookup.
+  Proper per-role split is part of the deferred 100k-tier naughty-buyer work.
+- `LEDGER_BUCKET_LABELS` / `lib/db/ledger.ts` still carry the old 8-bucket
+  taxonomy — untouched because that whole surface is gated off behind
+  `LEDGER_DETAIL_ENABLED`. Rework it before that flag is ever flipped.
+- T&C §4/§5 not yet reworded to the new state names.
+- Naughty-buyer visibility to sellers — deferred to the 100k tier per the
+  operator ("50 klaim berbeda should raise an eyebrow" is a human read of the
+  data, never a hardcoded threshold — the no-scores invariant holds).

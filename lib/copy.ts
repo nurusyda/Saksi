@@ -95,31 +95,38 @@ export const FORCED_CHECK_EMPTY_STATE =
 export const ERROR_ACCOUNT_HISTORY_UNAVAILABLE =
   'Riwayat tidak dapat dimuat saat ini. Coba lagi.';
 
-// copy-id.md §2 — account-history line (with history). A function, not a plain
-// constant, since it has interpolated values; the template itself is locked.
+// §45 (2026-07-21) — account-history line (with history), reworked around the
+// realistic lifecycle + fair attribution (see accountHistory.ts). This is the
+// SELLER's payout rekening, so it shows only what reflects on the SELLER's
+// conduct: how many times money was confirmed received ("transaksi berhasil"),
+// how many times a buyer disputed the goods ("klaim barang berbeda"), and how
+// many times the seller took payment but never confirmed it ("belum
+// dikonfirmasi penjual" — the naughty-seller signal that used to be invisible).
+// A payment dispute is deliberately NOT here: it questions the buyer's payment,
+// not the seller's honesty, and staining an honest seller with it would break
+// the one invariant.
 export function formatAccountHistory(
   bank: string,
   rekeningMasked: string,
-  selesaiCount: number,
-  tidakDipenuhiCount: number,
+  berhasilCount: number,
+  klaimBarangCount: number,
+  belumDikonfirmasiCount: number,
   sinceLabel: string,
 ): string {
-  return `Rekening tujuan: ${bank} ${rekeningMasked} · ${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
+  return `Rekening tujuan: ${bank} ${rekeningMasked} · ${formatAccountHistoryCounts(berhasilCount, klaimBarangCount, belumDikonfirmasiCount, sinceLabel)}`;
 }
 
-// §26 (2026-07-21) — the counts half of formatAccountHistory, for surfaces
-// that already render the bank + masked number as their own heading and
-// would otherwise print it twice. Same facts, same words, same order as the
-// tail of the line above; this is a projection of that locked string, not a
-// reworded second version of it. Do NOT reconstruct this by string-replacing
-// the prefix out of formatAccountHistory's output — that couples the two
-// through their exact punctuation and breaks silently if either changes.
+// §26 (2026-07-21), reworked §45 — the counts half of formatAccountHistory,
+// for surfaces that already render the bank + masked number as their own
+// heading and would otherwise print it twice. Same facts, same words, same
+// order as the tail of the line above.
 export function formatAccountHistoryCounts(
-  selesaiCount: number,
-  tidakDipenuhiCount: number,
+  berhasilCount: number,
+  klaimBarangCount: number,
+  belumDikonfirmasiCount: number,
   sinceLabel: string,
 ): string {
-  return `${selesaiCount} kesepakatan selesai · ${tidakDipenuhiCount} tidak dipenuhi · tercatat sejak ${sinceLabel}`;
+  return `${berhasilCount} transaksi berhasil · ${klaimBarangCount} klaim barang berbeda · ${belumDikonfirmasiCount} belum dikonfirmasi penjual · tercatat sejak ${sinceLabel}`;
 }
 
 // ============================================================
@@ -135,29 +142,27 @@ export function formatAccountHistoryCounts(
 // data-model.md's list order.
 // ============================================================
 
+// §45 (2026-07-21) — reworked to the four fair-attribution buckets. Unlike the
+// rekening card (seller-only), /cek looks up a PHONE, which can be the seller
+// in one deal and the buyer in another, so it also shows "klaim pembayaran
+// berbeda" — the payment-dispute bucket that, on a phone, is a true signal
+// about the number's own conduct as a payer. Each bucket is individually true
+// of the number regardless of which side it stood on.
 export function formatAccountHistoryFull(
   identifierLabel: string, // e.g. "BCA 12••••34" or a phone-hash-based label
   counts: {
-    selesaiCount: number;
-    dibatalkanBersamaCount: number;
-    tidakDilanjutkanCount: number;
-    kedaluwarsaCount: number;
-    dikembalikanPenuhCount: number;
-    dikembalikanSebagianCount: number;
-    tidakDipenuhiCount: number;
-    klaimBerbedaAktifCount: number;
+    berhasilCount: number;
+    klaimBarangCount: number;
+    belumDikonfirmasiCount: number;
+    klaimPembayaranCount: number;
   },
   sinceLabel: string,
 ): string {
   const parts = [
-    `${counts.selesaiCount} selesai`,
-    `${counts.dibatalkanBersamaCount} dibatalkan bersama`,
-    `${counts.tidakDilanjutkanCount} tidak dilanjutkan`,
-    `${counts.kedaluwarsaCount} kedaluwarsa`,
-    `${counts.dikembalikanPenuhCount} dikembalikan penuh`,
-    `${counts.dikembalikanSebagianCount} dikembalikan sebagian`,
-    `${counts.tidakDipenuhiCount} tidak dipenuhi`,
-    `${counts.klaimBerbedaAktifCount} klaim berbeda aktif`,
+    `${counts.berhasilCount} transaksi berhasil`,
+    `${counts.klaimBarangCount} klaim barang berbeda`,
+    `${counts.belumDikonfirmasiCount} belum dikonfirmasi penjual`,
+    `${counts.klaimPembayaranCount} klaim pembayaran berbeda`,
   ];
   return `${identifierLabel} · ${parts.join(' · ')} · tercatat sejak ${sinceLabel}`;
 }
@@ -486,16 +491,21 @@ export function formatSayaRecord(total: number, selesai: number, berjalan: numbe
   return `${total} tagihan tercatat · ${selesai} selesai · ${berjalan} berjalan`;
 }
 
-// Status chips. Neutral wording, matching the record lines in §7 — no chip
-// asserts fault, and "Tidak dipenuhi" is the record's own term for the state,
-// not a verdict this screen is adding.
+// Status chips. Neutral, literal wording — each chip names the state exactly
+// as it is, so anyone who sees it can read the truth off it without inference.
+// §45 (2026-07-21): the three lifecycle chips were made literal per the state
+// redesign — "Pembeli klaim membayar" (it is a claim, not a settled fact),
+// "Pembayaran diterima" (seller confirmed the money = the realistic success),
+// "Barang diterima" (buyer confirmed goods = the gold terminal). "Sudah
+// dibayar"/"Selesai" were retired: they implied the process was finished when
+// it may not be.
 export const SAYA_STATUS_LABELS: Record<string, string> = {
   DRAF: 'Menunggu pembeli',
   DIAJUKAN: 'Menunggu',
   DISEPAKATI: 'Menunggu pembayaran',
-  DIBAYAR_DIKLAIM: 'Perlu kamu konfirmasi',
-  DIKONFIRMASI_TERIMA: 'Menunggu pembeli terima',
-  SELESAI: 'Selesai',
+  DIBAYAR_DIKLAIM: 'Pembeli klaim membayar',
+  DIKONFIRMASI_TERIMA: 'Pembayaran diterima',
+  SELESAI: 'Barang diterima',
   TIDAK_DIPENUHI: 'Tidak dipenuhi',
   SENGKETA: 'Klaim berbeda',
   DIBATALKAN_BERSAMA: 'Dibatalkan bersama',
@@ -811,14 +821,16 @@ export const DEAL_LINK_SAVE_HINT =
 export const SHARE_TO_WHATSAPP_LABEL = 'Bagikan ke WhatsApp';
 
 // Progress stepper (6 nodes: Dibuat -> Bergabung -> Disepakati -> Dibayar ->
-// Diterima -> Selesai), shown on every deal-page status.
+// Diterima -> Barang diterima), shown on every deal-page status. §45: the final
+// node was 'Selesai', retired for the same reason as the chip — it implied the
+// whole thing was concluded. The literal terminal is "Barang diterima".
 export const PROGRESS_STEP_LABELS: readonly string[] = [
   'Dibuat',
   'Bergabung',
   'Disepakati',
   'Dibayar',
-  'Diterima',
-  'Selesai',
+  'Pembayaran diterima',
+  'Barang diterima',
 ];
 
 // ============================================================

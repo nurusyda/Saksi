@@ -31,8 +31,8 @@ const STEPS: { label: string; event: string }[] = [
   { label: 'Pembeli bergabung', event: 'COUNTERPART_JOINED' },
   { label: 'Disepakati', event: 'ACCEPTED' },
   { label: 'Bukti transfer dikirim', event: 'BUKTI_UPLOADED' },
-  { label: 'Dana dikonfirmasi penjual', event: 'RECEIPT_CONFIRMED' },
-  { label: 'Selesai', event: 'FULFILLMENT_CONFIRMED' },
+  { label: 'Pembayaran diterima penjual', event: 'RECEIPT_CONFIRMED' },
+  { label: 'Barang diterima', event: 'FULFILLMENT_CONFIRMED' },
 ];
 
 const DONE_COUNT: Partial<Record<string, number>> = {
@@ -52,7 +52,7 @@ const CURRENT_LINE: Partial<Record<string, string>> = {
   [DealStatus.DISEPAKATI]: 'Menunggu bukti transfer dari pembeli',
   [DealStatus.DIBAYAR_DIKLAIM]: 'Menunggu penjual konfirmasi dana',
   [DealStatus.DIKONFIRMASI_TERIMA]: 'Menunggu pembeli konfirmasi barang diterima',
-  [DealStatus.SELESAI]: 'Selesai',
+  [DealStatus.SELESAI]: 'Barang diterima',
 };
 
 export type EventTime = { event: string; created_at: string };

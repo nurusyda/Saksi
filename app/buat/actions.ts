@@ -245,8 +245,9 @@ export async function createDeal(
 export type AccountHistoryDisplay =
   | {
       status: 'found';
-      selesaiCount: number;
-      tidakDipenuhiCount: number;
+      berhasilCount: number;
+      klaimBarangCount: number;
+      belumDikonfirmasiCount: number;
       sinceLabel: string;
       rekeningMasked: string;
       ledgerEnabled: boolean;
@@ -268,8 +269,9 @@ export async function checkAccountHistory(
   if (result.status === 'empty') return { status: 'empty' };
   return {
     status: 'found',
-    selesaiCount: result.history.selesaiCount,
-    tidakDipenuhiCount: result.history.tidakDipenuhiCount,
+    berhasilCount: result.history.berhasilCount,
+    klaimBarangCount: result.history.klaimBarangCount,
+    belumDikonfirmasiCount: result.history.belumDikonfirmasiCount,
     sinceLabel: result.history.sinceLabel,
     rekeningMasked: maskRekening(rekening),
     ledgerEnabled: isLedgerDetailEnabled(),

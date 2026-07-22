@@ -249,8 +249,9 @@ export default function BuatPage() {
                 formatAccountHistory(
                   effectiveBank,
                   history.rekeningMasked,
-                  history.selesaiCount,
-                  history.tidakDipenuhiCount,
+                  history.berhasilCount,
+                  history.klaimBarangCount,
+                  history.belumDikonfirmasiCount,
                   history.sinceLabel,
                 )}
               {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}

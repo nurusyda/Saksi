@@ -53,8 +53,9 @@ export async function BuyerJoinGate({
         <p className="text-sm leading-relaxed text-zinc-800">
           {history.status === 'found' &&
             formatAccountHistoryCounts(
-              history.selesaiCount,
-              history.tidakDipenuhiCount,
+              history.berhasilCount,
+              history.klaimBarangCount,
+              history.belumDikonfirmasiCount,
               history.sinceLabel,
             )}
           {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}

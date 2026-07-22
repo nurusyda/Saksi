@@ -26,17 +26,17 @@
 import { supabaseServer } from '@/lib/supabase/server';
 
 export interface AccountHistory {
-  selesaiCount: number;
-  dibatalkanBersamaCount: number;
-  tidakDilanjutkanCount: number;
-  kedaluwarsaCount: number;
-  dikembalikanPenuhCount: number;
-  dikembalikanSebagianCount: number;
-  // Published-only (flags.published_at is not null) — see the gate-fix note
-  // above. An unpublished report (still within its 14-day window, or
-  // publication not yet enabled) contributes to neither bucket.
-  tidakDipenuhiCount: number;
-  klaimBerbedaAktifCount: number;
+  // §45 (2026-07-21) — fair-attribution buckets, computed from status + events
+  // (see buildHistoryFromDeals). berhasil = money confirmed received (pembayaran
+  // diterima) and/or goods confirmed (barang diterima); klaimBarang = buyer
+  // disputed the goods (reflects on the seller); belumDikonfirmasi = buyer paid
+  // but the seller never confirmed and the deal timed out (the naughty-seller
+  // signal); klaimPembayaran = seller disputed the payment (reflects on the
+  // BUYER — shown on /cek phone lookups, never on a seller's rekening card).
+  berhasilCount: number;
+  klaimBarangCount: number;
+  belumDikonfirmasiCount: number;
+  klaimPembayaranCount: number;
   sinceLabel: string; // e.g. "Maret 2026"
 }
 
@@ -75,37 +75,79 @@ export function maskPhone(phoneE164: string): string {
 
 type DealForHistory = { id: string; status: string; created_at: string };
 
+// §45 (2026-07-21) — the rekening history, reworked around the realistic
+// lifecycle and fair attribution. This is the SELLER's payout rekening (every
+// deal here is one where this identifier is the proposer/seller), so the
+// buckets answer one question for the next buyer: "is it safe to pay INTO
+// this account?"
+//
+// The outcome of a deal is computed from its status + its events, not from
+// status alone, because "seller confirmed receipt" is a success even when the
+// buyer never came back to confirm goods, and a payment dispute must NOT be
+// counted against the seller (it is the buyer's payment in question, not the
+// seller's conduct — see the fair-attribution design). The event set needed:
+//   RECEIPT_CONFIRMED  — seller confirmed the money landed (success pivot)
+//   BARANG_TIDAK_SESUAI — buyer disputed the goods (reflects on the seller)
+//   DANA_BELUM_MASUK   — seller disputed the payment (reflects on the BUYER;
+//                        excluded from the seller's rekening record)
 async function buildHistoryFromDeals(
   db: ReturnType<typeof supabaseServer>,
   deals: DealForHistory[],
 ): Promise<AccountHistoryResult> {
   if (deals.length === 0) return { status: 'empty' };
 
-  const selesaiCount = deals.filter((d) => d.status === 'SELESAI').length;
-  const dibatalkanBersamaCount = deals.filter((d) => d.status === 'DIBATALKAN_BERSAMA').length;
-  const tidakDilanjutkanCount = deals.filter((d) => d.status === 'TIDAK_DILANJUTKAN').length;
-  const kedaluwarsaCount = deals.filter((d) => d.status === 'KEDALUWARSA').length;
-  const dikembalikanPenuhCount = deals.filter((d) => d.status === 'DIKEMBALIKAN_PENUH').length;
-  const dikembalikanSebagianCount = deals.filter((d) => d.status === 'DIKEMBALIKAN_SEBAGIAN').length;
+  const dealIds = deals.map((d) => d.id);
+  const { data: events, error: eventsErr } = await db
+    .from('deal_events')
+    .select('deal_id, event')
+    .in('deal_id', dealIds)
+    .in('event', ['RECEIPT_CONFIRMED', 'BARANG_TIDAK_SESUAI', 'DANA_BELUM_MASUK']);
+  if (eventsErr) return { status: 'error' };
 
-  const tidakDipenuhiIds = deals.filter((d) => d.status === 'TIDAK_DIPENUHI').map((d) => d.id);
-  let tidakDipenuhiCount = 0;
-  let klaimBerbedaAktifCount = 0;
-  if (tidakDipenuhiIds.length > 0) {
+  const has = new Map<string, Set<string>>();
+  for (const e of events ?? []) {
+    let s = has.get(e.deal_id);
+    if (!s) has.set(e.deal_id, (s = new Set()));
+    s.add(e.event);
+  }
+  const dealHas = (id: string, ev: string) => has.get(id)?.has(ev) ?? false;
+
+  // Published breach flags (the gated publication layer) still fold into the
+  // goods-concern bucket — a published "tidak dipenuhi" or "klaim berbeda"
+  // is a delivery breach against the seller.
+  const breachIds = deals.filter((d) => d.status === 'TIDAK_DIPENUHI' || d.status === 'SENGKETA').map((d) => d.id);
+  const publishedBreach = new Set<string>();
+  if (breachIds.length > 0) {
     const { data: flags, error: flagsErr } = await db
       .from('flags')
-      .select('deal_id, hak_jawab_status, published_at')
-      .in('deal_id', tidakDipenuhiIds);
+      .select('deal_id, published_at')
+      .in('deal_id', breachIds);
     if (flagsErr) return { status: 'error' };
-    // Once published, both outcomes converge on deals.status = TIDAK_DIPENUHI
-    // (migration 0023: the silent branch stays there, the disputed branch
-    // demotes SENGKETA back to it) — flags.hak_jawab_status is what actually
-    // distinguishes the two buckets at that point.
-    for (const f of flags ?? []) {
-      if (!f.published_at) continue; // unpublished; counts toward neither bucket
-      if (f.hak_jawab_status === 'KADALUARSA') tidakDipenuhiCount++;
-      else if (f.hak_jawab_status === 'DISPUTED') klaimBerbedaAktifCount++;
+    for (const f of flags ?? []) if (f.published_at) publishedBreach.add(f.deal_id);
+  }
+
+  let berhasilCount = 0; // pembayaran diterima + barang diterima
+  let klaimBarangCount = 0; // buyer disputed goods (concern on the seller)
+  let belumDikonfirmasiCount = 0; // buyer paid, seller ghosted (weak)
+  let klaimPembayaranCount = 0; // seller disputed payment (the BUYER's issue — tracked, not a seller concern)
+
+  for (const d of deals) {
+    const receiptConfirmed = dealHas(d.id, 'RECEIPT_CONFIRMED');
+    const goodsDisputed = dealHas(d.id, 'BARANG_TIDAK_SESUAI');
+    const paymentDisputed = dealHas(d.id, 'DANA_BELUM_MASUK');
+
+    if (d.status === 'SELESAI') {
+      berhasilCount++; // barang diterima
+    } else if (goodsDisputed || publishedBreach.has(d.id)) {
+      klaimBarangCount++;
+    } else if (d.status === 'DIKONFIRMASI_TERIMA' || (d.status === 'KEDALUWARSA' && receiptConfirmed)) {
+      berhasilCount++; // pembayaran diterima — seller confirmed money, no goods complaint
+    } else if (paymentDisputed) {
+      klaimPembayaranCount++; // the buyer's payment is in question, not the seller
+    } else if (d.status === 'KEDALUWARSA') {
+      belumDikonfirmasiCount++; // paid, seller never confirmed, timed out
     }
+    // DISEPAKATI / DIBAYAR_DIKLAIM still in-flight (not timed out) → not counted
   }
 
   const earliest = deals.reduce((min, d) => (d.created_at < min ? d.created_at : min), deals[0].created_at);
@@ -117,17 +159,7 @@ async function buildHistoryFromDeals(
 
   return {
     status: 'found',
-    history: {
-      selesaiCount,
-      dibatalkanBersamaCount,
-      tidakDilanjutkanCount,
-      kedaluwarsaCount,
-      dikembalikanPenuhCount,
-      dikembalikanSebagianCount,
-      tidakDipenuhiCount,
-      klaimBerbedaAktifCount,
-      sinceLabel,
-    },
+    history: { berhasilCount, klaimBarangCount, belumDikonfirmasiCount, klaimPembayaranCount, sinceLabel },
   };
 }
 
