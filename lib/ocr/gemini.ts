@@ -5,8 +5,9 @@
 // vocabulary in copy-id.md §5 is reachable.
 //
 // Plain REST call, no SDK dependency: one fetch, small surface, no install
-// step. NOT live-tested against the real API in this session (no network
-// access here) — verify with a real upload before relying on it.
+// step. Live-tested against gemini-flash-lite-latest 2026-07-23 — correctly
+// extracts nominal, tanggal, rekening_tujuan, and bank from Indonesian bank
+// transfer screenshots.
 
 export type OcrVerdict = 'KONSISTEN' | 'TIDAK_KONSISTEN' | 'TIDAK_TERBACA';
 
@@ -24,7 +25,7 @@ interface ExtractedFields {
   bank: string | null;
 }
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
 
 async function extractFieldsFromImage(
   imageBytes: Buffer,
@@ -59,7 +60,11 @@ Use null for any field that is not legible. If the image is not a transfer recei
     },
   );
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error('[ocr] Gemini API error %d %s — %s', res.status, res.statusText, body.slice(0, 300));
+    return null;
+  }
 
   const json = await res.json();
   const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text;
