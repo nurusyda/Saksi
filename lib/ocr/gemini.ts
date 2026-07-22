@@ -41,6 +41,8 @@ Use null for any field that is not legible. If the image is not a transfer recei
   // Key goes in a header, not the ?key= query param — found by monster_check:
   // query strings are more likely to end up in server access logs / fetch
   // logging middleware than headers are.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000); // 8s; Vercel Hobby = 10s
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
@@ -57,8 +59,9 @@ Use null for any field that is not legible. If the image is not a transfer recei
         ],
         generationConfig: { responseMimeType: 'application/json' },
       }),
+      signal: controller.signal,
     },
-  );
+  ).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -79,6 +82,7 @@ Use null for any field that is not legible. If the image is not a transfer recei
       bank: typeof parsed.bank === 'string' ? parsed.bank : null,
     };
   } catch {
+    console.error('[ocr] JSON parse failed on Gemini response text:', text.slice(0, 200));
     return null;
   }
 }
@@ -101,7 +105,8 @@ export async function checkBuktiConsistency(
   let extracted: ExtractedFields | null;
   try {
     extracted = await extractFieldsFromImage(imageBytes, mimeType);
-  } catch {
+  } catch (err) {
+    console.error('[ocr] extraction failed:', err instanceof Error ? err.message : String(err));
     extracted = null;
   }
 
