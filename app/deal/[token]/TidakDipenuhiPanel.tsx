@@ -21,6 +21,7 @@ import {
   TIDAK_DIPENUHI_REPORTER_WAITING,
   TIDAK_DIPENUHI_FLAGGED_HEADING,
   TIDAK_DIPENUHI_FIELD_NOTE_LABEL,
+  STATEMENT_IMAGE_ATTACHED_LABEL,
   HAK_JAWAB_NOTE_LABEL,
   HAK_JAWAB_EVIDENCE_LABEL,
   HAK_JAWAB_EVIDENCE_HINT,
@@ -76,16 +77,26 @@ function ReportNoteCard({ token, phone }: { token: string; phone: string }) {
 
   // note.fieldNote can be an empty string: the deadline-lapse entry point
   // (breachActions.fileDeadlineLapseReport) makes the note optional, unlike
-  // C6's barang-tidak-sesuai path, which requires one. An empty-but-present
-  // breach_notes row would otherwise render a label with nothing under it.
-  if (note === 'loading' || !note || !note.fieldNote.trim()) return null;
+  // C6's barang-tidak-sesuai path, which requires one. Still render when there
+  // is no note but an image was attached, so the evidence isn't hidden.
+  if (note === 'loading' || !note || (!note.fieldNote.trim() && !note.evidenceSignedUrl)) return null;
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
         {TIDAK_DIPENUHI_FIELD_NOTE_LABEL}
       </p>
-      <p className="text-sm text-zinc-700">{note.fieldNote}</p>
+      {note.fieldNote.trim() && <p className="text-sm text-zinc-700">{note.fieldNote}</p>}
+      {note.evidenceSignedUrl && (
+        <a href={note.evidenceSignedUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={note.evidenceSignedUrl}
+            alt={STATEMENT_IMAGE_ATTACHED_LABEL}
+            className="max-h-64 w-auto rounded-lg border border-zinc-200 object-contain"
+          />
+        </a>
+      )}
     </div>
   );
 }

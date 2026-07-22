@@ -11,6 +11,8 @@ import {
   BARANG_TIDAK_SESUAI_MODAL_HEADING,
   MODAL_CLOSE_LABEL,
   PENDING_DEFAULT_LABEL,
+  STATEMENT_IMAGE_FIELD_LABEL,
+  STATEMENT_IMAGE_ATTESTATION,
 } from '@/lib/copy';
 
 // C6 — report filing.
@@ -42,6 +44,8 @@ export function BarangTidakSesuaiModal({
   onClose: () => void;
 }) {
   const [note, setNote] = useState('');
+  const [hasImage, setHasImage] = useState(false);
+  const [attested, setAttested] = useState(false);
 
   const boundFileReport = fileBarangTidakSesuaiReport.bind(null, token, phone);
   const fileInitialState: FileReportState = {};
@@ -79,6 +83,30 @@ export function BarangTidakSesuaiModal({
             <p className="mt-1 text-right text-xs text-zinc-400">{note.length}/600</p>
           </div>
 
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+            {STATEMENT_IMAGE_FIELD_LABEL}
+            <input
+              name="evidence_file"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setHasImage((e.target.files?.[0]?.size ?? 0) > 0)}
+              className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm`}
+            />
+          </label>
+
+          {hasImage && (
+            <label className="flex items-start gap-3 text-xs leading-relaxed text-zinc-700">
+              <input
+                type="checkbox"
+                name="attest_image"
+                checked={attested}
+                onChange={(e) => setAttested(e.target.checked)}
+                className="mt-0.5 shrink-0 accent-[var(--witness)]"
+              />
+              <span>{STATEMENT_IMAGE_ATTESTATION}</span>
+            </label>
+          )}
+
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-xs leading-relaxed text-zinc-500">
             {BARANG_TIDAK_SESUAI_CONSEQUENCES.map((line, i) => (
               <li key={i}>{line}</li>
@@ -90,7 +118,7 @@ export function BarangTidakSesuaiModal({
           <StepButton
             label={BARANG_TIDAK_SESUAI_SUBMIT_LABEL}
             pendingLabel={PENDING_DEFAULT_LABEL}
-            disabled={!note.trim()}
+            disabled={!note.trim() || (hasImage && !attested)}
           />
         </form>
       </div>

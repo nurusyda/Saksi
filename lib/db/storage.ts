@@ -67,6 +67,32 @@ export async function uploadHakJawabEvidence(
 }
 
 /**
+ * Upload the optional supporting image attached to a FORMAL "barang tidak
+ * sesuai" report (migration 0034), under a distinct `report/` prefix. The
+ * reporter counterpart to uploadHakJawabEvidence (which stores the responder's
+ * evidence). Same private bucket, signed-URL display, no OCR.
+ */
+export async function uploadReportEvidence(
+  db: SupabaseClient,
+  dealId: string,
+  file: File,
+): Promise<{ storagePath: string; mimeType: string } | null> {
+  if (file.size > MAX_UPLOAD_BYTES) return null;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const storagePath = `report/${dealId}/${randomUUID()}.${ext}`;
+  const mimeType = file.type || 'application/octet-stream';
+
+  const { error } = await db.storage.from(BUKTI_BUCKET).upload(storagePath, bytes, {
+    contentType: mimeType,
+    upsert: false,
+  });
+  if (error) return null;
+
+  return { storagePath, mimeType };
+}
+
+/**
  * Upload an optional supporting image attached to a deal statement (migration
  * 0033) — the photo a buyer shows with "barang tidak sesuai", or a seller with
  * "dana belum masuk". Same private bucket as bukti, under a distinct

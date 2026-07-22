@@ -11,7 +11,7 @@ import { submitAnchor } from '@/lib/db/anchor';
 import { maskRekening } from '@/lib/db/accountHistory';
 import { sendWaMessage } from '@/lib/wa/send';
 import { getTodayWib } from '@/lib/format';
-import { uploadHakJawabEvidence } from '@/lib/db/storage';
+import { uploadHakJawabEvidence, uploadReportEvidence } from '@/lib/db/storage';
 import { checkIdentifyRateLimit } from './paymentActions';
 import {
   ERROR_DEAL_NOT_FOUND,
@@ -26,6 +26,7 @@ import {
   ERROR_HAK_JAWAB_WINDOW_CLOSED,
   ERROR_HAK_JAWAB_FAILED,
   ERROR_BUKTI_UPLOAD_FAILED,
+  ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED,
   formatBreachReportFiledMessage,
   formatHakJawabFiledMessage,
 } from '@/lib/copy';
@@ -113,6 +114,22 @@ export async function fileBarangTidakSesuaiReport(
 
   const fieldNote = (formData.get('field_note') as string | null)?.trim() ?? '';
 
+  // §45 — optional supporting image on the report. Uploaded once here, before
+  // the retry loop; the storage path is persisted to report_evidence only in
+  // the success branch (after the report itself is filed), so a filed report
+  // never lacks the image its author attached. An attached image carries the
+  // same genuineness attestation as bukti (T&C §6.1), enforced here.
+  const evidenceFile = formData.get('evidence_file') as File | null;
+  let reportEvidencePath: string | null = null;
+  if (evidenceFile && evidenceFile.size > 0) {
+    if (formData.get('attest_image') == null) {
+      return { error: ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED };
+    }
+    const uploaded = await uploadReportEvidence(db, deal.id, evidenceFile);
+    if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
+    reportEvidencePath = uploaded.storagePath;
+  }
+
   try {
     assertTransition(DealStatus.DIKONFIRMASI_TERIMA, DealEventName.TENGGAT_LEWAT);
   } catch {
@@ -182,6 +199,17 @@ export async function fileBarangTidakSesuaiReport(
 
     if (rpcErr) return { error: ERROR_REPORT_FILE_FAILED };
     if (rpcRow) {
+      // Persist the reporter's evidence now that the report exists. A side
+      // table like bukti/hak_jawab_evidence, not part of the hash chain, so a
+      // best-effort insert after the atomic report write is the right split —
+      // if it failed the report still stands, just without the image.
+      if (reportEvidencePath) {
+        await db.from('report_evidence').insert({
+          deal_id: deal.id,
+          storage_path: reportEvidencePath,
+          mime_type: evidenceFile?.type || 'application/octet-stream',
+        });
+      }
       void submitAnchor(newHash);
       void notifyTurn(
         db,
@@ -362,6 +390,10 @@ export async function fileDeadlineLapseReport(
 export interface BreachReportNote {
   fieldNote: string;
   filedAt: string;
+  // §45 — signed URL for the reporter's optional attached image (report_evidence,
+  // migration 0034). Resolved server-side behind the same identity gate; null
+  // when none was attached.
+  evidenceSignedUrl: string | null;
 }
 
 export async function getBreachReportNote(token: string, phone: string): Promise<BreachReportNote | null> {
@@ -386,7 +418,18 @@ export async function getBreachReportNote(token: string, phone: string): Promise
     .maybeSingle();
   if (!note) return null;
 
-  return { fieldNote: note.field_note, filedAt: note.created_at };
+  let evidenceSignedUrl: string | null = null;
+  const { data: evidence } = await db
+    .from('report_evidence')
+    .select('storage_path')
+    .eq('deal_id', deal.id)
+    .maybeSingle();
+  if (evidence) {
+    const { data: signed } = await db.storage.from('bukti').createSignedUrl(evidence.storage_path, 300);
+    evidenceSignedUrl = signed?.signedUrl ?? null;
+  }
+
+  return { fieldNote: note.field_note, filedAt: note.created_at, evidenceSignedUrl };
 }
 
 export interface HakJawabResponse {
