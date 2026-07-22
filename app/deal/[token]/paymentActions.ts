@@ -15,7 +15,7 @@ import {
 import { submitAnchor } from '@/lib/db/anchor';
 import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
-import { uploadBuktiImage } from '@/lib/db/storage';
+import { uploadBuktiImage, uploadStatementImage } from '@/lib/db/storage';
 import { checkBuktiConsistency } from '@/lib/ocr/gemini';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import { checkPairCompletionLimit, getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
@@ -29,6 +29,7 @@ import {
   ERROR_BUKTI_ATTESTATION_REQUIRED,
   ERROR_BUKTI_FILE_REQUIRED,
   ERROR_BUKTI_UPLOAD_FAILED,
+  ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED,
   ERROR_BUKTI_SAVE_FAILED,
   ERROR_CONFIRM_FAILED,
   ERROR_WRONG_PARTY_PEMBELI_ONLY,
@@ -589,6 +590,29 @@ async function countPaymentDisputes(
 
 export type DanaBelumMasukState = { recorded?: boolean; error?: string; fieldError?: string };
 
+// §45 — read the optional supporting image from a statement form and upload it.
+// Returns the storage path, or null when no file was attached. A file that WAS
+// attached but failed to upload returns { error } so the caller aborts rather
+// than silently dropping the party's evidence and recording a weaker record
+// than they intended.
+async function uploadOptionalStatementImage(
+  db: ReturnType<typeof supabaseServer>,
+  dealId: string,
+  formData: FormData,
+): Promise<{ path: string | null } | { error: string }> {
+  const file = formData.get('image') as File | null;
+  if (!file || file.size === 0) return { path: null };
+  // An attached image carries the same genuineness attestation as bukti
+  // (T&C §6.1). The client gates on it, but that is presentation — enforce it
+  // here so an image can never be recorded without the attestation.
+  if (formData.get('attest_image') == null) {
+    return { error: ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED };
+  }
+  const uploaded = await uploadStatementImage(db, dealId, file);
+  if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
+  return { path: uploaded.storagePath };
+}
+
 export async function recordDanaBelumMasuk(
   token: string,
   phone: string,
@@ -633,6 +657,10 @@ export async function recordDanaBelumMasuk(
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
   const bodyHash = createHash('sha256').update(body, 'utf8').digest('hex');
 
+  const img = await uploadOptionalStatementImage(db, deal.id, formData);
+  if ('error' in img) return { error: img.error };
+  const imagePath = img.path;
+
   for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
 
@@ -668,6 +696,7 @@ export async function recordDanaBelumMasuk(
         p_event: DealEventName.DANA_BELUM_MASUK,
         p_prior_hash: priorHash,
         p_new_hash: newHash,
+        p_image_path: imagePath,
       })
       .maybeSingle();
 
@@ -890,7 +919,15 @@ export async function getPaymentDisputeState(
 // makes it a guess-and-check oracle otherwise).
 // ============================================================
 
-export type DealStatement = { actor: 'PROPOSER' | 'COUNTERPART'; body: string; created_at: string };
+export type DealStatement = {
+  actor: 'PROPOSER' | 'COUNTERPART';
+  body: string;
+  created_at: string;
+  // §45 — short-lived signed URL for the optional attached image, resolved
+  // here (behind the same identity gate as the statement body) so the client
+  // never sees the raw storage path. null when no image was attached.
+  imageUrl: string | null;
+};
 
 export async function getDealStatements(token: string, phone: string): Promise<DealStatement[]> {
   const db = supabaseServer();
@@ -909,11 +946,20 @@ export async function getDealStatements(token: string, phone: string): Promise<D
 
   const { data } = await db
     .from('deal_statements')
-    .select('actor, body, created_at')
+    .select('actor, body, created_at, image_path')
     .eq('deal_id', deal.id)
     .order('id', { ascending: true });
 
-  return data ?? [];
+  return Promise.all(
+    (data ?? []).map(async (s) => {
+      let imageUrl: string | null = null;
+      if (s.image_path) {
+        const { data: signed } = await db.storage.from('bukti').createSignedUrl(s.image_path, 300);
+        imageUrl = signed?.signedUrl ?? null;
+      }
+      return { actor: s.actor, body: s.body, created_at: s.created_at, imageUrl };
+    }),
+  );
 }
 
 // ============================================================
@@ -1353,6 +1399,10 @@ async function recordGoodsStatement(
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
   const bodyHash = createHash('sha256').update(body, 'utf8').digest('hex');
 
+  const img = await uploadOptionalStatementImage(db, deal.id, formData);
+  if ('error' in img) return { error: img.error };
+  const imagePath = img.path;
+
   for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
 
@@ -1386,6 +1436,7 @@ async function recordGoodsStatement(
         p_event: event,
         p_prior_hash: priorHash,
         p_new_hash: newHash,
+        p_image_path: imagePath,
       })
       .maybeSingle();
 

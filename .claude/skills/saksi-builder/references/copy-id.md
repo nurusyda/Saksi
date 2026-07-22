@@ -1450,9 +1450,29 @@ show all-zero seller buckets; goods disputes surface; seller-confirmed counts as
 berhasil. Retired the verdict word "Tidak dipenuhi" and the catch-all
 "Kedaluwarsa" from the primary rekening card.
 
-**Deferred (not built this pass), noted so the next session doesn't assume done:**
-- Images on both sides of every dispute (approved point #5) — needs the
-  statement/evidence UI extended to all three statement types.
+**Images on both sides of every dispute (built — migration 0033).** A
+deal_statement (DANA_BELUM_MASUK, BARANG_TIDAK_SESUAI, PENJUAL_JAWAB) may now
+carry one optional supporting image. Same evidentiary tier as the payment
+bukti: private 'bukti' bucket under a `statement/` prefix, referenced by
+nullable `deal_statements.image_path`, shown only via a 300s signed URL
+resolved server-side behind the same identity gate as the statement body, and
+NOT hash-chained (the BUKTI_UPLOADED payload is null too — giving statement
+images a stronger guarantee than the payment bukti would be inconsistent). The
+event payload stays `{ body_hash }`; the canonical hash format is untouched.
+`record_deal_statement_with_event` gained a trailing defaulted `p_image_path`.
+An attached image is shown neutrally ("Gambar yang dilampirkan"), attributed to
+the same claimant, never called "asli".
+- **Attestation:** an attached image requires the same genuineness attestation
+  as bukti (a dispute is where forgery risk is highest). Enforced server-side
+  in `uploadOptionalStatementImage`, not just client-gated. T&C bumped to v1.2:
+  §3A notes the optional image, §6.1 adds it to the fake-evidence-prohibition
+  list so the "centang wajib" claim stays true.
+- **Server Action body limit:** `next.config.ts` now sets
+  `serverActions.bodySizeLimit: '10mb'` to match MAX_UPLOAD_BYTES — the 1 MB
+  default silently capped every image upload (bukti included) below the app's
+  own declared limit. storage.ts remains the real guard.
+
+**Still deferred, noted so the next session doesn't assume done:**
 - `/cek` per-role attribution — the phone view still pools a number's seller-
   role and buyer-role deals; each bucket label is literally true, but a buyer in
   a seller-ghosted deal sees "belum dikonfirmasi penjual" on their own lookup.
@@ -1460,7 +1480,6 @@ berhasil. Retired the verdict word "Tidak dipenuhi" and the catch-all
 - `LEDGER_BUCKET_LABELS` / `lib/db/ledger.ts` still carry the old 8-bucket
   taxonomy — untouched because that whole surface is gated off behind
   `LEDGER_DETAIL_ENABLED`. Rework it before that flag is ever flipped.
-- T&C §4/§5 not yet reworded to the new state names.
 - Naughty-buyer visibility to sellers — deferred to the 100k tier per the
   operator ("50 klaim berbeda should raise an eyebrow" is a human read of the
   data, never a hardcoded threshold — the no-scores invariant holds).

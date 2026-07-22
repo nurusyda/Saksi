@@ -384,6 +384,19 @@ export const DANA_BELUM_MASUK_RECORDED = 'Keterangan Anda tercatat.';
 export const STATEMENT_FROM_PENJUAL_LABEL = 'Keterangan dari penjual';
 export const STATEMENT_FROM_PEMBELI_LABEL = 'Keterangan dari pembeli';
 
+// §45 — optional supporting image on a dispute statement. The field label is
+// offered as optional ("kalau ada"), and the shown image is described
+// neutrally: it is what the party attached, never asserted to be genuine.
+export const STATEMENT_IMAGE_FIELD_LABEL = 'Lampirkan foto/tangkapan layar (kalau ada)';
+export const STATEMENT_IMAGE_ATTACHED_LABEL = 'Gambar yang dilampirkan';
+// Required only when an image is attached — same genuineness attestation as
+// bukti (T&C §6.1). A dispute is where forgery risk is highest, so an attached
+// image carries the same "saya tidak memalsukan" liability as a payment bukti.
+export const STATEMENT_IMAGE_ATTESTATION =
+  'Gambar yang saya lampirkan asli dan belum diubah. Mengunggah bukti palsu adalah tanggung jawab hukum saya.';
+export const ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED =
+  'Centang pernyataan keaslian untuk melampirkan gambar.';
+
 export const ERROR_STATEMENT_TOO_SHORT = 'Tulis keterangan minimal 10 karakter.';
 export const ERROR_STATEMENT_TOO_LONG = 'Maksimal 600 karakter.';
 export const ERROR_STATEMENT_SAVE_FAILED = 'Gagal mencatat keterangan. Coba lagi.';

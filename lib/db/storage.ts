@@ -65,3 +65,30 @@ export async function uploadHakJawabEvidence(
 
   return { storagePath, mimeType };
 }
+
+/**
+ * Upload an optional supporting image attached to a deal statement (migration
+ * 0033) — the photo a buyer shows with "barang tidak sesuai", or a seller with
+ * "dana belum masuk". Same private bucket as bukti, under a distinct
+ * `statement/` prefix. Not OCR'd; stored and later shown as a signed URL only,
+ * the same tier as uploadHakJawabEvidence.
+ */
+export async function uploadStatementImage(
+  db: SupabaseClient,
+  dealId: string,
+  file: File,
+): Promise<{ storagePath: string } | null> {
+  if (file.size > MAX_UPLOAD_BYTES) return null;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const storagePath = `statement/${dealId}/${randomUUID()}.${ext}`;
+  const mimeType = file.type || 'application/octet-stream';
+
+  const { error } = await db.storage.from(BUKTI_BUCKET).upload(storagePath, bytes, {
+    contentType: mimeType,
+    upsert: false,
+  });
+  if (error) return null;
+
+  return { storagePath };
+}

@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react';
 import { getDealStatements, type DealStatement } from './paymentActions';
 import { formatTimeWib } from '@/lib/format';
 import { Card } from '@/components/ui';
-import { STATEMENT_FROM_PENJUAL_LABEL, STATEMENT_FROM_PEMBELI_LABEL } from '@/lib/copy';
+import {
+  STATEMENT_FROM_PENJUAL_LABEL,
+  STATEMENT_FROM_PEMBELI_LABEL,
+  STATEMENT_IMAGE_ATTACHED_LABEL,
+} from '@/lib/copy';
 
 // §24 (2026-07-21) — shows statements either party has recorded on this
 // deal, to the other party. This is the surface that makes the "Dana belum
@@ -60,6 +64,21 @@ export function DealStatements({
             </p>
           </div>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">{s.body}</p>
+          {s.imageUrl && (
+            <a
+              href={s.imageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={s.imageUrl}
+                alt={STATEMENT_IMAGE_ATTACHED_LABEL}
+                className="max-h-64 w-auto rounded-lg border border-zinc-200 object-contain"
+              />
+            </a>
+          )}
         </Card>
       ))}
     </div>

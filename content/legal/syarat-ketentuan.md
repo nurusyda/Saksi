@@ -1,11 +1,19 @@
 # Syarat & Ketentuan SAKSI
 
-**Versi: 1.1 (DRAF, menunggu tinjauan hukum)**
+**Versi: 1.2 (DRAF, menunggu tinjauan hukum)**
 **Berlaku sejak: [tanggal publikasi]**
 **Hash dokumen (SHA-256): [diisi otomatis saat publikasi]**
 
 <!--
   CHANGELOG (untuk peninjau, tidak untuk ditampilkan sebagai bagian dokumen):
+  v1.2 (2026-07-22) — gambar pendukung pada keterangan klarifikasi:
+    - Bagian 3A: keterangan klarifikasi kini dapat menyertakan satu gambar
+      pendukung (foto/tangkapan layar), bersifat opsional.
+    - Bagian 6: daftar unggahan yang tunduk pada larangan bukti palsu diperluas
+      untuk mencakup gambar pendukung tersebut. Gambar yang dilampirkan
+      memerlukan pernyataan keaslian yang sama seperti bukti transfer.
+    (Detail implementasi: copy-id.md §45.)
+
   v1.1 (2026-07-21) — menyelaraskan dokumen dengan sistem yang sebenarnya
   dibangun:
     - Bagian 4: kewajiban verifikasi OTP pelapor DIHAPUS. Mekanisme OTP
@@ -63,7 +71,7 @@ Dengan membuat atau bergabung ke dalam kesepakatan di SAKSI, Anda menyatakan bah
 Sebelum sebuah perselisihan menjadi laporan resmi (Bagian 4), SAKSI memberi ruang bagi kedua pihak untuk saling menjelaskan.
 
 1. Jika salah satu pihak menganggap kewajiban belum dipenuhi — misalnya penjual menyatakan dana belum masuk, atau pembeli menyatakan barang tidak sesuai — pihak tersebut dapat mencatat keterangannya, dan pihak lain dapat menanggapi. Pertukaran ini dibatasi maksimal dua putaran per pihak.
-2. Keterangan pada tahap ini adalah **pernyataan yang tercatat dan diatributkan kepada pihak yang menyatakannya**, bukan laporan, bukan putusan, dan bukan publikasi. Keterangan ini tidak mengubah status kesepakatan dan tidak mengubah tenggat waktunya.
+2. Keterangan pada tahap ini adalah **pernyataan yang tercatat dan diatributkan kepada pihak yang menyatakannya**, bukan laporan, bukan putusan, dan bukan publikasi. Keterangan ini tidak mengubah status kesepakatan dan tidak mengubah tenggat waktunya. Keterangan dapat menyertakan satu gambar pendukung (foto atau tangkapan layar); gambar tersebut opsional, ditampilkan sebagaimana adanya tanpa penilaian keaslian oleh SAKSI, dan tunduk pada larangan bukti palsu (Bagian 6).
 3. Kedua keterangan ditampilkan berdampingan pada halaman kesepakatan sehingga kedua sisi terlihat. SAKSI tidak menyimpulkan siapa yang benar; SAKSI hanya menampilkan bahwa kedua pihak berbeda pendapat.
 4. Tahap klarifikasi ini bersifat sukarela dan tidak menghapus hak pihak yang dirugikan untuk mengajukan laporan resmi (Bagian 4) setelah tenggat waktu terlewati.
 
@@ -93,7 +101,7 @@ Bagian ini adalah inti dari SAKSI. Bacalah dengan saksama.
 
 ## 6. Larangan bukti palsu
 
-1. Setiap bukti (bukti transfer, bukti pengembalian dana) yang Anda unggah harus asli dan belum diubah. Anda menyatakan hal ini melalui centang wajib pada saat mengunggah.
+1. Setiap bukti (bukti transfer, bukti pengembalian dana, atau gambar pendukung yang dilampirkan pada keterangan klarifikasi) yang Anda unggah harus asli dan belum diubah. Anda menyatakan hal ini melalui centang wajib pada saat mengunggah.
 2. Mengunggah bukti palsu atau yang telah dimanipulasi adalah tanggung jawab hukum Anda sepenuhnya, termasuk kemungkinan tuntutan pidana dari pihak yang dirugikan.
 3. Pemeriksaan otomatis SAKSI atas bukti adalah **pemeriksaan konsistensi** (kecocokan nominal, tanggal, dan rekening tujuan dengan rekaman kesepakatan), bukan pemeriksaan keaslian. Bukti yang lolos pemeriksaan konsistensi tidak berarti asli; bukti yang tidak lolos tercatat sebagai tidak konsisten dan ketidakcocokan itu sendiri menjadi bagian dari catatan.
 4. SAKSI dapat menolak, menandai, atau membekukan rekaman yang diyakini secara wajar memuat bukti palsu, penyalahgunaan identitas, atau penggunaan yang melanggar hukum.

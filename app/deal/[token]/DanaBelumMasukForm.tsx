@@ -14,6 +14,8 @@ import {
   DANA_BELUM_MASUK_RECORDED,
   PENDING_SAVE_LABEL,
   MODAL_CLOSE_LABEL,
+  STATEMENT_IMAGE_FIELD_LABEL,
+  STATEMENT_IMAGE_ATTESTATION,
   formatDisputeRoundsLeft,
 } from '@/lib/copy';
 
@@ -49,6 +51,8 @@ export function DanaBelumMasukForm({
 }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState('');
+  const [hasImage, setHasImage] = useState(false);
+  const [attested, setAttested] = useState(false);
   const bound = recordDanaBelumMasuk.bind(null, token, phone);
   const [state, formAction] = useActionState(bound, initialState);
 
@@ -100,13 +104,37 @@ export function DanaBelumMasukForm({
           <FieldError msg={state.fieldError} />
         </div>
 
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-600">
+          {STATEMENT_IMAGE_FIELD_LABEL}
+          <input
+            name="image"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setHasImage((e.target.files?.[0]?.size ?? 0) > 0)}
+            className={`${inputClass} file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm`}
+          />
+        </label>
+
+        {hasImage && (
+          <label className="flex items-start gap-3 text-xs leading-relaxed text-zinc-700">
+            <input
+              type="checkbox"
+              name="attest_image"
+              checked={attested}
+              onChange={(e) => setAttested(e.target.checked)}
+              className="mt-0.5 shrink-0 accent-[var(--witness)]"
+            />
+            <span>{STATEMENT_IMAGE_ATTESTATION}</span>
+          </label>
+        )}
+
         <ul className="flex list-disc flex-col gap-1 pl-5 text-xs leading-relaxed text-zinc-500">
           {DANA_BELUM_MASUK_CONSEQUENCES.map((c, i) => (
             <li key={i}>{c}</li>
           ))}
         </ul>
 
-        <SubmitButton disabled={body.trim().length < 10} />
+        <SubmitButton disabled={body.trim().length < 10 || (hasImage && !attested)} />
 
         {typeof roundsLeft === 'number' && (
           <p className="text-xs text-zinc-500">{formatDisputeRoundsLeft(roundsLeft)}</p>
