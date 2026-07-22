@@ -219,3 +219,64 @@ deferred, and the milestone it's tied to.
 - **Why deferred:** Didit is not a Dukcapil check; current e-KYC is
   sufficient for the Bermeterai tier's needs.
 - **Target:** When a paying use case demands it.
+
+## Paid-tier features (Toko Saksi Pro — Rp100rb)
+
+Context: the §45 trust redesign (fair-attribution history + literal state
+names + images on both sides of every dispute) is built and live on the free
+tier. The items below were surfaced while building it and deliberately deferred
+to the paid tier. The no-scores invariant holds for all of them: any
+"threshold" (e.g. "50 klaim berbeda raises an eyebrow") is a *human* read of
+the raw counts SAKSI shows, never a hardcoded score or verdict SAKSI renders.
+
+### Naughty-buyer visibility to sellers
+- **What it is:** Let a seller check a *buyer's* phone before accepting a deal
+  and see the buyer-side signals already computed in the ledger — chiefly
+  `klaim pembayaran berbeda` (times a seller disputed this number's payment)
+  and any pattern of one-sided/ghosted disputes. Today the fair-attribution
+  model already attributes payment disputes to the buyer's phone
+  (`accountHistory.ts` / `ledger.ts` phone mode); this feature is the seller-
+  facing *surface* for it, gated to the paid tier.
+- **Why deferred:** Founder call (2026-07-22) — the data model supports it now,
+  but exposing buyer-side reputation to sellers is a paid-tier feature, and the
+  surface needs its own design pass (what exactly a seller sees, how it stays
+  attributed-not-adjudicated). "50 disputes raises an eyebrow" is illustrative
+  of the human reading, not a number to encode.
+- **Target:** Toko Saksi Pro (Rp100rb tier).
+
+### Integrated spreadsheet export for sellers
+- **What it is:** Give a seller a clean, structured export of all their SAKSI
+  data — every deal, status, counterpart fingerprint, dates, amounts, dispute
+  outcomes — accessible as a spreadsheet (CSV/XLSX download, and/or a live
+  Google-Sheets-style connected view) so a high-volume seller can reconcile,
+  do their own bookkeeping, and analyse their record outside the deal pages.
+  Read-only projection of data the seller already owns; no new trust claims.
+- **Why deferred:** A power-seller convenience feature, not core to the
+  witnessing product; belongs to the paid tier alongside the shopfront
+  (`saksi.app/namatoko`) and logo-on-tagihan features already stubbed in
+  `TOKO_PRO_LOCKED_*` copy.
+- **Target:** Toko Saksi Pro (Rp100rb tier). Design the export schema + column
+  set first; reuse `lib/db/ledger.ts`'s aggregation rather than a new query
+  path.
+
+### Other paid-tier features (parking lot)
+- Logo on tagihan + own shop link `saksi.app/namatoko` (already stubbed in
+  `TOKO_PRO_LOCKED_TITLE`/`_PRICE`/`_DESC`).
+- Any further seller analytics that are read-only projections of owned data and
+  make no trust claim the free tier doesn't already earn — the rekam jejak
+  itself stays free and un-buyable (T&C §7).
+
+## Correctness refinements (post-launch)
+
+### /cek phone lookup — per-role attribution
+- **What it is:** The `/cek` phone lookup (`getAccountHistoryByPhoneHash`,
+  `formatAccountHistoryFull`) currently pools a number's seller-role and
+  buyer-role deals into one set of buckets. Each bucket label is individually
+  true of the number, but a buyer in a seller-ghosted deal still sees
+  "belum dikonfirmasi penjual" on their own lookup — imprecise, not false.
+  The fix: split the phone view by the number's role per deal so each bucket
+  reflects only that number's own conduct.
+- **Why deferred:** Founder call (2026-07-22) — rides with the naughty-buyer
+  paid-tier work above, which is where per-role attribution actually gets
+  surfaced. Not false today, only pooled, so no free-tier urgency.
+- **Target:** Alongside the naughty-buyer visibility feature.

@@ -19,21 +19,18 @@ import { maskRekening } from '@/lib/db/accountHistory';
 import { checkLookupRateLimit } from '@/lib/db/lookupRateLimit';
 
 const LEDGER_ROW_LIMIT = 50;
-const IN_FLIGHT_STATUSES = ['DRAF', 'DIAJUKAN', 'DISEPAKATI', 'DIBAYAR_DIKLAIM', 'DIKONFIRMASI_TERIMA', 'SENGKETA'];
 
 export function isLedgerDetailEnabled(): boolean {
   return process.env.LEDGER_DETAIL_ENABLED === 'true';
 }
 
+// §45 — same fair-attribution buckets as accountHistory.ts's aggregate, so the
+// drill-down and the counts it expands from can never disagree.
 export type LedgerBucket =
-  | 'SELESAI'
-  | 'DIBATALKAN_BERSAMA'
-  | 'TIDAK_DILANJUTKAN'
-  | 'KEDALUWARSA'
-  | 'DIKEMBALIKAN_PENUH'
-  | 'DIKEMBALIKAN_SEBAGIAN'
-  | 'TIDAK_DIPENUHI'
-  | 'KLAIM_BERBEDA_AKTIF';
+  | 'BERHASIL'
+  | 'KLAIM_BARANG'
+  | 'BELUM_DIKONFIRMASI'
+  | 'KLAIM_PEMBAYARAN';
 
 export interface LedgerRow {
   bucket: LedgerBucket;
@@ -81,66 +78,74 @@ type RawDeal = {
 // function trying to encode both rules through a single comparison.
 type AnnotatedDeal = RawDeal & { otherPartyId: string | null };
 
-function resolveBucket(
-  status: string,
-  flag: { hak_jawab_status: string; published_at: string | null } | undefined,
-): LedgerBucket | null {
-  if (status === 'TIDAK_DIPENUHI') {
-    if (!flag?.published_at) return null;
-    return flag.hak_jawab_status === 'DISPUTED' ? 'KLAIM_BERBEDA_AKTIF' : 'TIDAK_DIPENUHI';
-  }
-  if (
-    status === 'SELESAI' ||
-    status === 'DIBATALKAN_BERSAMA' ||
-    status === 'TIDAK_DILANJUTKAN' ||
-    status === 'KEDALUWARSA' ||
-    status === 'DIKEMBALIKAN_PENUH' ||
-    status === 'DIKEMBALIKAN_SEBAGIAN'
-  ) {
-    return status as LedgerBucket;
-  }
-  return null; // in-flight status: never listed
+// §45 — mirrors accountHistory.ts's buildHistoryFromDeals classification
+// exactly, computed from status + events rather than status alone. `ev` is the
+// set of this deal's events; `publishedBreach` is true for a published
+// TIDAK_DIPENUHI/SENGKETA flag. Returns null for in-flight/uncounted deals
+// (DIAJUKAN, DISEPAKATI, a fresh DIBAYAR_DIKLAIM with no dispute yet).
+function resolveBucket(status: string, ev: Set<string>, publishedBreach: boolean): LedgerBucket | null {
+  const receiptConfirmed = ev.has('RECEIPT_CONFIRMED');
+  const goodsDisputed = ev.has('BARANG_TIDAK_SESUAI');
+  const paymentDisputed = ev.has('DANA_BELUM_MASUK');
+
+  if (status === 'SELESAI') return 'BERHASIL';
+  if (goodsDisputed || publishedBreach) return 'KLAIM_BARANG';
+  if (status === 'DIKONFIRMASI_TERIMA' || (status === 'KEDALUWARSA' && receiptConfirmed)) return 'BERHASIL';
+  if (paymentDisputed) return 'KLAIM_PEMBAYARAN';
+  if (status === 'KEDALUWARSA') return 'BELUM_DIKONFIRMASI';
+  return null; // in-flight / uncounted
 }
 
-async function assembleLedger(db: SupabaseClient, deals: AnnotatedDeal[]): Promise<LedgerResult> {
+// `includePaymentDisputes` false in rekening mode (the seller's card never
+// shows a buyer's payment dispute — same fair-attribution rule as the
+// aggregate), true in phone mode where the number can be the payer.
+async function assembleLedger(
+  db: SupabaseClient,
+  deals: AnnotatedDeal[],
+  includePaymentDisputes: boolean,
+): Promise<LedgerResult> {
   if (deals.length === 0) return { status: 'empty' };
 
-  const tidakDipenuhiIds = deals.filter((d) => d.status === 'TIDAK_DIPENUHI').map((d) => d.id);
-  const flagsById = new Map<string, { hak_jawab_status: string; published_at: string | null }>();
-  if (tidakDipenuhiIds.length > 0) {
-    const { data: flags, error } = await db
-      .from('flags')
-      .select('deal_id, hak_jawab_status, published_at')
-      .in('deal_id', tidakDipenuhiIds);
+  // Published breach flags fold into KLAIM_BARANG, same as the aggregate.
+  const breachIds = deals.filter((d) => d.status === 'TIDAK_DIPENUHI' || d.status === 'SENGKETA').map((d) => d.id);
+  const publishedBreach = new Set<string>();
+  if (breachIds.length > 0) {
+    const { data: flags, error } = await db.from('flags').select('deal_id, published_at').in('deal_id', breachIds);
     if (error) return { status: 'error' };
-    for (const f of flags ?? []) flagsById.set(f.deal_id, f);
+    for (const f of flags ?? []) if (f.published_at) publishedBreach.add(f.deal_id);
   }
 
-  const eligible = deals
-    .map((d) => ({ deal: d, bucket: resolveBucket(d.status, flagsById.get(d.id)) }))
-    .filter((x): x is { deal: AnnotatedDeal; bucket: LedgerBucket } => x.bucket !== null);
-
-  if (eligible.length === 0) return { status: 'empty' };
-
-  // Batched, not per-row: every event for every eligible deal in one query.
-  // Needed for two things per deal — the row's display date (latest event,
-  // matching lib/flags/render.ts's "date of the specific transition being
-  // recorded," generalized here to "most recent" rather than a hardcoded
-  // status->event-name table) and, for SELESAI deals, the ACCEPTED
-  // timestamp signal 2 (velocity) needs.
-  const dealIds = eligible.map((x) => x.deal.id);
+  // Every event for every candidate deal in one query — needed both to
+  // classify (RECEIPT_CONFIRMED / BARANG_TIDAK_SESUAI / DANA_BELUM_MASUK) and
+  // for each row's display date (latest event) + the velocity signal's
+  // ACCEPTED timestamp.
+  const allDealIds = deals.map((d) => d.id);
   const { data: events } = await db
     .from('deal_events')
     .select('deal_id, event, created_at')
-    .in('deal_id', dealIds)
+    .in('deal_id', allDealIds)
     .order('created_at', { ascending: true });
 
   const latestEventByDeal = new Map<string, string>();
   const acceptedAtByDeal = new Map<string, string>();
+  const eventSetByDeal = new Map<string, Set<string>>();
   for (const e of events ?? []) {
     latestEventByDeal.set(e.deal_id, e.created_at); // ascending order: last write wins = latest
     if (e.event === 'ACCEPTED') acceptedAtByDeal.set(e.deal_id, e.created_at);
+    let s = eventSetByDeal.get(e.deal_id);
+    if (!s) eventSetByDeal.set(e.deal_id, (s = new Set()));
+    s.add(e.event);
   }
+
+  const eligible = deals
+    .map((d) => ({
+      deal: d,
+      bucket: resolveBucket(d.status, eventSetByDeal.get(d.id) ?? new Set(), publishedBreach.has(d.id)),
+    }))
+    .filter((x): x is { deal: AnnotatedDeal; bucket: LedgerBucket } => x.bucket !== null)
+    .filter((x) => includePaymentDisputes || x.bucket !== 'KLAIM_PEMBAYARAN');
+
+  if (eligible.length === 0) return { status: 'empty' };
 
   // Batched phone_hash lookup for tier-gated rows only (LIMA_RIBU/BERMETERAI).
   const partyIdsNeeded = new Set<string>();
@@ -254,14 +259,15 @@ export async function getRekeningLedger(bank: string, rekening: string): Promise
     .select('id, status, tier, proposer_id, counterpart_id, proposer_role, item_desc, amount_idr, rekening_tujuan, rekening_bank, created_at')
     .eq('rekening_bank', bank)
     .eq('rekening_tujuan', rekening)
-    .not('status', 'in', `(${IN_FLIGHT_STATUSES.join(',')})`);
+    .neq('status', 'DRAF');
   if (error) return { status: 'error' };
 
   const annotated: AnnotatedDeal[] = (data ?? []).map((d) => ({
     ...d,
     otherPartyId: d.proposer_role === 'PENJUAL' ? d.counterpart_id : d.proposer_id,
   }));
-  return assembleLedger(db, annotated);
+  // Rekening mode: a seller's card never surfaces a buyer's payment dispute.
+  return assembleLedger(db, annotated, false);
 }
 
 // Phone-mode: "other party" is whichever slot does NOT belong to one of this
@@ -279,12 +285,8 @@ export async function getPhoneLedger(phoneHash: string): Promise<LedgerResult> {
 
   const cols = 'id, status, tier, proposer_id, counterpart_id, item_desc, amount_idr, rekening_tujuan, rekening_bank, created_at';
   const [proposerDeals, counterpartDeals] = await Promise.all([
-    db.from('deals').select(cols).in('proposer_id', partyIds).not('status', 'in', `(${IN_FLIGHT_STATUSES.join(',')})`),
-    db
-      .from('deals')
-      .select(cols)
-      .in('counterpart_id', partyIds)
-      .not('status', 'in', `(${IN_FLIGHT_STATUSES.join(',')})`),
+    db.from('deals').select(cols).in('proposer_id', partyIds).neq('status', 'DRAF'),
+    db.from('deals').select(cols).in('counterpart_id', partyIds).neq('status', 'DRAF'),
   ]);
   if (proposerDeals.error || counterpartDeals.error) return { status: 'error' };
 
@@ -297,7 +299,9 @@ export async function getPhoneLedger(phoneHash: string): Promise<LedgerResult> {
     ...d,
     otherPartyId: partyIdSet.has(d.proposer_id) ? d.counterpart_id : d.proposer_id,
   }));
-  return assembleLedger(db, annotated);
+  // Phone mode: the number can be the payer, so its own payment disputes are a
+  // true signal about it and are shown.
+  return assembleLedger(db, annotated, true);
 }
 
 // Signal 5 — pair-completion rate limit, called from confirmFulfillment (and

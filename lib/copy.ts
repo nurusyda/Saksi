@@ -866,20 +866,17 @@ export const LEDGER_DETAIL_LINK_LABEL = 'Lihat detail lengkap history rekening';
 export const LEDGER_EMPTY_STATE = 'Belum ada riwayat lengkap untuk ditampilkan.';
 export const ERROR_LEDGER_UNAVAILABLE = 'Riwayat lengkap tidak dapat dimuat saat ini. Coba lagi.';
 
-// Per-row bucket labels — same words formatAccountHistoryFull already uses
-// for the aggregate line, kept identical rather than reworded per-row.
+// §45 — per-row bucket labels, reworked to the same fair-attribution taxonomy
+// as the aggregate line (formatAccountHistoryFull). Kept identical to the
+// aggregate wording rather than reworded per-row.
 export const LEDGER_BUCKET_LABELS: Record<
-  'SELESAI' | 'DIBATALKAN_BERSAMA' | 'TIDAK_DILANJUTKAN' | 'KEDALUWARSA' | 'DIKEMBALIKAN_PENUH' | 'DIKEMBALIKAN_SEBAGIAN' | 'TIDAK_DIPENUHI' | 'KLAIM_BERBEDA_AKTIF',
+  'BERHASIL' | 'KLAIM_BARANG' | 'BELUM_DIKONFIRMASI' | 'KLAIM_PEMBAYARAN',
   string
 > = {
-  SELESAI: 'selesai',
-  DIBATALKAN_BERSAMA: 'dibatalkan bersama',
-  TIDAK_DILANJUTKAN: 'tidak dilanjutkan',
-  KEDALUWARSA: 'kedaluwarsa',
-  DIKEMBALIKAN_PENUH: 'dikembalikan penuh',
-  DIKEMBALIKAN_SEBAGIAN: 'dikembalikan sebagian',
-  TIDAK_DIPENUHI: 'tidak dipenuhi',
-  KLAIM_BERBEDA_AKTIF: 'klaim berbeda aktif',
+  BERHASIL: 'transaksi berhasil',
+  KLAIM_BARANG: 'klaim barang berbeda',
+  BELUM_DIKONFIRMASI: 'belum dikonfirmasi penjual',
+  KLAIM_PEMBAYARAN: 'klaim pembayaran berbeda',
 };
 
 // Signal 5 — pair-completion rate limit block (confirmFulfillment).

@@ -1472,14 +1472,28 @@ the same claimant, never called "asli".
   default silently capped every image upload (bukti included) below the app's
   own declared limit. storage.ts remains the real guard.
 
-**Still deferred, noted so the next session doesn't assume done:**
-- `/cek` per-role attribution — the phone view still pools a number's seller-
-  role and buyer-role deals; each bucket label is literally true, but a buyer in
-  a seller-ghosted deal sees "belum dikonfirmasi penjual" on their own lookup.
-  Proper per-role split is part of the deferred 100k-tier naughty-buyer work.
-- `LEDGER_BUCKET_LABELS` / `lib/db/ledger.ts` still carry the old 8-bucket
-  taxonomy — untouched because that whole surface is gated off behind
-  `LEDGER_DETAIL_ENABLED`. Rework it before that flag is ever flipped.
-- Naughty-buyer visibility to sellers — deferred to the 100k tier per the
-  operator ("50 klaim berbeda should raise an eyebrow" is a human read of the
-  data, never a hardcoded threshold — the no-scores invariant holds).
+**Photo on the FORMAL "barang tidak sesuai" report (built — migration 0034).**
+The clarification loop already carried an image on both sides, but the formal
+report path lagged: the seller's hak-jawab response could attach evidence while
+the buyer's initial report could not. Closed with `report_evidence` (a parallel
+table to `hak_jawab_evidence`, no PK surgery on the working responder path),
+wired into `fileBarangTidakSesuaiReport` (optional `evidence_file`, `report/`
+prefix, same attestation), surfaced via `getBreachReportNote` → `ReportNoteCard`
+thumbnail. Both goods-complaint surfaces now support a photo.
+
+**Gated ledger reworked to the fair-attribution taxonomy (built).**
+`lib/db/ledger.ts` + `LEDGER_BUCKET_LABELS` dropped the old 8 status-buckets for
+the same 4 event-computed buckets as the aggregate (BERHASIL / KLAIM_BARANG /
+BELUM_DIKONFIRMASI / KLAIM_PEMBAYARAN). `resolveBucket` now mirrors
+`buildHistoryFromDeals` exactly; rekening mode hides payment disputes, phone
+mode shows them. Still gated off behind `LEDGER_DETAIL_ENABLED` — but now
+consistent with the aggregate it expands from, so it's safe whenever the flag
+is flipped. Verified against production (phone-mode BERHASIL=7/KLAIM_PEMBAYARAN=7/
+KLAIM_BARANG=2, 15 in-flight excluded; rekening-mode hides all 7 payment rows).
+
+**Moved to ROADMAP.md (deferred, per the operator 2026-07-22):**
+- Naughty-buyer visibility to sellers → Toko Saksi Pro (Rp100rb tier).
+- Integrated spreadsheet export for sellers → Rp100rb tier.
+- `/cek` per-role attribution (pooled phone view) → rides with the naughty-buyer
+  work. No-scores invariant holds throughout ("50 klaim berbeda raises an
+  eyebrow" is a human read, never a hardcoded threshold).
