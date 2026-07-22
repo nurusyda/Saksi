@@ -303,7 +303,7 @@ export default async function DealPage({
 
         {deal.status === DealStatus.DIKONFIRMASI_TERIMA && (
           <DikonfirmasiTerimaPanel
-            deal={{ token, item_desc: deal.item_desc, proposer_role: deal.proposer_role }}
+            deal={{ token, item_desc: deal.item_desc, proposer_role: deal.proposer_role, deadline: deal.deadline }}
             initialWhichParty={partySession}
           />
         )}

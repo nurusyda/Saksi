@@ -18,6 +18,7 @@ import { DealStatements } from './DealStatements';
 import { DealTimeline } from './DealTimeline';
 import { BarangTidakSesuaiModal } from './BarangTidakSesuaiModal';
 import type { WhichParty } from '@/lib/db/party';
+import { getTodayWib } from '@/lib/format';
 import { DealStatus } from '@/lib/db/transitions';
 import {
   CONFIRM_FULFILLMENT_LABEL_JUAL_BELI,
@@ -26,12 +27,14 @@ import {
   BARANG_TIDAK_SESUAI_BUTTON,
   RIWAYAT_HEADING,
   GOODS_DISPUTE_EXHAUSTED_NOTE,
+  GOODS_DISPUTE_LOADING_LABEL,
 } from '@/lib/copy';
 
 interface DealSummary {
   token: string;
   item_desc: string;
   proposer_role: string;
+  deadline: string;
 }
 
 function ConfirmFulfillmentButton() {
@@ -64,6 +67,10 @@ function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string 
   const boundConfirmFulfillment = confirmFulfillment.bind(null, deal.token, phone);
   const initialState: ConfirmActionState = {};
   const [state, formAction] = useActionState(boundConfirmFulfillment, initialState);
+  // Same strict `<` as breachActions.deadlineHasPassed and the payment panel:
+  // the buyer gets the full calendar day of the deadline itself before the
+  // formal report becomes offerable.
+  const deadlinePassed = deal.deadline < getTodayWib();
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,27 +90,46 @@ function PembeliActionPanel({ deal, phone }: { deal: DealSummary; phone: string 
           offered action. Before this, the first "barang tidak sesuai" filed
           a report immediately, even for the kind of mismatch one message
           settles. */}
-      {goods && goods.roundsLeft > 0 ? (
-        <GoodsStatementForm
-          token={deal.token}
-          phone={phone}
-          side="buyer"
-          roundsLeft={goods.roundsLeft}
-        />
+      {/* Clarification loop and formal report are independent blocks, gated the
+          same way the payment panel gates its deadline-lapse report:
+          - while `goods` is null (still loading, or a transient rate-limited
+            read) nothing is shown that could bypass the loop — the old code
+            fell through to the formal-report button here, letting a buyer skip
+            the two clarification rounds (§42) entirely and land straight in the
+            hak-jawab -> klaim berbeda path;
+          - the clarification form shows while rounds remain;
+          - the formal report is offered ONLY after the deadline has passed,
+            exactly as GOODS_DISPUTE_EXHAUSTED_NOTE promises ("laporan bisa
+            diajukan setelah batas waktu lewat") and matching the payment side —
+            before the deadline, filing would claim something not yet true. */}
+      {goods === null ? (
+        <div className="rounded-xl border border-zinc-200 px-4 py-3 text-xs text-zinc-500">
+          <PendingContent label={GOODS_DISPUTE_LOADING_LABEL} />
+        </div>
       ) : (
         <>
-          {goods && (
+          {goods.roundsLeft > 0 && (
+            <GoodsStatementForm
+              token={deal.token}
+              phone={phone}
+              side="buyer"
+              roundsLeft={goods.roundsLeft}
+            />
+          )}
+          {goods.roundsLeft === 0 && (
             <p className="rounded-xl border border-muted-amber-line bg-white px-4 py-3 text-xs leading-relaxed text-zinc-600">
               {GOODS_DISPUTE_EXHAUSTED_NOTE}
             </p>
           )}
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
-          >
-            {BARANG_TIDAK_SESUAI_BUTTON}
-          </button>
+          {deadlinePassed && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="flex h-12 w-full items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+            >
+              {BARANG_TIDAK_SESUAI_BUTTON}
+            </button>
+          )}
         </>
       )}
 

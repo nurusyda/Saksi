@@ -1497,3 +1497,36 @@ KLAIM_BARANG=2, 15 in-flight excluded; rekening-mode hides all 7 payment rows).
 - `/cek` per-role attribution (pooled phone view) → rides with the naughty-buyer
   work. No-scores invariant holds throughout ("50 klaim berbeda raises an
   eyebrow" is a human read, never a hardcoded threshold).
+
+## §46 — The goods clarification loop was bypassable (2026-07-22)
+
+Bug (found by the operator, confirmed against production): a buyer could skip
+the entire §42 two-round goods clarification loop and land straight in the
+formal report → hak-jawab → **klaim berbeda** path, after only one seller
+response. Two production SENGKETA deals proved it — TENGGAT_LEWAT filed on
+creation day, deadline still a week out, **zero** BARANG_TIDAK_SESUAI
+clarification events.
+
+Two causes, both fixed:
+1. **UI (`DikonfirmasiTerimaPanel`):** while the goods-dispute state (`goods`)
+   was still `null` — loading, or a transient rate-limited read — the panel
+   already rendered the formal "barang tidak sesuai" report button. A buyer who
+   acted before the state resolved bypassed the loop. Now: while `null`, a
+   loading spinner (`GOODS_DISPUTE_LOADING_LABEL`) and nothing else; the
+   clarification form shows while rounds remain; the formal report shows ONLY
+   after the deadline (`deadlinePassed`, threaded via the new `deadline` prop) —
+   independent blocks, matching how the payment panel gates its deadline-lapse
+   report.
+2. **Server (`fileBarangTidakSesuaiReport`):** had no deadline check at all,
+   only a status check — so a stale/racing client could still file early. Added
+   `if (!deadlineHasPassed(deal.deadline)) return ERROR_DEADLINE_NOT_PASSED`,
+   mirroring `fileDeadlineLapseReport`. The event is literally named
+   TENGGAT_LEWAT ("deadline passed"), so filing it before the deadline was
+   incoherent. Client gating is presentation; this is the enforcement.
+
+Design note: after the deadline the formal report is available regardless of
+clarification rounds (matching the payment side), which avoids a deadlock where
+a buyer who never files their own round 2 could never escalate. The two rounds
+are a pre-deadline opportunity, not a mandatory gate; the bug was that the
+formal path was reachable BEFORE the deadline (and before the state loaded),
+skipping the loop entirely.

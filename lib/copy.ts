@@ -452,6 +452,10 @@ export const GOODS_DISPUTE_CONSEQUENCES: readonly string[] = [
 ];
 export const GOODS_DISPUTE_EXHAUSTED_NOTE =
   'Batas dua kali klarifikasi sudah tercapai. Kedua keterangan tercatat. Kalau masih belum selesai, pihak yang dirugikan dapat mengajukan laporan setelah batas waktu lewat.';
+// Shown while the goods-dispute state is still loading — until it resolves, the
+// formal-report path stays hidden so a buyer can't bypass the clarification
+// loop (§42) before it is known whether rounds remain.
+export const GOODS_DISPUTE_LOADING_LABEL = 'Memuat pilihan…';
 export const STATEMENT_KIND_LABELS: Record<string, string> = {
   DANA_BELUM_MASUK: 'Keterangan penjual: dana belum masuk',
   BARANG_TIDAK_SESUAI: 'Keterangan pembeli: barang tidak sesuai',

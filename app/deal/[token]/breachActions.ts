@@ -96,6 +96,15 @@ export async function fileBarangTidakSesuaiReport(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
 
+  // The formal report fires TENGGAT_LEWAT ("deadline passed"), so filing it
+  // before the deadline is incoherent — and the §42 clarification loop is what
+  // the buyer uses before then. Enforced server-side, mirroring
+  // fileDeadlineLapseReport: the UI gate (DikonfirmasiTerimaPanel) is only
+  // presentation. Without this, a buyer could skip the two clarification rounds
+  // and file immediately, landing straight in the hak-jawab -> klaim berbeda
+  // path — exactly the bypass this closes.
+  if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
+
   if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
 
   let whichParty: WhichParty | null;
