@@ -1,7 +1,96 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizePhone, phoneHash } from './hash';
+import {
+  ERROR_TOO_MANY_ATTEMPTS,
+  ERROR_PHONE_INVALID,
+  ERROR_PHONE_NOT_IN_DEAL,
+  ERROR_WRONG_PARTY_PEMBELI_ONLY,
+  ERROR_WRONG_PARTY_PENJUAL_ONLY,
+} from '@/lib/copy';
 
 export type WhichParty = 'proposer' | 'counterpart';
+
+// ============================================================
+// Shared identity-rate limiter — moved here from paymentActions.ts (2026-07-24)
+// so assertPartyInDeal can bundle it without a lib→app circular dependency.
+// Counts identify_attempts rows in a 15-minute window. The row itself is
+// written by identifyPartyByPhone below on a MISS only (§40).
+// ============================================================
+export async function checkIdentifyRateLimit(
+  db: SupabaseClient,
+  dealId: string,
+): Promise<boolean> {
+  const ATTEMPT_WINDOW_MINUTES = 15;
+  const ATTEMPT_LIMIT = 10;
+  const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const { count: attemptCount } = await db
+    .from('identify_attempts')
+    .select('*', { count: 'exact', head: true })
+    .eq('deal_id', dealId)
+    .gte('attempted_at', windowStart);
+  return (attemptCount ?? 0) < ATTEMPT_LIMIT;
+}
+
+// ============================================================
+// Shared auth guard — bundles the 4-step identity sequence every mutating
+// action was hand-rolling separately. One function, 17+ call sites; a new
+// action that skips this is a visible omission, not a silent gap.
+//
+//   1. Rate-limit check   (identify_attempts, 10/15min)
+//   2. Normalize phone    (E.164, throws on unparseable)
+//   3. identifyPartyByPhone (hash comparison against both parties)
+//   4. Optional role gate (PENJUAL-only / PEMBELI-only)
+//
+// Returns { ok: true, whichParty } or { ok: false, error } with a
+// user-facing copy string ready to surface.
+// ============================================================
+export type AuthResult =
+  | { ok: true; whichParty: WhichParty }
+  | { ok: false; error: string };
+
+export async function assertPartyInDeal(
+  db: SupabaseClient,
+  deal: { id: string; proposer_id: string; counterpart_id: string | null; proposer_role: string },
+  rawPhone: string,
+  options?: { requiredRole?: 'PENJUAL' | 'PEMBELI' },
+): Promise<AuthResult> {
+  // Step 1 — rate limit
+  if (!(await checkIdentifyRateLimit(db, deal.id))) {
+    return { ok: false, error: ERROR_TOO_MANY_ATTEMPTS };
+  }
+
+  // Step 2 + 3 — normalize + identify. Only catch phone-format errors
+  // (normalizePhone throws with "Nomor HP …" messages). DB/network errors
+  // must propagate — masking them as "phone invalid" would be a false claim.
+  let whichParty: WhichParty | null;
+  try {
+    whichParty = await identifyPartyByPhone(db, deal, rawPhone);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.startsWith('Nomor HP')) {
+      return { ok: false, error: ERROR_PHONE_INVALID };
+    }
+    throw err;
+  }
+  if (!whichParty) return { ok: false, error: ERROR_PHONE_NOT_IN_DEAL };
+
+  // Step 4 — optional role gate
+  if (options?.requiredRole) {
+    const requiredSlot: WhichParty =
+      deal.proposer_role === options.requiredRole ? 'proposer' : 'counterpart';
+    if (whichParty !== requiredSlot) {
+      return {
+        ok: false,
+        error:
+          options.requiredRole === 'PEMBELI'
+            ? ERROR_WRONG_PARTY_PEMBELI_ONLY
+            : ERROR_WRONG_PARTY_PENJUAL_ONLY,
+      };
+    }
+  }
+
+  return { ok: true, whichParty };
+}
 
 // Phone re-entry is the only identity check in this app — no accounts, no
 // sessions (see the comment above the original inline version of this logic

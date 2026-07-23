@@ -13,91 +13,36 @@ import {
   GOODS_DISPUTE_MAX_ROUNDS,
 } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
-import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
+import { checkIdentifyRateLimit, assertPartyInDeal, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
 import { uploadBuktiImage, uploadStatementImage } from '@/lib/db/storage';
 import { checkBuktiConsistency } from '@/lib/ocr/gemini';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import { checkPairCompletionLimit, getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
-import { sendWaMessage } from '@/lib/wa/send';
 import {
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
   ERROR_PHONE_INVALID,
-  ERROR_PHONE_NOT_IN_DEAL,
-  ERROR_TOO_MANY_ATTEMPTS,
   ERROR_BUKTI_ATTESTATION_REQUIRED,
   ERROR_BUKTI_FILE_REQUIRED,
   ERROR_BUKTI_UPLOAD_FAILED,
   ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED,
   ERROR_BUKTI_SAVE_FAILED,
   ERROR_CONFIRM_FAILED,
-  ERROR_WRONG_PARTY_PEMBELI_ONLY,
-  ERROR_WRONG_PARTY_PENJUAL_ONLY,
   ERROR_PAIR_COMPLETION_LIMIT,
   ERROR_STATEMENT_TOO_SHORT,
   ERROR_STATEMENT_TOO_LONG,
   ERROR_STATEMENT_SAVE_FAILED,
   ERROR_DISPUTE_ROUNDS_EXHAUSTED,
-  formatBuktiUploadedMessage,
-  formatReceiptConfirmedMessage,
 } from '@/lib/copy';
-
-// Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
-// copy-id.md §9b) — same contract as actions.ts's notifyTurn: never blocks
-// or fails the transition it's attached to. Returns whether the send
-// actually succeeded — most call sites fire this with `void` and ignore the
-// result (the transition itself doesn't depend on it), but notifyTurn
-// itself must not swallow the result, since notifyPaymentNotReceived's
-// caller needs it to avoid a false "sent" claim (see that function).
-async function notifyTurn(
-  db: ReturnType<typeof supabaseServer>,
-  partyId: string | null,
-  template: 'BUKTI_UPLOADED' | 'RECEIPT_CONFIRMED' | 'PAYMENT_NOT_RECEIVED',
-  message: string,
-): Promise<boolean> {
-  const phone = await getPartyPhone(db, partyId);
-  if (!phone) return false;
-  const { sent } = await sendWaMessage({ toPhoneE164: phone, template, params: { message } });
-  return sent;
-}
 
 const RETRY_LIMIT = 3;
 
-// Rate limit shared by every action that accepts a caller-supplied phone
-// guess against a deal (identifyParty, getRekeningForPayer,
-// getBuktiForDisplay — see migration 0017). Blocker found by monster_check
-// twice over: first identifyParty shipped without this, then the two view
-// actions built to fix the props-leak (getRekeningForPayer,
-// getBuktiForDisplay) shipped as their own unprotected phone-guess oracles.
-// Centralizing it here so a fourth call site can't repeat the omission.
-// Exported so breachActions.ts (build step 4) can reuse the exact same
-// shared limiter rather than adding a fifth unprotected phone-guess oracle —
-// this is the "fourth call site" this comment already anticipated.
-export async function checkIdentifyRateLimit(
-  db: ReturnType<typeof supabaseServer>,
-  dealId: string,
-): Promise<boolean> {
-  const ATTEMPT_WINDOW_MINUTES = 15;
-  const ATTEMPT_LIMIT = 10;
-  const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MINUTES * 60 * 1000).toISOString();
-  const { count: attemptCount } = await db
-    .from('identify_attempts')
-    .select('*', { count: 'exact', head: true })
-    .eq('deal_id', dealId)
-    .gte('attempted_at', windowStart);
-  // Known check-then-act race (same accepted trade-off as createDeal's daily
-  // rate limit and the original accept_attempts check): two concurrent
-  // requests can both pass this count before either inserts, allowing a
-  // brief burst over ATTEMPT_LIMIT. Blast radius is small at this threshold.
-  //
-  // §40 — counts only; the row is written by identifyPartyByPhone when a
-  // guess actually MISSES. This used to insert unconditionally, so every
-  // legitimate read spent budget and a party could exhaust their own limit
-  // just by reloading (see that function for the full account). Callers are
-  // unchanged: they still gate on this before doing any work.
-  return (attemptCount ?? 0) < ATTEMPT_LIMIT;
-}
+// Shared rate limiter moved to lib/db/party.ts (2026-07-24) alongside
+// assertPartyInDeal — re-exported here so breachActions.ts import doesn't
+// need updating (it also imported from here). Remove this re-export once
+// breachActions.ts switches to assertPartyInDeal.
+export { checkIdentifyRateLimit } from '@/lib/db/party';
 
 // ============================================================
 // identifyParty — view-only phone gate shared by every post-DISEPAKATI
@@ -117,33 +62,22 @@ export async function identifyParty(
   const db = supabaseServer();
   const { data: deal, error: dealErr } = await db
     .from('deals')
-    .select('id, proposer_id, counterpart_id')
+    .select('id, proposer_id, counterpart_id, proposer_role')
     .eq('token', token)
     .single();
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
 
-  // Rate limit — the match/no-match response is otherwise a phone-enumeration
-  // oracle for anyone holding this deal's token. See migration 0017. (Accept
-  // no longer exists as a separate step, per migration 0025 — its own
-  // accept_attempts limiter, migration 0010, was dropped along with it.)
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
   const rawPhone = (formData.get('phone') as string | null)?.trim() ?? '';
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, rawPhone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
+  const auth = await assertPartyInDeal(db, deal, rawPhone);
+  if (!auth.ok) return { error: auth.error };
 
   // Remember this identification for a short window so the next status
   // screen this party lands on (same deal, same browser) can skip asking
   // for the phone again — see partySession.ts for why this doesn't weaken
   // the re-verify-on-every-mutation model.
-  await setPartySession(token, whichParty);
+  await setPartySession(token, auth.whichParty);
 
-  return { whichParty };
+  return { whichParty: auth.whichParty };
 }
 
 // ============================================================
@@ -214,18 +148,8 @@ export async function getDealLedger(token: string, phone: string): Promise<Ledge
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'empty' };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { status: 'error' };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { status: 'error' };
-  }
-  if (!whichParty) return { status: 'error' };
-
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) return { status: 'error' };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { status: 'error' };
 
   return getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
 }
@@ -292,18 +216,8 @@ export async function getRekeningForPayer(token: string, phone: string): Promise
   // phone guess and reveals a match/no-match result, the same
   // enumeration oracle identifyParty has — but shipped without its rate
   // limit. Closing it here too, not just at identifyParty.
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
-
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) return null;
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return null;
 
   return { rekeningBank: deal.rekening_bank, rekeningTujuan: deal.rekening_tujuan };
 }
@@ -370,29 +284,9 @@ export async function recordBuktiForPayer(
     return fail(`wrong-status:${deal.status}`, ERROR_DEAL_CLOSED);
   }
 
-  // Blocker found by monster_check: every action that re-verifies a
-  // caller-supplied phone against a deal is a phone-enumeration oracle
-  // (distinct error responses leak match/no-match/wrong-party) unless
-  // rate-limited — this mutating action had the same identifyPartyByPhone
-  // call as the view actions but was missing the guard.
-  if (!(await checkIdentifyRateLimit(db, deal.id))) {
-    return fail('rate-limited', ERROR_TOO_MANY_ATTEMPTS);
-  }
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return fail('phone-invalid', ERROR_PHONE_INVALID);
-  }
-  if (!whichParty) return fail('phone-not-in-deal', ERROR_PHONE_NOT_IN_DEAL);
-
-  // Jual-beli only (Section B gating) — the payer is whichever slot holds
-  // Pembeli.
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) {
-    return fail(`wrong-party:${whichParty}`, ERROR_WRONG_PARTY_PEMBELI_ONLY);
-  }
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return fail('auth', auth.error);
+  const { whichParty } = auth;
 
   try {
     assertTransition(DealStatus.DISEPAKATI, DealEventName.BUKTI_UPLOADED);
@@ -452,17 +346,6 @@ export async function recordBuktiForPayer(
     if (rpcRow) {
       void submitAnchor(newHash);
 
-      // Notify the payee (Penjual slot) it's their turn to review the bukti
-      // and confirm receipt.
-      const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
-      const payeePartyId = payeeSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
-      void notifyTurn(
-        db,
-        payeePartyId,
-        'BUKTI_UPLOADED',
-        formatBuktiUploadedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-      );
-
       // No redirect here — this is a plain function, not the action. Callers
       // decide what to do next, which is what lets joinAndPay keep running.
       return {};
@@ -499,18 +382,8 @@ export async function getBuktiForDisplay(token: string, phone: string): Promise<
   // *rendered* the call — it never stopped the server action itself from
   // being invoked directly. Now re-verifies phone + rate-limits, same as
   // every other action here.
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
-
-  const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
-  if (whichParty !== payeeSlot) return null;
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PENJUAL' });
+  if (!auth.ok) return null;
 
   const { data: bukti } = await db
     .from('bukti')
@@ -625,18 +498,9 @@ export async function recordDanaBelumMasuk(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
-  if (whichParty !== payeeSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PENJUAL' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   // Round limit, checked server-side — the client hides the button once the
   // limit is reached, but that is presentation, not enforcement.
@@ -760,18 +624,9 @@ export async function resubmitBukti(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   // Only answerable if there is actually something to answer. Without this a
   // payer could re-upload unprompted, which is not what this path is for.
@@ -881,15 +736,8 @@ export async function getPaymentDisputeState(
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal) return null;
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
+  const auth = await assertPartyInDeal(db, deal, phone);
+  if (!auth.ok) return null;
 
   // Only DANA_BELUM_MASUK and BUKTI_UPLOADED matter for whose turn it is;
   // other events (nudges) must not flip the turn, so they are filtered out
@@ -934,15 +782,8 @@ export async function getDealStatements(token: string, phone: string): Promise<D
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal) return [];
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return [];
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return [];
-  }
-  if (!whichParty) return [];
+  const auth = await assertPartyInDeal(db, deal, phone);
+  if (!auth.ok) return [];
 
   const { data } = await db
     .from('deal_statements')
@@ -981,18 +822,9 @@ export async function confirmReceipt(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const payeeSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
-  if (whichParty !== payeeSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PENJUAL' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   try {
     assertTransition(DealStatus.DIBAYAR_DIKLAIM, DealEventName.RECEIPT_CONFIRMED);
@@ -1040,16 +872,8 @@ export async function confirmReceipt(
     if (rpcRow) {
       void submitAnchor(newHash);
 
-      // Notify the payer (Pembeli slot) it's their turn to confirm the
-      // goods/fulfillment.
-      const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-      const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
-      void notifyTurn(
-        db,
-        payerPartyId,
-        'RECEIPT_CONFIRMED',
-        formatReceiptConfirmedMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-      );
+      // WA notification pending Meta Cloud API integration (formerly Fonnte).
+      // The transition itself is committed — delivery is best-effort.
 
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
@@ -1187,18 +1011,9 @@ export async function confirmFulfillment(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== payerSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   try {
     assertTransition(DealStatus.DIKONFIRMASI_TERIMA, DealEventName.FULFILLMENT_CONFIRMED);
@@ -1313,15 +1128,8 @@ export async function getGoodsDisputeState(
   const db = supabaseServer();
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal) return null;
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
+  const auth = await assertPartyInDeal(db, deal, phone);
+  if (!auth.ok) return null;
 
   const { data: events } = await db
     .from('deal_events')
@@ -1355,24 +1163,10 @@ async function recordGoodsStatement(
   const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.DIKONFIRMASI_TERIMA) return { error: ERROR_DEAL_CLOSED };
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const buyerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  const sellerSlot: WhichParty = buyerSlot === 'proposer' ? 'counterpart' : 'proposer';
-  if (side === 'buyer' && whichParty !== buyerSlot) {
-    return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
-  }
-  if (side === 'seller' && whichParty !== sellerSlot) {
-    return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
-  }
+  const requiredRole = side === 'buyer' ? 'PEMBELI' as const : 'PENJUAL' as const;
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   const claims = await countStatements(db, deal.id, DealEventName.BARANG_TIDAK_SESUAI);
   if (side === 'buyer' && claims >= GOODS_DISPUTE_MAX_ROUNDS) {

@@ -4,8 +4,6 @@ import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { DealEventName, DealStatus } from '@/lib/db/transitions';
 import type { WhichParty } from '@/lib/db/party';
 import { submitAnchor } from '@/lib/db/anchor';
-import { sendWaMessage } from '@/lib/wa/send';
-import { formatDeadlineNudgeMessage } from '@/lib/copy';
 import { getTodayWib } from '@/lib/format';
 
 // Phase 6 deadline sweep — one unified cron entry, three branches. Decision
@@ -88,12 +86,18 @@ function nudgeTargetSlot(deal: DealRow): WhichParty | null {
 }
 
 async function runNudgeBranch(db: ReturnType<typeof supabaseServer>, todayWib: string): Promise<number> {
+  // NUDGE_ENABLED gates the entire nudge branch. Without a delivery channel
+  // (Fonnte removed 2026-07-24, Meta Cloud API pending), recording NUDGE_SENT
+  // events would be a false claim — no notification was actually sent.
+  // When a channel exists, set NUDGE_ENABLED=true to re-enable.
+  if (process.env.NUDGE_ENABLED !== 'true') return 0;
+
   const { data: candidates } = await db.rpc('get_nudge_candidates', { p_today_wib: todayWib });
   let count = 0;
 
   for (const deal of (candidates ?? []) as DealRow[]) {
     const targetSlot = nudgeTargetSlot(deal);
-    if (!targetSlot) continue; // not jual-beli-shaped roles, or unexpected status; skip
+    if (!targetSlot) continue;
 
     const priorHash = await getLastHash(db, deal.id);
     const canonical = buildCanonicalPayload(
@@ -114,31 +118,6 @@ async function runNudgeBranch(db: ReturnType<typeof supabaseServer>, todayWib: s
     if (!rpcRow) continue; // lost race or already nudged; skip
 
     void submitAnchor(newHash);
-
-    const targetPartyId = targetSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
-    if (targetPartyId) {
-      const { data: targetParty } = await db.from('parties').select('phone_e164').eq('id', targetPartyId).single();
-      if (targetParty?.phone_e164) {
-        const dealUrl = `https://saksi.app/deal/${deal.token}`;
-        const message = formatDeadlineNudgeMessage(deal.item_desc, dealUrl);
-        try {
-          // Awaited sequentially, not fire-and-forget: the real Fonnte
-          // client (lib/wa/send.ts) bounds each call to a 10s timeout via
-          // AbortController, so one hung candidate stalls the rest of this
-          // loop by at most 10s rather than indefinitely. It also never
-          // throws on its own (network errors, non-2xx, and Fonnte's
-          // in-body rejection status all resolve to { sent: false }) — this
-          // try/catch is a defensive backstop, not the expected path.
-          await sendWaMessage({ toPhoneE164: targetParty.phone_e164, template: 'DEADLINE_NUDGE', params: { message } });
-        } catch (err) {
-          // Should not happen given sendWaMessage's never-throw contract —
-          // the NUDGE_SENT event is already committed at this point, so a
-          // delivery failure shouldn't abort the rest of the sweep run.
-          console.error('[deadline-sweep] WA send failed', deal.id, err);
-        }
-      }
-    }
-
     count++;
   }
 

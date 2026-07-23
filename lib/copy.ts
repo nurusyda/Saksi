@@ -216,6 +216,14 @@ export const ERROR_SELF_JOIN =
 export const ERROR_DEAL_NOT_FOUND = 'Kesepakatan tidak ditemukan.';
 export const ERROR_DEAL_CLOSED = 'Kesepakatan ini sudah tidak dapat dimasuki.';
 
+// Flag retraction (migration 0035)
+export const ERROR_FLAG_NOT_PUBLISHED = 'Laporan belum dipublikasikan atau sudah ditarik.';
+export const ERROR_FLAG_RETRACT_FAILED = 'Gagal menarik laporan. Silakan coba lagi.';
+export const FLAG_RETRACTION_REASON_LABEL = 'Alasan penarikan (opsional)';
+export const FLAG_RETRACT_SUBMIT_LABEL = 'Tarik laporan';
+export const FLAG_RETRACTED_LINE = 'Laporan ini telah ditarik kembali oleh pelapor.';
+export const FLAG_RETRACTED_PREFIX = 'Ditarik';
+
 // copy-id.md §12's accept step (DIAJUKAN -> DISEPAKATI) — ACCEPT_BUTTON_LABEL,
 // STATUS_ALREADY_ACCEPTED, ERROR_ACCEPT_FAILED — retired 2026-07-20: folded
 // into joinDeal (migration 0025), no separate accept action exists anymore.
@@ -767,60 +775,15 @@ export const WAITING_FOR_PAYMENT_PROOF =
 export const WAITING_FOR_RECEIPT_CONFIRMATION =
   'Menunggu konfirmasi penerimaan dari pihak penjual.';
 
-// copy-id.md §9a — deadline nudge WA template (locked 2026-07-20).
-// State-agnostic by design: does not name the specific action (differs by
-// DIBAYAR_DIKLAIM vs DIKONFIRMASI_TERIMA) and does not preview day-counts.
-// Sender identity matches the OTP template (copy-id.md §9): SAKSI (saksi.app).
-export function formatDeadlineNudgeMessage(itemDesc: string, dealUrl: string): string {
-  return `Kesepakatan SAKSI Anda ("${itemDesc}") telah melewati batas waktu. Buka ${dealUrl} untuk melihat status dan tindakan yang diperlukan.`;
-}
-
-// copy-id.md §9b — turn-taking WA notifications (locked 2026-07-20). Unlike
-// formatDeadlineNudgeMessage, each of these is tied to exactly one transition,
-// so each names the specific next action instead of staying state-agnostic.
-// Sender identity matches §9/§9a: SAKSI (saksi.app).
+// §9 WA notification templates removed 2026-07-24 — Fonnte client deleted
+// pending Meta Cloud API integration. The NUDGE_SENT event recording in the
+// deadline sweep remains; delivery will be re-wired when a channel exists.
+// (formatDeadlineNudgeMessage, formatDisepakatiMessage,
+//  formatBuktiUploadedMessage, formatReceiptConfirmedMessage,
+//  formatBreachReportFiledMessage, formatHakJawabFiledMessage)
 //
-// formatCounterpartJoinedMessage/formatPartyAcceptedMessage retired
-// 2026-07-20: both described a "come accept" step that no longer exists
-// (joinDeal fires ACCEPTED automatically — see migration 0025). Firing
-// either today would be an actively false message, not just an unused one,
-// so they're removed rather than left dormant. formatDisepakatiMessage below
-// now fires directly from joinDeal instead of only after a manual accept.
-export function formatDisepakatiMessage(itemDesc: string, dealUrl: string): string {
-  return `Kesepakatan SAKSI Anda ("${itemDesc}") telah disetujui kedua pihak. Buka ${dealUrl} untuk melakukan pembayaran.`;
-}
-
-export function formatBuktiUploadedMessage(itemDesc: string, dealUrl: string): string {
-  return `Bukti transfer telah diunggah untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi penerimaan dana.`;
-}
-
-export function formatReceiptConfirmedMessage(itemDesc: string, dealUrl: string): string {
-  return `Penerimaan dana telah dikonfirmasi untuk kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk mengonfirmasi barang diterima.`;
-}
-
-// formatPaymentNotReceivedMessage retired §24 (2026-07-21): the "Dana belum
-// masuk / bukti salah" tap no longer sends a WA message at all. It records
-// the penjual's own keterangan instead (migration 0029), which the pembeli
-// reads on the deal page. Noted here rather than silently dropped, same
-// treatment formatCounterpartJoinedMessage's retirement got above.
-
-// formatOtpMessage retired §25 (2026-07-21) — no OTP is sent anywhere in the
-// app anymore. If phone-possession proof is ever reintroduced, write a new
-// message for the mechanism actually chosen rather than reviving this one.
-
-// copy-id.md §9c (DRAFT, pending review) — build step 4 (breach path)
-// turn-taking notifications, same house style as §9b. Fired by fileBarangTidakSesuaiReport and
-// fileDeadlineLapseReport (both, to the flagged party) and respondHakJawab
-// (to the reporter). Renamed from formatBarangTidakSesuaiFiledMessage
-// (deadline-lapse entry point added) — the text was already generic (names
-// no specific claim), only the old name implied it was C6-specific.
-export function formatBreachReportFiledMessage(itemDesc: string, dealUrl: string): string {
-  return `Laporan diajukan untuk kesepakatan SAKSI Anda ("${itemDesc}"). Anda memiliki 14 hari untuk menanggapi. Buka ${dealUrl} untuk melihat detail.`;
-}
-
-export function formatHakJawabFiledMessage(itemDesc: string, dealUrl: string): string {
-  return `Pihak penjual telah menanggapi laporan pada kesepakatan SAKSI Anda ("${itemDesc}"). Buka ${dealUrl} untuk melihat tanggapannya.`;
-}
+// formatPaymentNotReceivedMessage retired §24, formatOtpMessage retired §25,
+// formatCounterpartJoinedMessage/formatPartyAcceptedMessage retired earlier.
 
 // ============================================================
 // UI chrome added for the UX-audit fix pass (2026-07-20) — not legally

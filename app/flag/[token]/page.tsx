@@ -9,6 +9,8 @@ import {
   formatFlagRekeningLine,
   formatFlagPhoneVerifiedLine,
   FLAG_IDENTITY_VERIFIED_LINE,
+  FLAG_RETRACTED_LINE,
+  FLAG_RETRACTED_PREFIX,
 } from '@/lib/copy';
 
 // GATE 2 — noindex until PSE Kominfo clears. Same treatment as /cek.
@@ -38,7 +40,7 @@ export default async function FlagPage({
   // RLS policy's own condition exactly.
   const { data: flag } = await db
     .from('flags')
-    .select('rung, identifiers, hak_jawab_status')
+    .select('rung, identifiers, hak_jawab_status, retracted_at, retraction_reason')
     .eq('deal_id', deal.id)
     .not('published_at', 'is', null)
     .maybeSingle();
@@ -84,6 +86,13 @@ export default async function FlagPage({
 
           {rendered.evidenceLine && (
             <p className="mt-2 text-sm text-zinc-600">{rendered.evidenceLine}</p>
+          )}
+
+          {flag.retracted_at && (
+            <div className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-500">
+              <p className="font-medium text-zinc-600">{FLAG_RETRACTED_PREFIX}</p>
+              <p>{FLAG_RETRACTED_LINE}</p>
+            </div>
           )}
 
           {(bank || phoneHash || identityVerified) && (

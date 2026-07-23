@@ -78,6 +78,10 @@ export const DealEventName = {
   // responded). Self-transition on TIDAK_DIPENUHI. See
   // publish_flag_silent_with_event.
   FLAG_PUBLISHED: 'FLAG_PUBLISHED',
+  // The original reporter retracts a published flag (migration 0035).
+  // Self-transition (no status change) — the flag stays visible but is
+  // marked as retracted. Only the PEMBELI slot can file this.
+  FLAG_RETRACTED: 'FLAG_RETRACTED',
   // System: 30+ days of silence past deadline with no laporan ever filed —
   // quiet, no-blame terminal outcome. Reachable from both DIBAYAR_DIKLAIM
   // and DIKONFIRMASI_TERIMA (unified in the sweep, migration 0018); the two
@@ -169,9 +173,11 @@ export const VALID_TRANSITIONS: Record<DealStatus, Transition[]> = {
   [DealStatus.TIDAK_DIPENUHI]: [
     { event: DealEventName.HAK_JAWAB_FILED, next: DealStatus.SENGKETA },
     { event: DealEventName.FLAG_PUBLISHED, next: DealStatus.TIDAK_DIPENUHI }, // self
+    { event: DealEventName.FLAG_RETRACTED, next: DealStatus.TIDAK_DIPENUHI }, // self
   ],
   [DealStatus.SENGKETA]: [
     { event: DealEventName.SENGKETA_KADALUARSA, next: DealStatus.TIDAK_DIPENUHI },
+    { event: DealEventName.FLAG_RETRACTED, next: DealStatus.SENGKETA }, // self
   ],
 };
 

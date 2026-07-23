@@ -4,31 +4,24 @@ import { createHash } from 'crypto';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase/server';
-import { buildCanonicalPayload, hashDeal, normalizePhone } from '@/lib/db/hash';
+import { buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
-import { identifyPartyByPhone, getPartyPhone, type WhichParty } from '@/lib/db/party';
+import { assertPartyInDeal, type WhichParty } from '@/lib/db/party';
 import { submitAnchor } from '@/lib/db/anchor';
 import { maskRekening } from '@/lib/db/accountHistory';
-import { sendWaMessage } from '@/lib/wa/send';
 import { getTodayWib } from '@/lib/format';
 import { uploadHakJawabEvidence, uploadReportEvidence } from '@/lib/db/storage';
-import { checkIdentifyRateLimit } from './paymentActions';
 import {
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
-  ERROR_PHONE_INVALID,
-  ERROR_PHONE_NOT_IN_DEAL,
-  ERROR_TOO_MANY_ATTEMPTS,
-  ERROR_WRONG_PARTY_PEMBELI_ONLY,
-  ERROR_WRONG_PARTY_PENJUAL_ONLY,
   ERROR_REPORT_FILE_FAILED,
   ERROR_DEADLINE_NOT_PASSED,
   ERROR_HAK_JAWAB_WINDOW_CLOSED,
   ERROR_HAK_JAWAB_FAILED,
   ERROR_BUKTI_UPLOAD_FAILED,
   ERROR_STATEMENT_IMAGE_ATTEST_REQUIRED,
-  formatBreachReportFiledMessage,
-  formatHakJawabFiledMessage,
+  ERROR_FLAG_NOT_PUBLISHED,
+  ERROR_FLAG_RETRACT_FAILED,
 } from '@/lib/copy';
 
 const RETRY_LIMIT = 3;
@@ -42,29 +35,10 @@ function hashNote(note: string): string {
   return createHash('sha256').update(note, 'utf8').digest('hex');
 }
 
-// Best-effort turn-taking WA nudge, same contract as actions.ts/
-// paymentActions.ts's notifyTurn: never blocks or fails the transition.
-async function notifyTurn(
-  db: ReturnType<typeof supabaseServer>,
-  partyId: string | null,
-  template: 'BARANG_TIDAK_SESUAI_FILED' | 'DEADLINE_LAPSE_FILED' | 'HAK_JAWAB_FILED',
-  message: string,
-): Promise<void> {
-  const phone = await getPartyPhone(db, partyId);
-  if (!phone) return;
-  void sendWaMessage({ toPhoneE164: phone, template, params: { message } });
-}
-
 // ============================================================
-// §25 (2026-07-21): sendBreachReportOtp / verifyBreachReportOtpAction and
-// their DeadlineLapse twins are removed, along with the SendOtpState /
-// VerifyOtpState types. The OTP step gated the wronged party's only recourse
-// on a WhatsApp delivery, so a channel outage meant a real complaint could
-// not be recorded at all. Identity is still established the same way every
-// other action in this file establishes it — identifyPartyByPhone, re-derived
-// server-side on submit, never trusted from the client. What is gone is
-// proof of possession of the number, and the flag/consequences copy no
-// longer claims otherwise.
+// §25 (2026-07-21): OTP removed. Identity is established via assertPartyInDeal
+// (lib/db/party.ts) — rate-limited, server-side, never trusted from the client.
+// WA notifications removed 2026-07-24 pending Meta Cloud API integration.
 // ============================================================
 
 // ============================================================
@@ -105,21 +79,9 @@ export async function fileBarangTidakSesuaiReport(
   // path — exactly the bypass this closes.
   if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    // Still normalized purely as a validity check — the value itself is no
-    // longer needed now that the OTP gate (its only consumer) is gone.
-    normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   const fieldNote = (formData.get('field_note') as string | null)?.trim() ?? '';
 
@@ -220,12 +182,6 @@ export async function fileBarangTidakSesuaiReport(
         });
       }
       void submitAnchor(newHash);
-      void notifyTurn(
-        db,
-        flaggedPartyId,
-        'BARANG_TIDAK_SESUAI_FILED',
-        formatBreachReportFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-      );
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
     }
@@ -270,21 +226,9 @@ export async function fileDeadlineLapseReport(
   if (deal.status !== DealStatus.DIBAYAR_DIKLAIM) return { error: ERROR_DEAL_CLOSED };
   if (!deadlineHasPassed(deal.deadline)) return { error: ERROR_DEADLINE_NOT_PASSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    // Still normalized purely as a validity check — the value itself is no
-    // longer needed now that the OTP gate (its only consumer) is gone.
-    normalizePhone(phone);
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  if (whichParty !== reporterSlot) return { error: ERROR_WRONG_PARTY_PEMBELI_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   // Optional here (unlike C6's field_note, which requires the reporter to
   // describe which part of the description wasn't met): the claim itself is
@@ -359,12 +303,6 @@ export async function fileDeadlineLapseReport(
     if (rpcErr) return { error: ERROR_REPORT_FILE_FAILED };
     if (rpcRow) {
       void submitAnchor(newHash);
-      void notifyTurn(
-        db,
-        flaggedPartyId,
-        'DEADLINE_LAPSE_FILED',
-        formatBreachReportFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-      );
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
     }
@@ -410,15 +348,8 @@ export async function getBreachReportNote(token: string, phone: string): Promise
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal) return null;
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
+  const auth = await assertPartyInDeal(db, deal, phone);
+  if (!auth.ok) return null;
 
   const { data: note } = await db
     .from('breach_notes')
@@ -453,15 +384,8 @@ export async function getHakJawabResponse(token: string, phone: string): Promise
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
   if (!deal) return null;
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return null;
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return null;
-  }
-  if (!whichParty) return null;
+  const auth = await assertPartyInDeal(db, deal, phone);
+  if (!auth.ok) return null;
 
   const { data: event } = await db
     .from('deal_events')
@@ -522,18 +446,9 @@ export async function respondHakJawab(
   if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
   if (deal.status !== DealStatus.TIDAK_DIPENUHI) return { error: ERROR_DEAL_CLOSED };
 
-  if (!(await checkIdentifyRateLimit(db, deal.id))) return { error: ERROR_TOO_MANY_ATTEMPTS };
-
-  let whichParty: WhichParty | null;
-  try {
-    whichParty = await identifyPartyByPhone(db, deal, phone);
-  } catch {
-    return { error: ERROR_PHONE_INVALID };
-  }
-  if (!whichParty) return { error: ERROR_PHONE_NOT_IN_DEAL };
-
-  const flaggedSlot: WhichParty = deal.proposer_role === 'PENJUAL' ? 'proposer' : 'counterpart';
-  if (whichParty !== flaggedSlot) return { error: ERROR_WRONG_PARTY_PENJUAL_ONLY };
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PENJUAL' });
+  if (!auth.ok) return { error: auth.error };
+  const { whichParty } = auth;
 
   // 14-day window, checked here rather than in the RPC: there is no sweep
   // yet to move the deal out of TIDAK_DIPENUHI once the window lapses (see
@@ -633,14 +548,6 @@ export async function respondHakJawab(
     if (rpcErr) return { error: ERROR_HAK_JAWAB_FAILED };
     if (rpcRow) {
       void submitAnchor(newHash);
-      const reporterSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-      const reporterPartyId = reporterSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
-      void notifyTurn(
-        db,
-        reporterPartyId,
-        'HAK_JAWAB_FILED',
-        formatHakJawabFiledMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-      );
       revalidatePath(`/deal/${token}`);
       redirect(`/deal/${token}`);
     }
@@ -648,4 +555,97 @@ export async function respondHakJawab(
   }
 
   return { error: ERROR_HAK_JAWAB_FAILED };
+}
+
+// ============================================================
+// retractFlag — the original reporter (PEMBELI) can retract a published flag.
+// The flag stays in the DB (history is preserved); retracted_at is set so the
+// flag page renders the retraction status. Hash-chained like every other event.
+// Only callable when flags.published_at is set AND retracted_at is null.
+// ============================================================
+
+export type RetractFlagState = { error?: string; retracted?: boolean };
+
+export async function retractFlag(
+  token: string,
+  phone: string,
+  _prev: RetractFlagState,
+  formData: FormData,
+): Promise<RetractFlagState> {
+  const db = supabaseServer();
+  const { data: deal, error: dealErr } = await db.from('deals').select('*').eq('token', token).single();
+  if (dealErr || !deal) return { error: ERROR_DEAL_NOT_FOUND };
+
+  // Must be in TIDAK_DIPENUHI or SENGKETA — the only states a published flag can be in.
+  if (deal.status !== DealStatus.TIDAK_DIPENUHI && deal.status !== DealStatus.SENGKETA) {
+    return { error: ERROR_DEAL_CLOSED };
+  }
+
+  // Only the reporter (PEMBELI) can retract their own report.
+  const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
+  if (!auth.ok) return { error: auth.error };
+
+  // Verify the flag is published and not already retracted.
+  const { data: flag } = await db
+    .from('flags')
+    .select('published_at, retracted_at')
+    .eq('deal_id', deal.id)
+    .single();
+  if (!flag || !flag.published_at || flag.retracted_at) {
+    return { error: ERROR_FLAG_NOT_PUBLISHED };
+  }
+
+  const retractionReason = (formData.get('retraction_reason') as string | null)?.trim() ?? '';
+
+  try {
+    assertTransition(deal.status as DealStatus, DealEventName.FLAG_RETRACTED);
+  } catch {
+    return { error: ERROR_DEAL_CLOSED };
+  }
+
+  const actor = auth.whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
+
+    const { data: cur } = await db.from('deals').select('*').eq('id', deal.id).single();
+    if (!cur) return { error: ERROR_DEAL_NOT_FOUND };
+
+    const { data: lastEvent } = await db
+      .from('deal_events')
+      .select('new_hash')
+      .eq('deal_id', deal.id)
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    const priorHash = lastEvent?.new_hash ?? null;
+
+    const retractionReasonHash = retractionReason ? hashNote(retractionReason) : undefined;
+    const canonical = buildCanonicalPayload(
+      cur,
+      { name: DealEventName.FLAG_RETRACTED, actor, payload: { retraction_reason_hash: retractionReasonHash } },
+      priorHash,
+    );
+    const newHash = hashDeal(canonical);
+
+    const { data: rpcRow, error: rpcErr } = await db
+      .rpc('retract_flag_with_event', {
+        p_deal_id: deal.id,
+        p_actor: actor,
+        p_retraction_reason: retractionReason,
+        p_prior_hash: priorHash,
+        p_new_hash: newHash,
+      })
+      .maybeSingle();
+
+    if (rpcErr) return { error: ERROR_FLAG_RETRACT_FAILED };
+    if (rpcRow) {
+      void submitAnchor(newHash);
+      revalidatePath(`/deal/${token}`);
+      redirect(`/deal/${token}`);
+    }
+    if (attempt === RETRY_LIMIT - 1) return { error: ERROR_FLAG_RETRACT_FAILED };
+  }
+
+  return { error: ERROR_FLAG_RETRACT_FAILED };
 }

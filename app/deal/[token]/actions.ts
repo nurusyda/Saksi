@@ -6,10 +6,8 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { normalizePhone, phoneHash, buildCanonicalPayload, hashDeal } from '@/lib/db/hash';
 import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transitions';
 import { submitAnchor } from '@/lib/db/anchor';
-import { getPartyPhone, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
-import { sendWaMessage } from '@/lib/wa/send';
 import { recordBuktiForPayer } from './paymentActions';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
@@ -22,25 +20,7 @@ import {
   ERROR_BUKTI_UPLOAD_FAILED,
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
-  formatDisepakatiMessage,
 } from '@/lib/copy';
-
-// Best-effort turn-taking WA nudge (UX-audit fix pass, 2026-07-20,
-// copy-id.md §9b). Never awaited by callers with a blocking `await` on its
-// result and never allowed to fail the transition it's attached to —
-// sendWaMessage already swallows its own errors (returns {sent: false}
-// rather than throwing), so this is a thin fetch-phone-then-send wrapper,
-// not a retry/queue mechanism.
-async function notifyTurn(
-  db: ReturnType<typeof supabaseServer>,
-  partyId: string | null,
-  template: 'DISEPAKATI',
-  message: string,
-): Promise<void> {
-  const phone = await getPartyPhone(db, partyId);
-  if (!phone) return;
-  void sendWaMessage({ toPhoneE164: phone, template, params: { message } });
-}
 
 export type JoinDealState = {
   error?: string;
@@ -209,18 +189,6 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
   // (proposer, see app/buat/actions.ts) and join (here) instead, since
   // acceptance itself no longer exists as a separate round trip.
   await setPartySession(token, 'counterpart');
-
-  // The deal is DISEPAKATI the instant this completes — notify the payer
-  // directly (no more intermediate "come accept" ping, since there's
-  // nothing left to accept).
-  const payerSlot: WhichParty = deal.proposer_role === 'PEMBELI' ? 'proposer' : 'counterpart';
-  const payerPartyId = payerSlot === 'proposer' ? deal.proposer_id : party.id;
-  void notifyTurn(
-    db,
-    payerPartyId,
-    'DISEPAKATI',
-    formatDisepakatiMessage(deal.item_desc, `https://saksi.app/deal/${token}`),
-  );
 
   // §39 — returns, does NOT redirect. redirect() throws NEXT_REDIRECT, and
   // when this function still ended with one, that exception unwound straight
