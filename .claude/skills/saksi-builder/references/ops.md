@@ -58,6 +58,14 @@ OpenTimestamps proves a hash existed; it does not preserve the record. On the fr
 - Secrets needed by the Action: `SUPABASE_DB_URL` (or project ref + access token) stored as GitHub Actions secrets, never in the workflow file.
 - Storage bucket (bukti images) is NOT covered by a db dump — add object storage sync to the backup job before real bukti exist in production.
 
+## Pre-push checklist
+
+Before every `git push` that includes migration files:
+
+1. **`npx tsc --noEmit`** — zero errors. Exclude `analysis/` (documentation artifacts).
+2. **`supabase migration list`** — every new migration file in `supabase/migrations/` must have a matching `remote: <NNNN>` entry. A migration committed to git but unapplied to the live database is the gap that bit 0035 (flag retraction sat in git for hours before being pushed to the DB). If a migration is new in this push, apply it with `npx supabase db push` before pushing the git commit that references it.
+3. **`python3 scripts/monster_check.py`** — zero blockers. Run after staging.
+
 ## Working agreements for Claude Code sessions
 
 - Copy strings come from `references/copy-id.md` verbatim; if a needed string is missing, STOP and ask — never improvise legal-adjacent Indonesian copy.
