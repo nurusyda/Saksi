@@ -12,8 +12,15 @@ export interface CanonicalDealPayload {
   proposer_role: string;
   item_desc: string;
   amount_idr: number;
-  rekening_tujuan: string | null;   // null only while status is DRAF (Pembeli-initiated)
+  // rekening_* null only while status is DRAF (Pembeli-initiated), or
+  // permanently null on a QRIS deal (migration 0036) — the two payment
+  // destination types are mutually exclusive, never both populated.
+  rekening_tujuan: string | null;
   rekening_bank: string | null;
+  payment_method: string;           // 'REKENING' | 'QRIS' (migration 0036)
+  qris_nmid: string | null;
+  qris_merchant_name: string | null;
+  qris_merchant_city: string | null;
   deadline: string;   // ISO-8601 date
   status: string;
   meterai_applied: boolean;
@@ -83,6 +90,10 @@ export function buildCanonicalPayload(
     amount_idr: number | bigint;
     rekening_tujuan: string | null;
     rekening_bank: string | null;
+    payment_method?: string;
+    qris_nmid?: string | null;
+    qris_merchant_name?: string | null;
+    qris_merchant_city?: string | null;
     deadline: string;
     status: string;
     meterai_applied: boolean;
@@ -101,6 +112,14 @@ export function buildCanonicalPayload(
     amount_idr: Number(deal.amount_idr),   // ensure integer, not bigint
     rekening_tujuan: deal.rekening_tujuan,
     rekening_bank: deal.rekening_bank,
+    // Optional + defaulted so every pre-0036 call site (which reads rows that
+    // predate these columns, or passes a hand-built object without them)
+    // keeps hashing exactly as before rather than changing every deal's
+    // chain the instant this ships.
+    payment_method: deal.payment_method ?? 'REKENING',
+    qris_nmid: deal.qris_nmid ?? null,
+    qris_merchant_name: deal.qris_merchant_name ?? null,
+    qris_merchant_city: deal.qris_merchant_city ?? null,
     deadline: deal.deadline,               // must already be YYYY-MM-DD
     status: deal.status,
     meterai_applied: deal.meterai_applied,

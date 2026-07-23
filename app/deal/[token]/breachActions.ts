@@ -120,10 +120,13 @@ export async function fileBarangTidakSesuaiReport(
   const flaggedPartyId = flaggedSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
   const flagged = await getPartyIdentityFields(db, flaggedPartyId);
 
-  const identifiers: Record<string, unknown> = {
-    rekening_masked: maskRekening(deal.rekening_tujuan as string),
-    bank: deal.rekening_bank,
-  };
+  // migration 0036 — a QRIS deal has no rekening to mask; the flag's
+  // identifiers carry the merchant name/NMID instead. Two identity types,
+  // never both on the same flag, mirroring payment_method on deals itself.
+  const identifiers: Record<string, unknown> =
+    deal.payment_method === 'QRIS'
+      ? { qris_merchant_name: deal.qris_merchant_name, qris_nmid: deal.qris_nmid }
+      : { rekening_masked: maskRekening(deal.rekening_tujuan as string), bank: deal.rekening_bank };
   if ((deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') && flagged.phoneHash) {
     identifiers.phone_hash = flagged.phoneHash;
   }
@@ -253,10 +256,11 @@ export async function fileDeadlineLapseReport(
   const flaggedPartyId = flaggedSlot === 'proposer' ? deal.proposer_id : deal.counterpart_id;
   const flagged = await getPartyIdentityFields(db, flaggedPartyId);
 
-  const identifiers: Record<string, unknown> = {
-    rekening_masked: maskRekening(deal.rekening_tujuan as string),
-    bank: deal.rekening_bank,
-  };
+  // migration 0036 — see the mirror comment in fileBarangTidakSesuaiReport above.
+  const identifiers: Record<string, unknown> =
+    deal.payment_method === 'QRIS'
+      ? { qris_merchant_name: deal.qris_merchant_name, qris_nmid: deal.qris_nmid }
+      : { rekening_masked: maskRekening(deal.rekening_tujuan as string), bank: deal.rekening_bank };
   if ((deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') && flagged.phoneHash) {
     identifiers.phone_hash = flagged.phoneHash;
   }

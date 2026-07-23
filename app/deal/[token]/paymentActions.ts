@@ -16,9 +16,9 @@ import { submitAnchor } from '@/lib/db/anchor';
 import { checkIdentifyRateLimit, assertPartyInDeal, type WhichParty } from '@/lib/db/party';
 import { setPartySession } from '@/lib/db/partySession';
 import { uploadBuktiImage, uploadStatementImage } from '@/lib/db/storage';
-import { checkBuktiConsistency } from '@/lib/ocr/gemini';
-import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
-import { checkPairCompletionLimit, getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
+import { checkBuktiConsistency, checkQrisBuktiConsistency } from '@/lib/ocr/gemini';
+import { getAccountHistory, getAccountHistoryByNmid, maskRekening } from '@/lib/db/accountHistory';
+import { checkPairCompletionLimit, getRekeningLedger, getQrisLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
 import {
   ERROR_DEAL_NOT_FOUND,
   ERROR_DEAL_CLOSED,
@@ -39,10 +39,13 @@ import {
 const RETRY_LIMIT = 3;
 
 // Shared rate limiter moved to lib/db/party.ts (2026-07-24) alongside
-// assertPartyInDeal — re-exported here so breachActions.ts import doesn't
-// need updating (it also imported from here). Remove this re-export once
-// breachActions.ts switches to assertPartyInDeal.
-export { checkIdentifyRateLimit } from '@/lib/db/party';
+// assertPartyInDeal. breachActions.ts has since switched to assertPartyInDeal
+// directly, so the re-export this comment used to describe is gone — a
+// `export { x } from` re-export is not a function declaration, and Next's
+// "use server" compiler requires every export from such a file to be an
+// async function, which broke the production build entirely (found while
+// building the QRIS feature, unrelated to it). checkIdentifyRateLimit is
+// still imported and used locally in this file below.
 
 // ============================================================
 // identifyParty — view-only phone gate shared by every post-DISEPAKATI
@@ -95,6 +98,12 @@ export type AccountHistoryDisplay =
       klaimBarangCount: number;
       belumDikonfirmasiCount: number;
       sinceLabel: string;
+      // Found by monster_check: for a QRIS deal this holds qris_merchant_name,
+      // not a masked rekening — no consumer renders it in that branch today
+      // (see BuyerJoinGate, which only uses the count fields), but the name
+      // is misleading if a future caller assumes it's always an account
+      // number. Flagged here rather than renamed across both
+      // AccountHistoryDisplay definitions for a currently-unused field.
       rekeningMasked: string;
       ledgerEnabled: boolean;
     }
@@ -106,12 +115,18 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
   const db = supabaseServer();
   const { data: deal } = await db
     .from('deals')
-    .select('rekening_bank, rekening_tujuan')
+    .select('payment_method, rekening_bank, rekening_tujuan, qris_nmid, qris_merchant_name')
     .eq('token', token)
     .single();
-  if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'idle' };
+  if (!deal) return { status: 'idle' };
 
-  const result = await getAccountHistory(deal.rekening_bank, deal.rekening_tujuan);
+  const isQris = deal.payment_method === 'QRIS';
+  if (isQris && !deal.qris_nmid) return { status: 'idle' };
+  if (!isQris && (!deal.rekening_bank || !deal.rekening_tujuan)) return { status: 'idle' };
+
+  const result = isQris
+    ? await getAccountHistoryByNmid(deal.qris_nmid as string)
+    : await getAccountHistory(deal.rekening_bank as string, deal.rekening_tujuan as string);
   if (result.status === 'error') return { status: 'error' };
   if (result.status === 'empty') return { status: 'empty' };
   return {
@@ -120,9 +135,16 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
     klaimBarangCount: result.history.klaimBarangCount,
     belumDikonfirmasiCount: result.history.belumDikonfirmasiCount,
     sinceLabel: result.history.sinceLabel,
-    rekeningMasked: maskRekening(deal.rekening_tujuan),
+    rekeningMasked: isQris ? deal.qris_merchant_name ?? '' : maskRekening(deal.rekening_tujuan as string),
     ledgerEnabled: isLedgerDetailEnabled(),
   };
+}
+
+/** Signed URL (5 min) for a QRIS image stored by uploadQrisImage — same bucket/TTL as every other evidence image in this app. */
+export async function getQrisImageSignedUrl(storagePath: string): Promise<string | null> {
+  const db = supabaseServer();
+  const { data: signed } = await db.storage.from('bukti').createSignedUrl(storagePath, 300);
+  return signed?.signedUrl ?? null;
 }
 
 // ============================================================
@@ -146,12 +168,15 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
 export async function getDealLedger(token: string, phone: string): Promise<LedgerResult> {
   const db = supabaseServer();
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
-  if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'empty' };
+  if (!deal) return { status: 'empty' };
+  const isQris = deal.payment_method === 'QRIS';
+  if (isQris && !deal.qris_nmid) return { status: 'empty' };
+  if (!isQris && (!deal.rekening_bank || !deal.rekening_tujuan)) return { status: 'empty' };
 
   const auth = await assertPartyInDeal(db, deal, phone, { requiredRole: 'PEMBELI' });
   if (!auth.ok) return { status: 'error' };
 
-  return getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
+  return isQris ? getQrisLedger(deal.qris_nmid) : getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
 }
 
 // ============================================================
@@ -181,12 +206,15 @@ export async function getDealLedger(token: string, phone: string): Promise<Ledge
 export async function getDealLedgerPublic(token: string): Promise<LedgerResult> {
   const db = supabaseServer();
   const { data: deal } = await db.from('deals').select('*').eq('token', token).single();
-  if (!deal || !deal.rekening_bank || !deal.rekening_tujuan) return { status: 'empty' };
+  if (!deal) return { status: 'empty' };
+  const isQris = deal.payment_method === 'QRIS';
+  if (isQris && !deal.qris_nmid) return { status: 'empty' };
+  if (!isQris && (!deal.rekening_bank || !deal.rekening_tujuan)) return { status: 'empty' };
 
   if (!isLedgerDetailEnabled()) return { status: 'empty' };
   if (!(await checkIdentifyRateLimit(db, deal.id))) return { status: 'error' };
 
-  return getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
+  return isQris ? getQrisLedger(deal.qris_nmid) : getRekeningLedger(deal.rekening_bank, deal.rekening_tujuan);
 }
 
 // ============================================================
@@ -297,12 +325,19 @@ export async function recordBuktiForPayer(
   const uploaded = await uploadBuktiImage(db, deal.id, file);
   if (!uploaded) return fail('upload-failed', ERROR_BUKTI_UPLOAD_FAILED);
 
-  const { ocrResult, verdict } = await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
-    amount_idr: Number(deal.amount_idr),
-    rekening_tujuan: deal.rekening_tujuan,
-    rekening_bank: deal.rekening_bank,
-    deadline: deal.deadline,
-  });
+  const { ocrResult, verdict } =
+    deal.payment_method === 'QRIS'
+      ? await checkQrisBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
+          amount_idr: Number(deal.amount_idr),
+          deadline: deal.deadline,
+          qris_merchant_name: deal.qris_merchant_name,
+        })
+      : await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
+          amount_idr: Number(deal.amount_idr),
+          rekening_tujuan: deal.rekening_tujuan,
+          rekening_bank: deal.rekening_bank,
+          deadline: deal.deadline,
+        });
 
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
 
@@ -366,7 +401,12 @@ export async function recordBuktiForPayer(
 
 export interface BuktiDisplay {
   signedUrl: string | null;
-  ocrResult: { amount_match: boolean | null; date_ok: boolean | null; rekening_match: boolean | null; bank_match: boolean | null } | null;
+  // Two shapes depending on the deal's payment_method (migration 0036) — a
+  // QRIS bukti was checked against merchant_name_match, never rekening/bank.
+  ocrResult:
+    | { amount_match: boolean | null; date_ok: boolean | null; rekening_match: boolean | null; bank_match: boolean | null }
+    | { amount_match: boolean | null; date_ok: boolean | null; merchant_name_match: boolean | null }
+    | null;
   ocrVerdict: 'KONSISTEN' | 'TIDAK_KONSISTEN' | 'TIDAK_TERBACA' | null;
 }
 
@@ -650,12 +690,19 @@ export async function resubmitBukti(
   const uploaded = await uploadBuktiImage(db, deal.id, file);
   if (!uploaded) return { error: ERROR_BUKTI_UPLOAD_FAILED };
 
-  const { ocrResult, verdict } = await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
-    amount_idr: Number(deal.amount_idr),
-    rekening_tujuan: deal.rekening_tujuan,
-    rekening_bank: deal.rekening_bank,
-    deadline: deal.deadline,
-  });
+  const { ocrResult, verdict } =
+    deal.payment_method === 'QRIS'
+      ? await checkQrisBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
+          amount_idr: Number(deal.amount_idr),
+          deadline: deal.deadline,
+          qris_merchant_name: deal.qris_merchant_name,
+        })
+      : await checkBuktiConsistency(uploaded.bytes, uploaded.mimeType, {
+          amount_idr: Number(deal.amount_idr),
+          rekening_tujuan: deal.rekening_tujuan,
+          rekening_bank: deal.rekening_bank,
+          deadline: deal.deadline,
+        });
 
   const actor = whichParty === 'proposer' ? 'PROPOSER' : 'COUNTERPART';
 

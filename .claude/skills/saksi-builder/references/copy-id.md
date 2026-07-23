@@ -1530,3 +1530,74 @@ a buyer who never files their own round 2 could never escalate. The two rounds
 are a pre-deadline opportunity, not a mandatory gate; the bug was that the
 formal path was reachable BEFORE the deadline (and before the state loaded),
 skipping the loop entirely.
+
+## §47 — QRIS as an alternate payment-destination type (locked 2026-07-24)
+
+Drafted by the AI building the feature, reviewed and approved by the operator
+2026-07-24. `monster_check` had correctly blocked the commit that introduced
+these strings (migration 0036) because they are cross-file (`app/buat/page.tsx`,
+`BuyerJoinGate.tsx`, `QrisPaymentCard.tsx`, `DibayarDiklaimPanel.tsx`,
+`InvoiceCard.tsx`, `app/flag/[token]/page.tsx`) with no signed entry here —
+Law 3. That gate is now satisfied; the strings below are locked, matching
+every other section in this file.
+
+**Why this exists:** a real seller uses QRIS as their only payment channel —
+no bank account to type into the existing rekening field. QRIS doesn't carry
+a bank account number at all (it abstracts the merchant's settlement account
+behind a PJSP-assigned National Merchant ID), so this is a second payment-
+destination type living alongside rekening, not a new way to capture the same
+data. Confirmed with the operator before building: seller-chosen alternative
+(both paths stay supported), available from GRATIS up, no tier gate.
+
+**The unmasked merchant name** — `QrisPaymentCard`/`InvoiceCard` show
+`qris_merchant_name` in full, same reasoning §31 gave for the unmasked
+rekening number: it's the same public-facing name the QR code itself already
+displays to anyone who scans it, not new PII exposure. Unlike rekening, there
+is no masked-vs-unmasked split to draw for this field at all — see
+`lib/qris/decode.ts`'s header comment on why the NMID is treated as
+"best-effort merchant identifier" rather than a guaranteed-exact value
+(Bank Indonesia's spec doesn't fix which sub-tag carries it across every
+acquirer implementation).
+
+**New copy (draft):**
+
+- `PAYMENT_METHOD_LABEL` — the create-form section label above the toggle:
+  > Metode pembayaran
+- `PAYMENT_METHOD_REKENING_LABEL` / `PAYMENT_METHOD_QRIS_LABEL` — the two toggle options:
+  > Rekening bank
+  > QRIS
+- `QRIS_UPLOAD_LABEL` / `QRIS_UPLOAD_HINT` — the seller's upload field:
+  > Unggah kode QRIS kamu
+  > Unduh atau screenshot kode QRIS dari aplikasi bank/e-wallet kamu, lalu unggah di sini.
+- `ERROR_QRIS_FILE_REQUIRED`:
+  > Unggah gambar QRIS terlebih dahulu.
+- `ERROR_QRIS_NO_QR_FOUND` — image uploaded but no QR code detected in it:
+  > Kode QR tidak ditemukan pada gambar ini. Coba unggah ulang.
+- `ERROR_QRIS_INVALID_CHECKSUM` — a QR code was found but its CRC16 fails, i.e. corrupted/tampered:
+  > Kode QRIS tidak valid atau rusak. Coba unggah ulang dari sumber aslinya.
+- `ERROR_QRIS_NOT_QRIS` — a valid QR code, but not an EMVCo/QRIS payload (or missing a merchant name):
+  > Kode QR ini bukan kode QRIS.
+- `ERROR_QRIS_UPLOAD_FAILED`:
+  > Gagal mengunggah gambar QRIS. Coba lagi.
+- `QRIS_MERCHANT_NAME_LABEL` / `QRIS_MERCHANT_CITY_LABEL` — field labels used on the invoice, the buyer's payment card, and the OCR field-match row:
+  > Nama merchant
+  > Kota merchant
+- `QRIS_SCAN_INSTRUCTION` — shown to the buyer in place of a rekening + copy button (no account number exists to copy for this payment method):
+  > Pindai kode QRIS ini menggunakan aplikasi bank atau e-wallet kamu untuk membayar.
+- `formatFlagQrisLine(merchantName)` — flag page's identifiers block, QRIS-payment-method variant of `formatFlagRekeningLine`:
+  > QRIS: [nama merchant]
+
+**Open judgment calls made while building, flagged rather than defaulted silently:**
+
+1. No live account-history preview on the create form for QRIS (unlike the
+   as-you-type rekening check) — the seller's QRIS identity is only known once
+   the server decodes the upload, which happens on submit. History for the
+   merchant still renders to the buyer on the deal page and would extend to
+   `/cek` if that surface is later given an NMID search path (not built —
+   `/cek` today only searches by rekening or phone; a QRIS deal's history is
+   reachable from the deal page's own forced-check card, just not from a
+   standalone lookup yet).
+2. `qris_nmid` is documented and coded as best-effort, not authoritative —
+   see the decode-utility comment above. If a dispute ever turns on the exact
+   NMID value, that caveat needs to be visible somewhere a reader outside the
+   code would see it, not just in a source comment.

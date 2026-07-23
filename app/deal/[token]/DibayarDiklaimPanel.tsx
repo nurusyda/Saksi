@@ -31,6 +31,7 @@ import {
   DEADLINE_LAPSE_REPORT_BUTTON,
   ERROR_BUKTI_LOAD_FAILED,
   REKENING_TUJUAN_LABEL,
+  QRIS_MERCHANT_NAME_LABEL,
   DISPUTE_ROUNDS_EXHAUSTED_NOTE,
 } from '@/lib/copy';
 
@@ -38,17 +39,36 @@ import {
 // §5's [field yang berbeda] marker) — date_ok is excluded to match
 // checkBuktiConsistency's own mismatch signal (lib/ocr/gemini.ts), which
 // treats the transfer date as informational only, not a consistency check.
-const MISMATCH_FIELD_LABELS: Record<'amount_match' | 'rekening_match' | 'bank_match', string> = {
+// Two label sets, not one, since a QRIS bukti's ocrResult (migration 0036)
+// never carries rekening_match/bank_match — it carries merchant_name_match
+// instead. Which one a given ocrResult has tells us which deal type it's for.
+const REKENING_MISMATCH_FIELD_LABELS: Record<'amount_match' | 'rekening_match' | 'bank_match', string> = {
   amount_match: 'nominal',
   rekening_match: 'rekening tujuan',
   bank_match: 'bank',
 };
 
+const QRIS_MISMATCH_FIELD_LABELS: Record<'amount_match' | 'merchant_name_match', string> = {
+  amount_match: 'nominal',
+  merchant_name_match: 'nama merchant',
+};
+
+function isQrisOcrResult(
+  ocrResult: NonNullable<BuktiDisplay['ocrResult']>,
+): ocrResult is { amount_match: boolean | null; date_ok: boolean | null; merchant_name_match: boolean | null } {
+  return 'merchant_name_match' in ocrResult;
+}
+
 function getMismatchedFields(ocrResult: BuktiDisplay['ocrResult']): string[] {
   if (!ocrResult) return [];
-  return (Object.keys(MISMATCH_FIELD_LABELS) as (keyof typeof MISMATCH_FIELD_LABELS)[])
+  if (isQrisOcrResult(ocrResult)) {
+    return (Object.keys(QRIS_MISMATCH_FIELD_LABELS) as (keyof typeof QRIS_MISMATCH_FIELD_LABELS)[])
+      .filter((k) => ocrResult[k] === false)
+      .map((k) => QRIS_MISMATCH_FIELD_LABELS[k]);
+  }
+  return (Object.keys(REKENING_MISMATCH_FIELD_LABELS) as (keyof typeof REKENING_MISMATCH_FIELD_LABELS)[])
     .filter((k) => ocrResult[k] === false)
-    .map((k) => MISMATCH_FIELD_LABELS[k]);
+    .map((k) => REKENING_MISMATCH_FIELD_LABELS[k]);
 }
 
 interface DealSummary {
@@ -161,8 +181,14 @@ function PenjualReviewPanel({ deal, phone }: { deal: DealSummary; phone: string 
           <div className="mb-4">
             <FieldMatchRow label="Nominal" match={bukti.ocrResult.amount_match} />
             <FieldMatchRow label="Tanggal" match={bukti.ocrResult.date_ok} />
-            <FieldMatchRow label={REKENING_TUJUAN_LABEL} match={bukti.ocrResult.rekening_match} />
-            <FieldMatchRow label="Bank" match={bukti.ocrResult.bank_match} />
+            {isQrisOcrResult(bukti.ocrResult) ? (
+              <FieldMatchRow label={QRIS_MERCHANT_NAME_LABEL} match={bukti.ocrResult.merchant_name_match} />
+            ) : (
+              <>
+                <FieldMatchRow label={REKENING_TUJUAN_LABEL} match={bukti.ocrResult.rekening_match} />
+                <FieldMatchRow label="Bank" match={bukti.ocrResult.bank_match} />
+              </>
+            )}
           </div>
         )}
 

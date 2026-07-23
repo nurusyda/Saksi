@@ -13,18 +13,27 @@ import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
 import { getAccountHistory, maskRekening } from '@/lib/db/accountHistory';
 import { getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/lib/db/ledger';
 import { getDefaultDeadlineWib } from '@/lib/format';
+import { uploadQrisImage } from '@/lib/db/storage';
+import { decodeQrisImage } from '@/lib/qris/decode';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_RATE_LIMIT,
   ERROR_PHONE_INVALID,
   ERROR_PARTY_SAVE_FAILED,
   ERROR_DEAL_SAVE_FAILED,
+  ERROR_QRIS_FILE_REQUIRED,
+  ERROR_QRIS_NO_QR_FOUND,
+  ERROR_QRIS_INVALID_CHECKSUM,
+  ERROR_QRIS_NOT_QRIS,
+  ERROR_QRIS_UPLOAD_FAILED,
 } from '@/lib/copy';
 
 export type CreateDealState = {
   error?: string;
   fieldErrors?: Record<string, string>;
 };
+
+type PaymentMethod = 'REKENING' | 'QRIS';
 
 // "Notify me" checkboxes (feature_interest, migration 0012, extended by
 // 0016 to also cover the paid-tier checkboxes below — those shipped in
@@ -67,6 +76,11 @@ export async function createDeal(
   const amountRaw = (formData.get('amount_idr') as string | null) ?? '';
   const rekeningTujuanRaw = (formData.get('rekening_tujuan') as string | null)?.trim() ?? '';
   const rekeningBankRaw = (formData.get('rekening_bank') as string | null)?.trim() ?? '';
+  // migration 0036 — seller-chosen alternative to rekening, not a replacement.
+  // Defaults to REKENING so a stale client / direct POST without the field
+  // behaves exactly as it did before this existed.
+  const paymentMethod: PaymentMethod = formData.get('payment_method') === 'QRIS' ? 'QRIS' : 'REKENING';
+  const qrisFile = formData.get('qris_image') as File | null;
   // Auto-derived (2026-07-21 simplification pass), no longer a form field —
   // see getDefaultDeadlineWib. PERPANJANGAN remains the witnessed way to
   // change it after creation.
@@ -119,11 +133,16 @@ export async function createDeal(
   // C1 — only Penjual has a destination account to offer at create time; a
   // Pembeli-proposed deal leaves these null until the joining Penjual
   // supplies them (see JoinDealForm.tsx / joinDeal, C2).
-  const rekeningRequired = proposerRole === 'PENJUAL';
+  const rekeningRequired = proposerRole === 'PENJUAL' && paymentMethod === 'REKENING';
   if (rekeningRequired && !rekeningTujuanRaw) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
   if (rekeningRequired && !rekeningBankRaw) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';
   const rekeningTujuan = rekeningRequired ? rekeningTujuanRaw : null;
   const rekeningBank = rekeningRequired ? rekeningBankRaw : null;
+
+  const qrisRequired = proposerRole === 'PENJUAL' && paymentMethod === 'QRIS';
+  if (qrisRequired && (!qrisFile || qrisFile.size === 0)) {
+    fieldErrors.qris_image = ERROR_QRIS_FILE_REQUIRED;
+  }
 
   // Only GRATIS is selectable in the UI (paid tiers have no radio input at all,
   // Phase 0.6) — reject anything else server-side too, since a direct form POST
@@ -133,6 +152,53 @@ export async function createDeal(
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   const db = supabaseServer();
+
+  // dealId generated here (not at its old spot further down) so the QRIS
+  // upload below — which needs a deal id for its storage path — has one to
+  // use before any party/rate-limit writes happen. Same client-generated-UUID
+  // pattern as before (crypto.randomUUID(), so the id is known before the
+  // canonical hash is computed and before the atomic RPC write).
+  const dealId = randomUUID();
+  const token = nanoid(21);
+
+  let qrisNmid: string | null = null;
+  let qrisMerchantName: string | null = null;
+  let qrisMerchantCity: string | null = null;
+  let qrisImagePath: string | null = null;
+
+  if (qrisRequired && qrisFile) {
+    const uploaded = await uploadQrisImage(db, dealId, qrisFile);
+    if (!uploaded) return { fieldErrors: { qris_image: ERROR_QRIS_UPLOAD_FAILED } };
+
+    const decoded = await decodeQrisImage(uploaded.bytes);
+    if (decoded.status !== 'ok') {
+      // Found by monster_check: a decode failure returned an error without
+      // removing the file just uploaded — an orphaned storage object with no
+      // deal ever referencing it (the deal row hasn't been inserted yet at
+      // this point in the flow). Best-effort: a cleanup failure here must not
+      // block the user from seeing/retrying the actual error.
+      await db.storage.from('bukti').remove([uploaded.storagePath]).catch(() => {});
+      const message =
+        decoded.status === 'no_qr_found'
+          ? ERROR_QRIS_NO_QR_FOUND
+          : decoded.status === 'invalid_checksum'
+            ? ERROR_QRIS_INVALID_CHECKSUM
+            : ERROR_QRIS_NOT_QRIS;
+      return { fieldErrors: { qris_image: message } };
+    }
+    if (!decoded.fields.merchantName) {
+      // Merchant name is the field the buyer actually reads to recognize the
+      // seller — a payload that decodes but carries no name isn't usable,
+      // same "don't proceed on an unusable read" posture as the OCR path.
+      await db.storage.from('bukti').remove([uploaded.storagePath]).catch(() => {});
+      return { fieldErrors: { qris_image: ERROR_QRIS_NOT_QRIS } };
+    }
+
+    qrisNmid = decoded.fields.nmid;
+    qrisMerchantName = decoded.fields.merchantName;
+    qrisMerchantCity = decoded.fields.merchantCity;
+    qrisImagePath = uploaded.storagePath;
+  }
 
   const pHash = phoneHash(phoneE164);
   await db
@@ -166,9 +232,6 @@ export async function createDeal(
     .gte('created_at', todayUtc.toISOString());
   if ((count ?? 0) >= 20) return { error: ERROR_RATE_LIMIT };
 
-  const dealId = randomUUID();
-  const token = nanoid(21);
-
   // Pre-compute hash before the write. created_at is excluded from the canonical
   // payload so the hash is deterministic regardless of server clock at insert time.
   const virtualDeal = {
@@ -182,6 +245,10 @@ export async function createDeal(
     amount_idr: amountIdr,
     rekening_tujuan: rekeningTujuan,
     rekening_bank: rekeningBank,
+    payment_method: paymentMethod,
+    qris_nmid: qrisNmid,
+    qris_merchant_name: qrisMerchantName,
+    qris_merchant_city: qrisMerchantCity,
     deadline,
     status: 'DRAF',
     meterai_applied: false,
@@ -212,6 +279,11 @@ export async function createDeal(
       p_rekening_bank: rekeningBank,
       p_deadline: deadline,
       p_new_hash: newHash,
+      p_payment_method: paymentMethod,
+      p_qris_nmid: qrisNmid,
+      p_qris_merchant_name: qrisMerchantName,
+      p_qris_merchant_city: qrisMerchantCity,
+      p_qris_image_path: qrisImagePath,
     })
     .single();
 

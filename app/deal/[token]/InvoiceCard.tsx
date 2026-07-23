@@ -8,6 +8,7 @@ import {
   INVOICE_NUMBER_LABEL,
   INVOICE_FOR_LABEL,
   REKENING_TUJUAN_LABEL,
+  QRIS_MERCHANT_NAME_LABEL,
 } from '@/lib/copy';
 
 // §23 — the deal summary re-presented as a tagihan.
@@ -29,6 +30,7 @@ export function InvoiceCard({
   token,
   rekeningBank,
   rekeningTujuan,
+  qrisMerchantName,
   kategoriLabel,
 }: {
   itemDesc: string;
@@ -37,6 +39,7 @@ export function InvoiceCard({
   token: string;
   rekeningBank?: string | null;
   rekeningTujuan?: string | null;
+  qrisMerchantName?: string | null;
   kategoriLabel?: string | null;
 }) {
   return (
@@ -89,6 +92,12 @@ export function InvoiceCard({
               <dd className="text-right font-semibold text-zinc-900">
                 {rekeningBank} {maskRekening(rekeningTujuan)}
               </dd>
+            </div>
+          )}
+          {qrisMerchantName && (
+            <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">
+              <dt className="text-zinc-600">{QRIS_MERCHANT_NAME_LABEL}</dt>
+              <dd className="text-right font-semibold text-zinc-900">{qrisMerchantName}</dd>
             </div>
           )}
           <div className="flex justify-between gap-3 border-t border-dashed border-zinc-200 py-1.5 text-xs">

@@ -922,3 +922,35 @@ export const BUAT_SECTION_REKENING = 'Rekening pembayaran kamu';
 // before the seller has done anything. The deadline is still shown where it is
 // actually load-bearing — on the invoice the buyer reads (formatDeadlineWib),
 // where it tells them how long they have rather than what goes wrong.
+
+// ============================================================
+// QRIS payment method (migration 0036) — copy-id.md §47, locked 2026-07-24.
+// ============================================================
+export const PAYMENT_METHOD_LABEL = 'Metode pembayaran';
+export const PAYMENT_METHOD_REKENING_LABEL = 'Rekening bank';
+export const PAYMENT_METHOD_QRIS_LABEL = 'QRIS';
+
+export const QRIS_UPLOAD_LABEL = 'Unggah kode QRIS kamu';
+export const QRIS_UPLOAD_HINT =
+  'Unduh atau screenshot kode QRIS dari aplikasi bank/e-wallet kamu, lalu unggah di sini.';
+
+export const ERROR_QRIS_FILE_REQUIRED = 'Unggah gambar QRIS terlebih dahulu.';
+export const ERROR_QRIS_NO_QR_FOUND = 'Kode QR tidak ditemukan pada gambar ini. Coba unggah ulang.';
+export const ERROR_QRIS_INVALID_CHECKSUM =
+  'Kode QRIS tidak valid atau rusak. Coba unggah ulang dari sumber aslinya.';
+export const ERROR_QRIS_NOT_QRIS = 'Kode QR ini bukan kode QRIS.';
+export const ERROR_QRIS_UPLOAD_FAILED = 'Gagal mengunggah gambar QRIS. Coba lagi.';
+
+export const QRIS_MERCHANT_NAME_LABEL = 'Nama merchant';
+export const QRIS_MERCHANT_CITY_LABEL = 'Kota merchant';
+
+// Shown to the buyer in place of RekeningCopyCard for a QRIS deal — the
+// account number never appears at all for this payment method, so the copy
+// must not imply one exists.
+export const QRIS_SCAN_INSTRUCTION =
+  'Pindai kode QRIS ini menggunakan aplikasi bank atau e-wallet kamu untuk membayar.';
+
+// Flag page's identifiers block, QRIS-payment-method variant of formatFlagRekeningLine.
+export function formatFlagQrisLine(merchantName: string): string {
+  return `QRIS: ${merchantName}`;
+}

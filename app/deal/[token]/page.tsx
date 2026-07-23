@@ -109,13 +109,14 @@ export default async function DealPage({
     notFound();
   }
 
-  // Defense in depth: migration 0013's CHECK constraint guarantees
-  // rekening_tujuan/rekening_bank are non-null once a deal leaves DRAF, but
-  // `deal` here is untyped (select('*') with no generated Database schema)
-  // so TypeScript can't catch a drift between the constraint and this
-  // assumption. DisepakatiPanel and friends are typed to expect non-null
-  // strings for these fields.
-  if (deal.status !== DealStatus.DRAF && (!deal.rekening_tujuan || !deal.rekening_bank)) {
+  // Defense in depth: migration 0036's CHECK constraint guarantees a deal
+  // leaving DRAF has either rekening_tujuan+rekening_bank (REKENING) or
+  // qris_nmid (QRIS) set, but `deal` here is untyped (select('*') with no
+  // generated Database schema) so TypeScript can't catch a drift between the
+  // constraint and this assumption.
+  const hasRekeningDestination = Boolean(deal.rekening_tujuan && deal.rekening_bank);
+  const hasQrisDestination = deal.payment_method === 'QRIS' && Boolean(deal.qris_nmid);
+  if (deal.status !== DealStatus.DRAF && !hasRekeningDestination && !hasQrisDestination) {
     notFound();
   }
 
@@ -206,6 +207,7 @@ export default async function DealPage({
           token={token}
           rekeningBank={deal.rekening_bank}
           rekeningTujuan={deal.rekening_tujuan}
+          qrisMerchantName={deal.qris_merchant_name}
         />
         {/* No kategori badge: the mockup's Reguler/PO chip has no column
             behind it (deal-type gating was removed, §6a) and the deadline is
@@ -231,12 +233,16 @@ export default async function DealPage({
                  actually has a rekening; createDeal requires one for PENJUAL
                  (the only proposer role since §22), so the fallback below is
                  defensive rather than a live branch. */
-              deal.rekening_bank && deal.rekening_tujuan ? (
+              hasRekeningDestination || hasQrisDestination ? (
                 <BuyerJoinGate
                   token={token}
                   action={boundJoinAndPay}
+                  paymentMethod={deal.payment_method}
                   rekeningBank={deal.rekening_bank}
                   rekeningTujuan={deal.rekening_tujuan}
+                  qrisMerchantName={deal.qris_merchant_name}
+                  qrisMerchantCity={deal.qris_merchant_city}
+                  qrisImagePath={deal.qris_image_path}
                 />
               ) : (
                 <Card className="bg-zinc-50 text-sm text-zinc-700">
@@ -280,12 +286,16 @@ export default async function DealPage({
               <p>{WAITING_FOR_PAYMENT_PROOF}</p>
               <WaitingStatusPoll token={token} knownStatus={DealStatus.DISEPAKATI} />
             </Card>
-          ) : deal.rekening_bank && deal.rekening_tujuan ? (
+          ) : hasRekeningDestination || hasQrisDestination ? (
             <BuyerJoinGate
               token={token}
               action={boundSubmitBukti}
+              paymentMethod={deal.payment_method}
               rekeningBank={deal.rekening_bank}
               rekeningTujuan={deal.rekening_tujuan}
+              qrisMerchantName={deal.qris_merchant_name}
+              qrisMerchantCity={deal.qris_merchant_city}
+              qrisImagePath={deal.qris_image_path}
               mode="pay"
             />
           ) : (

@@ -7,6 +7,7 @@ import { shortHashFragment } from '@/lib/format';
 import {
   CANONICAL_DOMAIN,
   formatFlagRekeningLine,
+  formatFlagQrisLine,
   formatFlagPhoneVerifiedLine,
   FLAG_IDENTITY_VERIFIED_LINE,
   FLAG_RETRACTED_LINE,
@@ -66,6 +67,8 @@ export default async function FlagPage({
 
   const bank = typeof identifiers.bank === 'string' ? identifiers.bank : null;
   const rekeningMasked = typeof identifiers.rekening_masked === 'string' ? identifiers.rekening_masked : null;
+  const qrisMerchantName =
+    typeof identifiers.qris_merchant_name === 'string' ? identifiers.qris_merchant_name : null;
   const phoneHash = typeof identifiers.phone_hash === 'string' ? identifiers.phone_hash : null;
   const identityVerified = identifiers.identity_verified === true;
 
@@ -95,9 +98,10 @@ export default async function FlagPage({
             </div>
           )}
 
-          {(bank || phoneHash || identityVerified) && (
+          {(bank || qrisMerchantName || phoneHash || identityVerified) && (
             <div className="mt-4 border-t border-zinc-200 pt-3 text-xs text-zinc-500">
               {bank && rekeningMasked && <p>{formatFlagRekeningLine(bank, rekeningMasked)}</p>}
+              {qrisMerchantName && <p>{formatFlagQrisLine(qrisMerchantName)}</p>}
               {phoneHash && <p>{formatFlagPhoneVerifiedLine(shortHashFragment(phoneHash))}</p>}
               {identityVerified && <p>{FLAG_IDENTITY_VERIFIED_LINE}</p>}
             </div>

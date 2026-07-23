@@ -93,6 +93,33 @@ export async function uploadReportEvidence(
 }
 
 /**
+ * Upload the seller's QRIS image at deal creation (migration 0036), under a
+ * distinct `qris/` prefix. Same private bucket/size cap as every other
+ * upload here — kept (not discarded after decode) so a later dispute over
+ * "this isn't the QRIS you showed me" has the original image as evidence,
+ * not just the fields decoded from it.
+ */
+export async function uploadQrisImage(
+  db: SupabaseClient,
+  dealId: string,
+  file: File,
+): Promise<{ storagePath: string; bytes: Buffer; mimeType: string } | null> {
+  if (file.size > MAX_UPLOAD_BYTES) return null;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const storagePath = `qris/${dealId}/${randomUUID()}.${ext}`;
+  const mimeType = file.type || 'application/octet-stream';
+
+  const { error } = await db.storage.from(BUKTI_BUCKET).upload(storagePath, bytes, {
+    contentType: mimeType,
+    upsert: false,
+  });
+  if (error) return null;
+
+  return { storagePath, bytes, mimeType };
+}
+
+/**
  * Upload an optional supporting image attached to a deal statement (migration
  * 0033) — the photo a buyer shows with "barang tidak sesuai", or a seller with
  * "dana belum masuk". Same private bucket as bukti, under a distinct

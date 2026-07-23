@@ -66,8 +66,12 @@ type RawDeal = {
   counterpart_id: string | null;
   item_desc: string;
   amount_idr: number;
-  rekening_tujuan: string;
-  rekening_bank: string;
+  // Exactly one of {rekening_tujuan+rekening_bank} or {qris_merchant_name} is
+  // set, per migration 0036's payment_method split — never both, never
+  // neither, for any deal past DRAF.
+  rekening_tujuan?: string | null;
+  rekening_bank?: string | null;
+  qris_merchant_name?: string | null;
   created_at: string;
 };
 
@@ -166,8 +170,13 @@ async function assembleLedger(
       dateIso: latestEventByDeal.get(deal.id) ?? deal.created_at,
       itemDesc: deal.item_desc,
       amountIdr: Number(deal.amount_idr),
-      bank: deal.rekening_bank,
-      rekeningMasked: maskRekening(deal.rekening_tujuan),
+      // rekeningMasked/bank double as the QRIS display fields when this deal
+      // has no rekening at all — neither is currently rendered by
+      // LedgerDetail.tsx (dateIso/itemDesc/amountIdr/counterpartPhoneHash are
+      // the only fields formatLedgerRow consumes today), but kept populated
+      // and truthful rather than left blank in case that changes.
+      bank: deal.rekening_bank ?? 'QRIS',
+      rekeningMasked: deal.rekening_tujuan ? maskRekening(deal.rekening_tujuan) : deal.qris_merchant_name ?? '',
       counterpartPhoneHash:
         deal.tier !== 'GRATIS' && deal.otherPartyId ? phoneHashById.get(deal.otherPartyId) ?? null : null,
     }));
@@ -267,6 +276,29 @@ export async function getRekeningLedger(bank: string, rekening: string): Promise
     otherPartyId: d.proposer_role === 'PENJUAL' ? d.counterpart_id : d.proposer_id,
   }));
   // Rekening mode: a seller's card never surfaces a buyer's payment dispute.
+  return assembleLedger(db, annotated, false);
+}
+
+// QRIS parallel to getRekeningLedger (migration 0036), keyed on qris_nmid —
+// a separate identity namespace from rekening+bank, not a merge (see
+// lib/qris/decode.ts). Same "seller's card never shows a buyer's payment
+// dispute" rule as the rekening path.
+export async function getQrisLedger(nmid: string): Promise<LedgerResult> {
+  if (!isLedgerDetailEnabled()) return { status: 'disabled' };
+  const db = supabaseServer();
+  if (!(await checkLookupRateLimit(db))) return { status: 'error' };
+  const { data, error } = await db
+    .from('deals')
+    .select('id, status, tier, proposer_id, counterpart_id, proposer_role, item_desc, amount_idr, qris_merchant_name, created_at')
+    .eq('payment_method', 'QRIS')
+    .eq('qris_nmid', nmid)
+    .neq('status', 'DRAF');
+  if (error) return { status: 'error' };
+
+  const annotated: AnnotatedDeal[] = (data ?? []).map((d) => ({
+    ...d,
+    otherPartyId: d.proposer_role === 'PENJUAL' ? d.counterpart_id : d.proposer_id,
+  }));
   return assembleLedger(db, annotated, false);
 }
 

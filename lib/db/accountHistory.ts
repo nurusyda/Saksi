@@ -176,6 +176,25 @@ export async function getAccountHistory(bank: string, rekening: string): Promise
   return buildHistoryFromDeals(db, data ?? []);
 }
 
+// QRIS parallel to getAccountHistory (migration 0036) — same fair-attribution
+// buckets, keyed on qris_nmid instead of bank+rekening_tujuan. A separate
+// namespace, not a merge: a rekening and an NMID are different identity
+// primitives (see lib/qris/decode.ts's header comment), so there is no
+// shared key to join the two payment methods' history on even for the same
+// real-world seller.
+export async function getAccountHistoryByNmid(nmid: string): Promise<AccountHistoryResult> {
+  const db = supabaseServer();
+  const { data, error } = await db
+    .from('deals')
+    .select('id, status, created_at')
+    .eq('payment_method', 'QRIS')
+    .eq('qris_nmid', nmid)
+    .neq('status', 'DRAF');
+
+  if (error) return { status: 'error' };
+  return buildHistoryFromDeals(db, data ?? []);
+}
+
 // B5 — public /cek lookup by phone. phoneHash is computed by the caller
 // (server action) before this is ever called; the raw phone number never
 // reaches this function or any query log. A phone can appear as either

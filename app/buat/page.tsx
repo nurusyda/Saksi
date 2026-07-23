@@ -37,6 +37,11 @@ import {
   BUAT_SECTION_BARANG,
   BUAT_SECTION_REKENING,
   CTA_BUAT_TAGIHAN,
+  PAYMENT_METHOD_LABEL,
+  PAYMENT_METHOD_REKENING_LABEL,
+  PAYMENT_METHOD_QRIS_LABEL,
+  QRIS_UPLOAD_LABEL,
+  QRIS_UPLOAD_HINT,
 } from '@/lib/copy';
 
 // Seller-first invoice form. The proposer is always PENJUAL (hidden field
@@ -83,6 +88,8 @@ const initialState: CreateDealState = {};
 export default function BuatPage() {
   const [state, formAction] = useActionState(createDeal, initialState);
   const [tcChecked, setTcChecked] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'REKENING' | 'QRIS'>('REKENING');
+  const [qrisFileName, setQrisFileName] = useState('');
   const [bank, setBank] = useState('');
   const [customBank, setCustomBank] = useState('');
   const [itemTitle, setItemTitle] = useState('');
@@ -195,72 +202,123 @@ export default function BuatPage() {
         </FormSection>
 
         <FormSection label={BUAT_SECTION_REKENING}>
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <div className="sm:flex-1">
-              <Field label="Bank" htmlFor="rekening_bank_select" error={fe.rekening_bank}>
-                <select
-                  id="rekening_bank_select"
-                  value={bank}
-                  onChange={(e) => setBank(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">Pilih bank</option>
-                  {BANK_OPTIONS.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                  <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
-                </select>
-                {bank === BANK_OTHER_VALUE && (
-                  <input
-                    type="text"
-                    value={customBank}
-                    onChange={(e) => setCustomBank(e.target.value)}
-                    placeholder="Nama bank"
-                    className={`mt-2 ${inputClass}`}
-                  />
-                )}
-                <input type="hidden" name="rekening_bank" value={effectiveBank} />
-              </Field>
-            </div>
-            <div className="sm:flex-[2]">
-              <Field
-                label="Nomor rekening tujuan pembayaran"
-                htmlFor="rekening_tujuan"
-                error={fe.rekening_tujuan}
-              >
+          <Field label={PAYMENT_METHOD_LABEL} htmlFor="payment_method_rekening">
+            <div className="flex gap-4 text-sm text-zinc-700">
+              <label className="flex items-center gap-2">
                 <input
-                  id="rekening_tujuan"
-                  name="rekening_tujuan"
-                  type="text"
-                  inputMode="numeric"
-                  value={rekening}
-                  onChange={(e) => setRekening(e.target.value)}
-                  className={inputClass}
+                  id="payment_method_rekening"
+                  type="radio"
+                  name="payment_method"
+                  value="REKENING"
+                  checked={paymentMethod === 'REKENING'}
+                  onChange={() => setPaymentMethod('REKENING')}
+                  className="accent-[var(--witness)]"
                 />
-              </Field>
+                {PAYMENT_METHOD_REKENING_LABEL}
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value="QRIS"
+                  checked={paymentMethod === 'QRIS'}
+                  onChange={() => setPaymentMethod('QRIS')}
+                  className="accent-[var(--witness)]"
+                />
+                {PAYMENT_METHOD_QRIS_LABEL}
+              </label>
             </div>
-          </div>
+          </Field>
 
-          {history.status !== 'idle' && (
-            <p className="text-xs leading-relaxed text-zinc-500">
-              {history.status === 'found' &&
-                formatAccountHistory(
-                  effectiveBank,
-                  history.rekeningMasked,
-                  history.berhasilCount,
-                  history.klaimBarangCount,
-                  history.belumDikonfirmasiCount,
-                  history.sinceLabel,
-                )}
-              {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-              {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
-            </p>
+          {paymentMethod === 'REKENING' && (
+            <>
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <div className="sm:flex-1">
+                  <Field label="Bank" htmlFor="rekening_bank_select" error={fe.rekening_bank}>
+                    <select
+                      id="rekening_bank_select"
+                      value={bank}
+                      onChange={(e) => setBank(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Pilih bank</option>
+                      {BANK_OPTIONS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                      <option value={BANK_OTHER_VALUE}>{BANK_OTHER_LABEL}</option>
+                    </select>
+                    {bank === BANK_OTHER_VALUE && (
+                      <input
+                        type="text"
+                        value={customBank}
+                        onChange={(e) => setCustomBank(e.target.value)}
+                        placeholder="Nama bank"
+                        className={`mt-2 ${inputClass}`}
+                      />
+                    )}
+                    <input type="hidden" name="rekening_bank" value={effectiveBank} />
+                  </Field>
+                </div>
+                <div className="sm:flex-[2]">
+                  <Field
+                    label="Nomor rekening tujuan pembayaran"
+                    htmlFor="rekening_tujuan"
+                    error={fe.rekening_tujuan}
+                  >
+                    <input
+                      id="rekening_tujuan"
+                      name="rekening_tujuan"
+                      type="text"
+                      inputMode="numeric"
+                      value={rekening}
+                      onChange={(e) => setRekening(e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {history.status !== 'idle' && (
+                <p className="text-xs leading-relaxed text-zinc-500">
+                  {history.status === 'found' &&
+                    formatAccountHistory(
+                      effectiveBank,
+                      history.rekeningMasked,
+                      history.berhasilCount,
+                      history.klaimBarangCount,
+                      history.belumDikonfirmasiCount,
+                      history.sinceLabel,
+                    )}
+                  {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+                  {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+                </p>
+              )}
+
+              {history.status === 'found' && history.ledgerEnabled && (
+                <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
+              )}
+            </>
           )}
 
-          {history.status === 'found' && history.ledgerEnabled && (
-            <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
+          {paymentMethod === 'QRIS' && (
+            <Field label={QRIS_UPLOAD_LABEL} htmlFor="qris_image" hint={QRIS_UPLOAD_HINT} error={fe.qris_image}>
+              <input
+                id="qris_image"
+                name="qris_image"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setQrisFileName(e.target.files?.[0]?.name ?? '')}
+                className={inputClass}
+              />
+              {qrisFileName && <p className="mt-1 text-xs text-zinc-500">{qrisFileName}</p>}
+              {/* No live history preview here (unlike the rekening path above) — the
+                  seller's QRIS identity is only known once the server decodes the
+                  upload, which happens on submit, not as-you-type. History for this
+                  merchant is still shown to the buyer on the deal page and on /cek,
+                  same as rekening — this form just doesn't preview it before submit. */}
+            </Field>
           )}
         </FormSection>
 
