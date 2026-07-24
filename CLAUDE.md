@@ -7,7 +7,7 @@ Deal-witnessing web app for Indonesian informal commerce (fandom sales, jastip, 
 Read `.claude/skills/saksi-builder/SKILL.md` and its `references/` files:
 - `references/data-model.md` — schema, state machine, tier spec, breach/flag logic (read before touching the database or any flow)
 - `references/copy-id.md` — every locked Indonesian string, VERBATIM, no paraphrasing (read before building any UI)
-- `references/integrations.md` — Midtrans, WA OTP, Didit, OpenTimestamps, Gemini OCR, evidence-pack PDF (read before wiring any external service)
+- `references/integrations.md` — WA OTP, OpenTimestamps, Gemini OCR, evidence-pack PDF (read before wiring any external service)
 - `references/ops.md` — live infrastructure facts, env var names, migration discipline, backup requirement (read before proposing any infra or config)
 
 These contain LOCKED product decisions. Do not improvise alternative wording, states, tiers, or stack choices. If something needed is missing from them, ask the human — do not invent.
@@ -18,16 +18,16 @@ Every string SAKSI shows must be true even when a user is lying to it. Claims ar
 
 ## Stack (locked)
 
-Next.js App Router + TypeScript + Tailwind on Vercel · Supabase (Postgres/RLS/Storage, project in ap-southeast-1) · identity = phone (no accounts/emails/passwords) · SHA-256 + OpenTimestamps on every state transition · Gemini for OCR consistency · Midtrans Snap (QRIS only on Rp5rb tier) · Didit e-KYC (Bermeterai tier).
+Next.js App Router + TypeScript + Tailwind on Vercel · Supabase (Postgres/RLS/Storage, project in ap-southeast-1) · identity = phone (no accounts/emails/passwords) · SHA-256 + OpenTimestamps on every state transition · Gemini for OCR consistency.
 
 ## Build order
 
 1. Schema + state machine + hash/anchor layer (migrations in `supabase/migrations/`, via CLI, committed)
 2. Free-tier happy path: create → link → attestations → accept → forced-check → bukti upload → OCR → SELESAI
 3. D5 exit states + PERPANJANGAN
-4. Breach path (OTP enters here, not before)
+4. Breach path (identify, not OTP — §25 removed OTP from breach path)
 5. Public surfaces: check page, flag page, profile (counts, never a score)
-6. Paid tiers (Midtrans, Didit, meterai mock, evidence-pack PDF)
+6. Paid tiers (Akun Saksi Rp20rb one-time, Toko Saksi Pro Rp200rb/year, Saksi Resmi e-meterai Rp30rb/perjanjian — buyer-initiated stamping)
 
 Week-one non-negotiable alongside step 1: the daily `supabase db dump` GitHub Action (backup + keepalive) — see ops.md.
 

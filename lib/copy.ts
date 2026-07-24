@@ -60,8 +60,8 @@ export const COUNTERPART_FALLBACK_LABEL = 'Pihak lain';
 // That model is superseded twice. Its verification mechanism, WA OTP, was
 // deleted (§25) — so "Nomor HP kedua pihak terverifikasi (OTP WhatsApp)" is
 // now false. And SAKSI-MASTER.md §6 replaced the ladder with a different
-// product: Akun Saksi (Rp10.000 one-time — phone login, saved rekening, the
-// displayed track-record badge) and Toko Saksi Pro (Rp100.000 one-time —
+// product: Akun Saksi (Rp20.000 one-time — phone login, saved rekening, the
+// displayed track-record badge) and Toko Saksi Pro (Rp200.000/year —
 // logo on the invoice + a saksi.app/namatoko storefront). The new tiers sell
 // seller convenience and display, NOT counterparty verification.
 //
@@ -111,9 +111,10 @@ export function formatAccountHistory(
   berhasilCount: number,
   klaimBarangCount: number,
   belumDikonfirmasiCount: number,
+  pernahKlaimBelumTerimaCount: number,
   sinceLabel: string,
 ): string {
-  return `Rekening tujuan: ${bank} ${rekeningMasked} · ${formatAccountHistoryCounts(berhasilCount, klaimBarangCount, belumDikonfirmasiCount, sinceLabel)}`;
+  return `Rekening tujuan: ${bank} ${rekeningMasked} · ${formatAccountHistoryCounts(berhasilCount, klaimBarangCount, belumDikonfirmasiCount, pernahKlaimBelumTerimaCount, sinceLabel)}`;
 }
 
 // §26 (2026-07-21), reworked §45 — the counts half of formatAccountHistory,
@@ -124,9 +125,10 @@ export function formatAccountHistoryCounts(
   berhasilCount: number,
   klaimBarangCount: number,
   belumDikonfirmasiCount: number,
+  pernahKlaimBelumTerimaCount: number,
   sinceLabel: string,
 ): string {
-  return `${berhasilCount} transaksi berhasil · ${klaimBarangCount} klaim barang berbeda · ${belumDikonfirmasiCount} belum dikonfirmasi penjual · tercatat sejak ${sinceLabel}`;
+  return `${berhasilCount} transaksi berhasil · ${klaimBarangCount} klaim barang berbeda · ${belumDikonfirmasiCount} belum dikonfirmasi penjual · ${pernahKlaimBelumTerimaCount} klaim pembayaran belum diterima · tercatat sejak ${sinceLabel}`;
 }
 
 // ============================================================
@@ -155,6 +157,7 @@ export function formatAccountHistoryFull(
     klaimBarangCount: number;
     belumDikonfirmasiCount: number;
     klaimPembayaranCount: number;
+    pernahKlaimBelumTerimaCount: number;
   },
   sinceLabel: string,
 ): string {
@@ -163,6 +166,7 @@ export function formatAccountHistoryFull(
     `${counts.klaimBarangCount} klaim barang berbeda`,
     `${counts.belumDikonfirmasiCount} belum dikonfirmasi penjual`,
     `${counts.klaimPembayaranCount} klaim pembayaran berbeda`,
+    `${counts.pernahKlaimBelumTerimaCount} klaim pembayaran belum diterima`,
   ];
   return `${identifierLabel} · ${parts.join(' · ')} · tercatat sejak ${sinceLabel}`;
 }
@@ -544,9 +548,9 @@ export const SAYA_STATUS_LABELS: Record<string, string> = {
 // look purchasable while there is nothing to purchase. States what it would
 // unlock and nothing about trust: paying never buys a track record.
 export const TOKO_PRO_LOCKED_TITLE = 'Toko Saksi Pro';
-export const TOKO_PRO_LOCKED_PRICE = 'Rp100.000 · sekali bayar';
+export const TOKO_PRO_LOCKED_PRICE = 'Rp200.000 · per tahun';
 export const TOKO_PRO_LOCKED_DESC =
-  'Nanti: logo kamu di tagihan, dan link toko sendiri (saksi.app/namatoko). Rekam jejakmu tetap gratis dan tidak bisa dibeli.';
+  'Nanti: logo kamu di tagihan, dan link toko sendiri (saksi.app/namatoko). Rekam jejakmu tetap tercatat apa adanya dan tidak bisa dibeli.';
 export const TOKO_PRO_LOCKED_BADGE = 'Belum tersedia';
 export const OCR_AUTHENTICITY_DISCLAIMER =
   'Pemeriksaan konsistensi bukan pemeriksaan keaslian. Buka aplikasi perbankan Anda sendiri sebelum mengonfirmasi.';

@@ -289,6 +289,7 @@ export default function BuatPage() {
                       history.berhasilCount,
                       history.klaimBarangCount,
                       history.belumDikonfirmasiCount,
+                      history.pernahKlaimBelumTerimaCount,
                       history.sinceLabel,
                     )}
                   {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}

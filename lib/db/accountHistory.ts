@@ -32,11 +32,15 @@ export interface AccountHistory {
   // disputed the goods (reflects on the seller); belumDikonfirmasi = buyer paid
   // but the seller never confirmed and the deal timed out (the naughty-seller
   // signal); klaimPembayaran = seller disputed the payment (reflects on the
-  // BUYER — shown on /cek phone lookups, never on a seller's rekening card).
+  // BUYER — shown on /cek phone lookups, never on a seller's rekening card);
+  // pernahKlaimBelumTerima = seller filed DANA_BELUM_MASUK (also shown on the
+  // seller's rekening card — the seller made the claim, so the claim itself is
+  // a fact about the seller regardless of whether it was honest).
   berhasilCount: number;
   klaimBarangCount: number;
   belumDikonfirmasiCount: number;
   klaimPembayaranCount: number;
+  pernahKlaimBelumTerimaCount: number;
   sinceLabel: string; // e.g. "Maret 2026"
 }
 
@@ -88,8 +92,10 @@ type DealForHistory = { id: string; status: string; created_at: string };
 // seller's conduct — see the fair-attribution design). The event set needed:
 //   RECEIPT_CONFIRMED  — seller confirmed the money landed (success pivot)
 //   BARANG_TIDAK_SESUAI — buyer disputed the goods (reflects on the seller)
-//   DANA_BELUM_MASUK   — seller disputed the payment (reflects on the BUYER;
-//                        excluded from the seller's rekening record)
+//   DANA_BELUM_MASUK   — seller disputed the payment (reflects on the BUYER
+//                        via klaimPembayaranCount AND on the seller via
+//                        pernahKlaimBelumTerimaCount — the claim itself is a
+//                        fact about the seller who made it)
 async function buildHistoryFromDeals(
   db: ReturnType<typeof supabaseServer>,
   deals: DealForHistory[],
@@ -130,6 +136,7 @@ async function buildHistoryFromDeals(
   let klaimBarangCount = 0; // buyer disputed goods (concern on the seller)
   let belumDikonfirmasiCount = 0; // buyer paid, seller ghosted (weak)
   let klaimPembayaranCount = 0; // seller disputed payment (the BUYER's issue — tracked, not a seller concern)
+  let pernahKlaimBelumTerimaCount = 0; // seller filed DANA_BELUM_MASUK — fact about the seller, shown on both rekening + phone cards
 
   for (const d of deals) {
     const receiptConfirmed = dealHas(d.id, 'RECEIPT_CONFIRMED');
@@ -143,7 +150,8 @@ async function buildHistoryFromDeals(
     } else if (d.status === 'DIKONFIRMASI_TERIMA' || (d.status === 'KEDALUWARSA' && receiptConfirmed)) {
       berhasilCount++; // pembayaran diterima — seller confirmed money, no goods complaint
     } else if (paymentDisputed) {
-      klaimPembayaranCount++; // the buyer's payment is in question, not the seller
+      klaimPembayaranCount++; // the buyer's payment is in question
+      pernahKlaimBelumTerimaCount++; // the seller made this claim — fact about the seller
     } else if (d.status === 'KEDALUWARSA') {
       belumDikonfirmasiCount++; // paid, seller never confirmed, timed out
     }
@@ -159,7 +167,7 @@ async function buildHistoryFromDeals(
 
   return {
     status: 'found',
-    history: { berhasilCount, klaimBarangCount, belumDikonfirmasiCount, klaimPembayaranCount, sinceLabel },
+    history: { berhasilCount, klaimBarangCount, belumDikonfirmasiCount, klaimPembayaranCount, pernahKlaimBelumTerimaCount, sinceLabel },
   };
 }
 

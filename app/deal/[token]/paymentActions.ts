@@ -97,6 +97,7 @@ export type AccountHistoryDisplay =
       berhasilCount: number;
       klaimBarangCount: number;
       belumDikonfirmasiCount: number;
+      pernahKlaimBelumTerimaCount: number;
       sinceLabel: string;
       // Found by monster_check: for a QRIS deal this holds qris_merchant_name,
       // not a masked rekening — no consumer renders it in that branch today
@@ -134,6 +135,7 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
     berhasilCount: result.history.berhasilCount,
     klaimBarangCount: result.history.klaimBarangCount,
     belumDikonfirmasiCount: result.history.belumDikonfirmasiCount,
+    pernahKlaimBelumTerimaCount: result.history.pernahKlaimBelumTerimaCount,
     sinceLabel: result.history.sinceLabel,
     rekeningMasked: isQris ? deal.qris_merchant_name ?? '' : maskRekening(deal.rekening_tujuan as string),
     ledgerEnabled: isLedgerDetailEnabled(),

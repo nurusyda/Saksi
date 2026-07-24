@@ -320,6 +320,7 @@ export type AccountHistoryDisplay =
       berhasilCount: number;
       klaimBarangCount: number;
       belumDikonfirmasiCount: number;
+      pernahKlaimBelumTerimaCount: number;
       sinceLabel: string;
       rekeningMasked: string;
       ledgerEnabled: boolean;
@@ -344,6 +345,7 @@ export async function checkAccountHistory(
     berhasilCount: result.history.berhasilCount,
     klaimBarangCount: result.history.klaimBarangCount,
     belumDikonfirmasiCount: result.history.belumDikonfirmasiCount,
+    pernahKlaimBelumTerimaCount: result.history.pernahKlaimBelumTerimaCount,
     sinceLabel: result.history.sinceLabel,
     rekeningMasked: maskRekening(rekening),
     ledgerEnabled: isLedgerDetailEnabled(),

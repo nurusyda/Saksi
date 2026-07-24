@@ -220,7 +220,7 @@ deferred, and the milestone it's tied to.
   sufficient for the Bermeterai tier's needs.
 - **Target:** When a paying use case demands it.
 
-## Paid-tier features (Toko Saksi Pro — Rp100rb)
+## Paid-tier features (Toko Saksi Pro — Rp200rb)
 
 Context: the §45 trust redesign (fair-attribution history + literal state
 names + images on both sides of every dispute) is built and live on the free
@@ -242,7 +242,7 @@ the raw counts SAKSI shows, never a hardcoded score or verdict SAKSI renders.
   surface needs its own design pass (what exactly a seller sees, how it stays
   attributed-not-adjudicated). "50 disputes raises an eyebrow" is illustrative
   of the human reading, not a number to encode.
-- **Target:** Toko Saksi Pro (Rp100rb tier).
+- **Target:** Toko Saksi Pro (Rp200rb tier).
 
 ### Integrated spreadsheet export for sellers
 - **What it is:** Give a seller a clean, structured export of all their SAKSI
@@ -255,7 +255,7 @@ the raw counts SAKSI shows, never a hardcoded score or verdict SAKSI renders.
   witnessing product; belongs to the paid tier alongside the shopfront
   (`saksi.app/namatoko`) and logo-on-tagihan features already stubbed in
   `TOKO_PRO_LOCKED_*` copy.
-- **Target:** Toko Saksi Pro (Rp100rb tier). Design the export schema + column
+- **Target:** Toko Saksi Pro (Rp200rb tier). Design the export schema + column
   set first; reuse `lib/db/ledger.ts`'s aggregation rather than a new query
   path.
 

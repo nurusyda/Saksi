@@ -26,8 +26,7 @@
       pihak dapat saling memberi keterangan (maksimal dua putaran) yang
       tercatat sebagai pernyataan, bukan laporan.
     - Bagian 7: tingkatan berbayar diselaraskan dengan model produk terbaru
-      (Akun Saksi, Toko Saksi Pro). Saat ini seluruh layanan gratis; tingkatan
-      berbayar belum aktif.
+      (Akun Saksi, Toko Saksi Pro). Tingkatan berbayar belum aktif.
   Publikasi catatan (Bagian 4) masih dinonaktifkan secara operasional sampai
   tinjauan hukum selesai; teksnya tetap ada sebagai dasar persetujuan.
 -->
@@ -108,8 +107,8 @@ Bagian ini adalah inti dari SAKSI. Bacalah dengan saksama.
 
 ## 7. Biaya
 
-1. Saat ini **seluruh layanan SAKSI gratis.** Membuat tagihan, mengirim link, mencatat pembayaran, mengklarifikasi, dan melaporkan kesepakatan tidak terpenuhi tidak dikenai biaya.
-2. Ke depan SAKSI berencana menyediakan tingkatan berbayar sebagai layanan tambahan bagi penjual, misalnya akun untuk menyimpan data toko lintas perangkat, dan halaman toko dengan identitas sendiri. Tingkatan berbayar menambah **kemudahan dan tampilan bagi penjual**, bukan jaminan atas pihak lain dan bukan tingkat keamanan kesepakatan.
+1. Saat ini **tingkatan berbayar belum aktif.** Membuat tagihan, mengirim link, mencatat pembayaran, mengklarifikasi, dan melaporkan kesepakatan tidak terpenuhi belum dikenai biaya.
+2. SAKSI akan menyediakan dua tingkatan berbayar sebagai layanan tambahan bagi penjual: **Akun Saksi (Rp20.000, sekali bayar)** — login HP, data rekening tersimpan, lencana rekam jejak ditampilkan; dan **Toko Saksi Pro (Rp200.000/tahun)** — logo penjual di tagihan, dan halaman toko sendiri (`saksi.app/namatoko`). Tingkatan berbayar menambah **kemudahan dan tampilan bagi penjual**, bukan jaminan atas pihak lain dan bukan tingkat keamanan kesepakatan.
 3. Rekam jejak yang Anda bangun — jumlah kesepakatan selesai, umur akun, riwayat — **tidak dapat dibeli dan tidak diperjualbelikan.** Membayar tingkatan apa pun tidak pernah menambah, memalsukan, atau mempercepat rekam jejak; rekam jejak hanya terbentuk dari kesepakatan nyata seiring waktu.
 4. Ketika tingkatan berbayar aktif, rinciannya — harga, apa yang termasuk, dan ketentuan pengembalian — akan dijelaskan pada saat pembelian dan dalam versi dokumen ini yang berlaku saat itu. Sampai saat itu, tidak ada biaya apa pun yang dikenakan.
 

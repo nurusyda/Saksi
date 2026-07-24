@@ -9,8 +9,8 @@ create table parties (
   phone_e164 text unique not null,          -- RLS-protected, never in public views
   phone_hash text unique not null,          -- sha256(phone_e164), public clustering key
   phone_verified_at timestamptz,            -- set by OTP success (Rp5rb+ or breach filing)
-  ekyc_status text default 'NONE',          -- NONE | PASSED | FAILED (Didit)
-  ekyc_ref text,                            -- Didit session id
+  ekyc_status text default 'NONE',          -- NONE | PASSED | FAILED (future: Saksi Resmi e-KYC)
+  ekyc_ref text,                            -- e-KYC vendor session id (vendor TBD)
   created_at timestamptz default now()
 );
 
@@ -314,7 +314,7 @@ GATE 1 (lawyer review) and the T&C gap above both apply, same reasoning as the b
 ## Breach → flag pipeline
 
 1. Deadline lapses in an eligible state → SYSTEM event `TENGGAT_LEWAT`.
-2. Reporter (the unpaid/undelivered party) files breach. **Filing is free at every tier.**
+2. Reporter (the unpaid/undelivered party) files breach. **Filing a breach report does not require a paid tier.**
    ~~Requires reporter OTP (we pay ~Rp430) — every flag has a traceable reporter~~ —
    **removed 2026-07-21 (copy-id.md §25).** The OTP step sat on the WhatsApp
    channel, so a Fonnte outage blocked the wronged party's only recourse: the
@@ -336,7 +336,7 @@ direction. Do not build against it.** It is kept for context on the existing
 `deals.tier` enum only.
 
 The original ladder priced *counterparty verification for the flag*: GRATIS
-(nothing) → LIMA_RIBU (both phones via WA OTP) → BERMETERAI (Didit e-KYC +
+(nothing) → LIMA_RIBU (both phones via WA OTP) → BERMETERAI (e-KYC +
 e-meterai). Two things retired it:
 
 1. **WA OTP was deleted (§25).** The LIMA_RIBU rung's only verification
@@ -345,10 +345,10 @@ e-meterai). Two things retired it:
 2. **SAKSI-MASTER.md §6 replaced the ladder with a different product.** The new
    tiers sell *seller convenience and display*, not counterparty verification:
 
-   | | Gratis (Rp0) | Akun Saksi (Rp10.000, one-time) | Toko Saksi Pro (Rp100.000, one-time) |
-   |---|---|---|---|
-   | What it is | the whole loop | phone login, saved rekening, displayed track-record badge | logo on invoice + `saksi.app/namatoko` storefront |
-   | Verifies about the other party | nothing | nothing | nothing |
+   | | Akun Saksi (Rp20.000, one-time) | Toko Saksi Pro (Rp200.000/year) |
+   |---|---|---|
+   | What it is | phone login, saved rekening, displayed track-record badge | logo on invoice + `saksi.app/namatoko` storefront |
+   | Verifies about the other party | nothing | nothing |
 
    (e-meterai / e-KYC live on later, separate lines — Saksi Resmi and a future
    verified tier — not on these two.)

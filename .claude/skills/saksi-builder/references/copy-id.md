@@ -30,7 +30,7 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 ## 2. Forced-check page (payer, before copy-rekening activates)
 
 **With history:**
-> Rekening tujuan: [bank] [rekening_masked] · [N] kesepakatan selesai · [N] tidak dipenuhi · tercatat sejak [bulan tahun]
+> Rekening tujuan: [bank] [rekening_masked] · [N] transaksi berhasil · [N] klaim barang berbeda · [N] belum dikonfirmasi penjual · [N] klaim pembayaran belum diterima · tercatat sejak [bulan tahun]
 
 **Empty state (MUST show, never soften):**
 > Belum ada riwayat di SAKSI. Ini bukan jaminan aman. Sebagian besar rekening belum tercatat.
@@ -64,7 +64,7 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - GRATIS — `Catat kesepakatan. Rekening tujuan terekam dari bukti transfer.`
 - LIMA_RIBU — `Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).`
 - BERMETERAI — `Rp50.000/pihak · Identitas terverifikasi (e-KYC) + meterai elektronik + berkas bukti siap diajukan.`
-- Shared footer: `Tingkatan menunjukkan kekuatan verifikasi identitas kedua pihak, bukan keamanan kesepakatan. Mengajukan dan melihat laporan selalu gratis di semua tingkatan.`
+- Shared footer: `Tingkatan menunjukkan fitur tambahan untuk penjual, bukan keamanan kesepakatan. Mengajukan laporan selalu terbuka di semua tingkatan.`
 - Notify-me checkbox label (paid-tier disabled cards, shipped Phase 0.6): `Beri tahu saat tersedia.`
 
 ## 6a. Deal-type gating (create flow) — REMOVED 2026-07-20
@@ -341,7 +341,7 @@ Live in production, backfilled here for the record. **GATE 2 reminder:** this pa
 - Submit button: `Cek riwayat`
 - Error, invalid input: `Masukkan bank dan nomor rekening, atau nomor HP yang valid.`
 - Error, rate-limited (anti-enumeration guard, not a per-user abuse limit): `Terlalu banyak permintaan. Coba lagi dalam beberapa menit.`
-- Result line format: extends §2's forced-check line to the full 8-bucket set per data-model.md's profile-page spec — `[identifier] · [N] selesai · [N] dibatalkan bersama · [N] tidak dilanjutkan · [N] kedaluwarsa · [N] dikembalikan penuh · [N] dikembalikan sebagian · [N] tidak dipenuhi · [N] klaim berbeda aktif · tercatat sejak [tgl]`
+- Result line format: extends §2's forced-check line to the full 9-bucket set — `[identifier] · [N] transaksi berhasil · [N] klaim barang berbeda · [N] belum dikonfirmasi penjual · [N] klaim pembayaran berbeda · [N] klaim pembayaran belum diterima · tercatat sejak [tgl]`
 - Empty state: reuses §2's locked line verbatim, unmodified: `Belum ada riwayat di SAKSI. Ini bukan jaminan aman. Sebagian besar rekening belum tercatat.`
 
 **Waiting-state fill-ins (the non-active-party side of each merged status page; not explicitly specced in the original build order, minimal placeholders):**
@@ -1045,7 +1045,7 @@ price appears. Reasoning:
 ⚠ **Tier-naming drift to reconcile before any of this ships.** `feature_interest`
 (0012/0016) and `TIER_LABELS` still carry the *old* taxonomy —
 `LIMA_RIBU` (Rp5.000) / `BERMETERAI` (Rp50.000). SAKSI-MASTER.md §6.1 replaced
-those with **Akun Saksi (Rp10.000)** and **Toko Saksi Pro (Rp100.000)**. The
+those with **Akun Saksi (Rp20.000)** and **Toko Saksi Pro (Rp200.000/tahun)**. The
 schema, the copy constants, and the master doc must be reconciled in one pass —
 not patched independently — or the notify-me capture will key interest against
 tiers that no longer exist.
@@ -1492,8 +1492,8 @@ is flipped. Verified against production (phone-mode BERHASIL=7/KLAIM_PEMBAYARAN=
 KLAIM_BARANG=2, 15 in-flight excluded; rekening-mode hides all 7 payment rows).
 
 **Moved to ROADMAP.md (deferred, per the operator 2026-07-22):**
-- Naughty-buyer visibility to sellers → Toko Saksi Pro (Rp100rb tier).
-- Integrated spreadsheet export for sellers → Rp100rb tier.
+- Naughty-buyer visibility to sellers → Toko Saksi Pro (Rp200rb tier).
+- Integrated spreadsheet export for sellers → Rp200rb tier.
 - `/cek` per-role attribution (pooled phone view) → rides with the naughty-buyer
   work. No-scores invariant holds throughout ("50 klaim berbeda raises an
   eyebrow" is a human read, never a hardcoded threshold).

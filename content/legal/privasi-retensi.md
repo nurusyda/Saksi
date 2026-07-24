@@ -84,7 +84,7 @@ Semua permintaan: sapa@saksi.app. SAKSI menanggapi selambatnya dalam batas waktu
 | Penyedia basis data dan penyimpanan (Supabase) | Menyimpan rekaman dan gambar bukti | Seluruh data pada Bagian 1, di pusat data kawasan Singapura |
 | Penyedia hosting (Vercel) | Menjalankan situs saksi.app | Data yang melintas saat Anda menggunakan situs |
 | Penyedia pengiriman WhatsApp/SMS | Mengirim OTP dan pemberitahuan | Nomor HP tujuan dan isi pesan |
-| Penyedia pembayaran (Midtrans) | Memproses biaya tingkatan berbayar | Data pembayaran biaya; **bukan** uang transaksi antar pihak |
+| Penyedia pembayaran (jika ada) | Memproses biaya tingkatan berbayar | Data pembayaran biaya; **bukan** uang transaksi antar pihak |
 | Penyedia verifikasi identitas (tingkatan Bermeterai) | e-KYC | Dokumen dan wajah Anda diproses oleh penyedia tersebut; SAKSI hanya menerima status dan rujukan |
 | Penyedia pemeriksaan konsistensi bukti | Membaca nominal, tanggal, dan rekening pada gambar bukti | Gambar bukti yang Anda unggah |
 
