@@ -122,7 +122,10 @@ export async function getDealAccountHistory(token: string): Promise<AccountHisto
   if (!deal) return { status: 'idle' };
 
   const isQris = deal.payment_method === 'QRIS';
-  if (isQris && !deal.qris_nmid) return { status: 'idle' };
+  // NMID is best-effort (see lib/qris/decode.ts header) — merchant name is
+  // the guaranteed identifier. Show empty history rather than an error when
+  // NMID is missing; the buyer can still see who they're paying.
+  if (isQris && !deal.qris_nmid) return { status: 'empty' };
   if (!isQris && (!deal.rekening_bank || !deal.rekening_tujuan)) return { status: 'idle' };
 
   const result = isQris

@@ -115,7 +115,7 @@ export default async function DealPage({
   // generated Database schema) so TypeScript can't catch a drift between the
   // constraint and this assumption.
   const hasRekeningDestination = Boolean(deal.rekening_tujuan && deal.rekening_bank);
-  const hasQrisDestination = deal.payment_method === 'QRIS' && Boolean(deal.qris_nmid);
+  const hasQrisDestination = deal.payment_method === 'QRIS' && Boolean(deal.qris_merchant_name);
   if (deal.status !== DealStatus.DRAF && !hasRekeningDestination && !hasQrisDestination) {
     notFound();
   }
