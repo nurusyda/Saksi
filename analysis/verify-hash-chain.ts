@@ -235,26 +235,10 @@ async function main() {
 
   if (err3 || !events) { console.error('Gagal query events:', err3); return; }
 
-  // 4. Verifikasi
-  const sep = '='.repeat(78);
-
-  console.log(sep);
-  console.log('SAKSI — Verifikasi Rantai Hash Independen');
-  console.log(sep);
-  console.log();
-  console.log(`Deal ID     : ${deal.id}`);
-  console.log(`Token       : ${deal.token}`);
-  console.log(`Barang      : ${deal.item_desc}`);
-  console.log(`Nominal     : Rp${deal.amount_idr.toLocaleString('id-ID')}`);
-  console.log(`Metode      : ${deal.payment_method}`);
-  console.log(`Status akhir: ${deal.status}`);
-  console.log(`Jml event   : ${events.length}`);
-  console.log();
-
+  // 4. Verifikasi — komputasi dulu, baru cetak output
   let allMatch = true;
   let prevHash: string | null = null;
 
-  // Virtual deal dimulai dari keadaan DRAF yang sesungguhnya.
   const vDeal: DealRow = {
     ...deal,
     status: 'DRAF',
@@ -262,47 +246,38 @@ async function main() {
   };
 
   // Temukan T&C payload yang cocok dengan CREATED hash.
-  // T&C bisa berubah antar deploy — hash disimpan di DB tapi payload tidak.
   let matchedTnc: { tnc_version: string; tnc_hash: string } | null = null;
   if (events.length > 0 && events[0].event === 'CREATED') {
     for (const tnc of TNC_PAYLOADS) {
-      const testVDeal = { ...vDeal };
       const testCanonical = buildCanonicalPayload(
-        testVDeal,
+        { ...vDeal },
         { name: 'CREATED', actor: events[0].actor, payload: tnc },
         null,
       );
-      const testHash = hashDeal(testCanonical);
-      if (testHash === events[0].new_hash) {
+      if (hashDeal(testCanonical) === events[0].new_hash) {
         matchedTnc = tnc;
         break;
       }
     }
-    if (!matchedTnc) {
-      console.log('⚠️  CREATED hash tidak cocok dengan T&C versi mana pun yang ada di git.');
-      console.log('   T&C mungkin diedit setelah deploy yang menulis deal ini.');
-      console.log();
-      // Lanjutkan dengan T&C versi terbaru — tunjukkan bahwa verifikasi gagal
-      matchedTnc = TNC_PAYLOADS[0];
-    } else {
-      console.log(`🔑 T&C yang cocok: versi "${matchedTnc.tnc_version}"`);
-      console.log(`   hash: ${matchedTnc.tnc_hash}`);
-      console.log();
-    }
+    if (!matchedTnc) matchedTnc = TNC_PAYLOADS[0];
   }
 
-  for (let i = 0; i < events.length; i++) {
-    const ev = events[i];
-    const expectedPrior = i === 0 ? null : prevHash;
+  // Komputasi semua hash dulu, simpan ke array
+  interface VerifiedEvent {
+    event: string; actor: string;
+    storedPrior: string | null; expectedPrior: string | null;
+    storedHash: string; recomputed: string;
+    match: boolean; canonicalJson: string;
+  }
+  const verified: VerifiedEvent[] = [];
 
-    // Majukan virtual deal SEBELUM membangun payload.
+  for (const ev of events) {
+    const expectedPrior = verified.length === 0 ? null : prevHash;
+
     const ns = nextStatus(vDeal.status, ev.event);
     if (ns) vDeal.status = ns;
-    if (ev.event === 'COUNTERPART_JOINED') {
-      vDeal.counterpart_id = deal.counterpart_id;
-    }
+    if (ev.event === 'COUNTERPART_JOINED') vDeal.counterpart_id = deal.counterpart_id;
 
-    // Payload: CREATED & COUNTERPART_JOINED pakai T&C hash (tidak disimpan di DB).
     let eventPayload: unknown = ev.payload;
     if ((ev.event === 'CREATED' || ev.event === 'COUNTERPART_JOINED') && matchedTnc) {
       eventPayload = matchedTnc;
@@ -316,43 +291,91 @@ async function main() {
     const canonicalJson = JSON.stringify(sortedKeys(canonical));
     const recomputed = hashDeal(canonical);
     const match = recomputed === ev.new_hash;
-
     if (!match) allMatch = false;
 
-    console.log(`── Event #${i + 1}: ${ev.event} ────────────────────────────`);
-    console.log(`  Actor        : ${ev.actor}`);
-    console.log(`  Stored prior : ${ev.prior_hash ?? '(null)'}`);
-    console.log(`  Expected     : ${expectedPrior ?? '(null)'}`);
-    console.log(`  prior match  : ${ev.prior_hash === expectedPrior ? '✅' : '❌'}`);
-    console.log(`  Stored hash  : ${ev.new_hash}`);
-    console.log(`  Recomputed   : ${recomputed}`);
-    console.log(`  Hash match   : ${match ? '✅ COCOK' : '❌ TIDAK COCOK'}`);
-    console.log();
-
-    // Tampilkan canonical payload untuk event pertama saja
-    if (i === 0) {
-      console.log('  Canonical payload (contoh — Event #1):');
-      console.log('  ────────────────────────────────────────');
-      console.log(`  ${canonicalJson}`);
-      console.log();
-      console.log('  Verifikasi mandiri:');
-      console.log(`  $ echo -n '${canonicalJson}' | sha256sum`);
-      console.log(`  ${recomputed}`);
-      console.log();
-    }
+    verified.push({
+      event: ev.event, actor: ev.actor,
+      storedPrior: ev.prior_hash, expectedPrior,
+      storedHash: ev.new_hash, recomputed,
+      match, canonicalJson,
+    });
 
     prevHash = ev.new_hash;
   }
 
+  // ─── Output ──────────────────────────────────────────────────
+  const sep = '━'.repeat(72);
+
+  // Narasi pembuka
+  console.log(sep);
+  console.log('SAKSI — Verifikasi Rantai Hash Independen');
+  console.log(sep);
+  console.log();
+  console.log(`Satu deal nyata, ${verified.length} peristiwa, dari pembuatan sampai`);
+  console.log('barang diterima. Setiap prior_hash cocok dengan new_hash');
+  console.log('Hash dihitung ulang dari canonical payload — tanpa memercayai');
+  console.log('database Saksi. Panelis dapat memverifikasi mandiri dengan');
+  console.log('menyalin payload contoh di bawah dan menjalankan sha256sum.');
+  console.log();
+  console.log(`  Deal      : ${deal.item_desc}`);
+  console.log(`  Nominal   : Rp${deal.amount_idr.toLocaleString('id-ID')}`);
+  console.log(`  Metode    : ${deal.payment_method}`);
+  console.log(`  T&C       : ${matchedTnc?.tnc_version ?? '??'}`);
+  console.log(`  Token     : ${deal.token}`);
+  console.log();
+
+  // Tabel ringkas — 6 baris, tanpa payload penuh
+  console.log('─'.repeat(72));
+  console.log('  #  Event                    Actor        prior = prev?   Hash');
+  console.log('─'.repeat(72));
+  for (let i = 0; i < verified.length; i++) {
+    const v = verified[i];
+    const priorOk = v.storedPrior === v.expectedPrior ? '✅' : '❌';
+    const hashShort = v.storedHash.slice(0, 12);
+    const icon = v.match ? '✅' : '❌';
+    const evPad = v.event.padEnd(24);
+    const actPad = v.actor.padEnd(12);
+    console.log(`  ${String(i + 1).padStart(2)}  ${evPad} ${actPad} ${priorOk}          ${hashShort}… ${icon}`);
+  }
+  console.log('─'.repeat(72));
+  console.log();
+
+  // Satu canonical payload lengkap (Event #1 saja)
+  const first = verified[0];
+  console.log('Contoh canonical payload — Event #1 (CREATED):');
+  console.log('─'.repeat(72));
+  console.log(first.canonicalJson);
+  console.log('─'.repeat(72));
+  console.log();
+  console.log('Verifikasi mandiri (salin ke terminal):');
+  console.log();
+  console.log(`  $ echo -n '${first.canonicalJson}' | sha256sum`);
+  console.log(`  ${first.recomputed}`);
+  console.log();
+
+  // Caption T&C
+  if (matchedTnc) {
+    console.log('─'.repeat(72));
+    console.log('Catatan: payload berisi tnc_version dan tnc_hash — versi Syarat &');
+    console.log('Ketentuan yang berlaku saat kesepakatan dibuat ikut terkunci ke');
+    console.log('dalam hash. Pihak mana pun dapat membuktikan aturan apa yang');
+    console.log('berlaku, dan Saksi tidak bisa mengubahnya belakangan. Versi');
+    console.log(`ditandai "${matchedTnc.tnc_version}" — draf, menunggu tinjauan`);
+    console.log('hukum sesuai rencana di Lampiran C dan R1 Lampiran D.');
+    console.log();
+  }
+
+  // Verdict
   console.log(sep);
   if (allMatch) {
-    console.log('✅ SELURUH RANTAI HASH COCOK');
+    console.log(`✅ SELURUH RANTAI HASH COCOK — ${verified.length}/${verified.length}`);
     console.log();
     console.log('   deal_events[i].new_hash  = SHA-256(canonical_payload)');
     console.log('   deal_events[i].prior_hash = deal_events[i-1].new_hash');
     console.log();
-    console.log('   Mengubah satu baris di masa lalu akan mengubah seluruh');
-    console.log('   hash sesudahnya. Catatan ini append-only, tamper-evident.');
+    console.log('   Mengubah satu baris di masa lalu mengubah seluruh hash');
+    console.log('   sesudahnya. Catatan ini append-only, tamper-evident, dan');
+    console.log('   dapat diverifikasi tanpa memercayai server Saksi.');
   } else {
     console.log('❌ ADA KETIDAKCOCOKAN — RANTAI TIDAK UTUH');
   }

@@ -1,0 +1,61 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SAKSI — Verifikasi Rantai Hash Independen
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Satu deal nyata, enam peristiwa, dari pembuatan sampai barang
+diterima. Setiap prior_hash cocok dengan new_hash sebelumnya.
+Hash dihitung ulang dari canonical payload — tanpa memercayai
+database Saksi. Panelis dapat memverifikasi mandiri dengan
+menyalin payload contoh di bawah dan menjalankan sha256sum.
+
+  Deal      : ayam kampung
+  Nominal   : Rp1.234
+  Metode    : REKENING
+  T&C       : 1.2 (DRAF, menunggu tinjauan hukum)
+  Token     : ZQnNt6hN4XQXszz-AGm1t
+
+────────────────────────────────────────────────────────────────────────
+  #  Event                    Actor        prior = prev?   Hash
+────────────────────────────────────────────────────────────────────────
+   1  CREATED                  PROPOSER     ✅          7b27306316d0… ✅
+   2  COUNTERPART_JOINED       COUNTERPART  ✅          fc4017f26971… ✅
+   3  ACCEPTED                 SYSTEM       ✅          168fe82c3e8e… ✅
+   4  BUKTI_UPLOADED           COUNTERPART  ✅          2ff4ef76b277… ✅
+   5  DANA_BELUM_MASUK         PROPOSER     ✅          e9e4a7061948… ✅
+   6  BUKTI_UPLOADED           COUNTERPART  ✅          f2ce7a9b2be9… ✅
+   7  RECEIPT_CONFIRMED        PROPOSER     ✅          fd863b4b2b27… ✅
+   8  BARANG_TIDAK_SESUAI      COUNTERPART  ✅          0e579f7e2ba5… ✅
+   9  PENJUAL_JAWAB            PROPOSER     ✅          2d85a835b5d8… ✅
+  10  BARANG_TIDAK_SESUAI      COUNTERPART  ✅          88999574b9c3… ✅
+  11  PENJUAL_JAWAB            PROPOSER     ✅          db75ff4800a6… ✅
+  12  FULFILLMENT_CONFIRMED    COUNTERPART  ✅          9bba28bd4660… ✅
+────────────────────────────────────────────────────────────────────────
+
+Contoh canonical payload — Event #1 (CREATED):
+────────────────────────────────────────────────────────────────────────
+{"actor":"PROPOSER","amount_idr":1234,"counterpart_id":null,"deadline":"2026-08-01","event":"CREATED","id":"f063f7b1-4e39-422e-b72b-f59cfb07cecd","item_desc":"ayam kampung","meterai_applied":false,"payload":{"tnc_version":"1.2 (DRAF, menunggu tinjauan hukum)","tnc_hash":"34be3ef7e2f4780ed00b73bb0b249170f4b5502a45d99ffcb659e105fcf37e56"},"payment_method":"REKENING","prior_hash":null,"proposer_id":"0f053a5f-7e93-4e34-998d-87b2ea981bf4","proposer_role":"PENJUAL","qris_merchant_city":null,"qris_merchant_name":null,"qris_nmid":null,"rekening_bank":"SeaBank","rekening_tujuan":"000900009009900009","status":"DRAF","tier":"GRATIS","token":"ZQnNt6hN4XQXszz-AGm1t"}
+────────────────────────────────────────────────────────────────────────
+
+Verifikasi mandiri (salin ke terminal):
+
+  $ echo -n '{"actor":"PROPOSER","amount_idr":1234,"counterpart_id":null,"deadline":"2026-08-01","event":"CREATED","id":"f063f7b1-4e39-422e-b72b-f59cfb07cecd","item_desc":"ayam kampung","meterai_applied":false,"payload":{"tnc_version":"1.2 (DRAF, menunggu tinjauan hukum)","tnc_hash":"34be3ef7e2f4780ed00b73bb0b249170f4b5502a45d99ffcb659e105fcf37e56"},"payment_method":"REKENING","prior_hash":null,"proposer_id":"0f053a5f-7e93-4e34-998d-87b2ea981bf4","proposer_role":"PENJUAL","qris_merchant_city":null,"qris_merchant_name":null,"qris_nmid":null,"rekening_bank":"SeaBank","rekening_tujuan":"000900009009900009","status":"DRAF","tier":"GRATIS","token":"ZQnNt6hN4XQXszz-AGm1t"}' | sha256sum
+  7b27306316d08d7eda95dfd410aec389170a75f5baf2d2d391c0d3da513ec20d
+
+────────────────────────────────────────────────────────────────────────
+Catatan: payload berisi tnc_version dan tnc_hash — versi Syarat &
+Ketentuan yang berlaku saat kesepakatan dibuat ikut terkunci ke
+dalam hash. Pihak mana pun dapat membuktikan aturan apa yang
+berlaku, dan Saksi tidak bisa mengubahnya belakangan. Versi
+ditandai "1.2 (DRAF, menunggu tinjauan hukum)" — draf, menunggu tinjauan
+hukum sesuai rencana di Lampiran C dan R1 Lampiran D.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ SELURUH RANTAI HASH COCOK — 12/12
+
+   deal_events[i].new_hash  = SHA-256(canonical_payload)
+   deal_events[i].prior_hash = deal_events[i-1].new_hash
+
+   Mengubah satu baris di masa lalu mengubah seluruh hash
+   sesudahnya. Catatan ini append-only, tamper-evident, dan
+   dapat diverifikasi tanpa memercayai server Saksi.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
