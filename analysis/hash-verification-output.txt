@@ -2,8 +2,8 @@
 SAKSI — Verifikasi Rantai Hash Independen
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Satu deal nyata, enam peristiwa, dari pembuatan sampai barang
-diterima. Setiap prior_hash cocok dengan new_hash sebelumnya.
+Satu deal simulasi QA di database produksi, 12 peristiwa,
+dari pembuatan sampai barang diterima. Setiap prior_hash cocok
 Hash dihitung ulang dari canonical payload — tanpa memercayai
 database Saksi. Panelis dapat memverifikasi mandiri dengan
 menyalin payload contoh di bawah dan menjalankan sha256sum.

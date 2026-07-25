@@ -311,8 +311,8 @@ async function main() {
   console.log('SAKSI — Verifikasi Rantai Hash Independen');
   console.log(sep);
   console.log();
-  console.log(`Satu deal nyata, ${verified.length} peristiwa, dari pembuatan sampai`);
-  console.log('barang diterima. Setiap prior_hash cocok dengan new_hash');
+  console.log(`Satu deal simulasi QA di database produksi, ${verified.length} peristiwa,`);
+  console.log('dari pembuatan sampai barang diterima. Setiap prior_hash cocok');
   console.log('Hash dihitung ulang dari canonical payload — tanpa memercayai');
   console.log('database Saksi. Panelis dapat memverifikasi mandiri dengan');
   console.log('menyalin payload contoh di bawah dan menjalankan sha256sum.');
