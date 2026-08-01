@@ -1,7 +1,7 @@
 # Kebijakan Privasi & Retensi Data SAKSI
 
-**Versi: 1.0 (DRAF)**
-**Berlaku sejak: [tanggal publikasi]**
+**Versi: 1.1 (DRAF)**
+**Berlaku sejak: 1 Agustus 2026**
 **Hash dokumen (SHA-256): [diisi otomatis saat publikasi]**
 
 Dokumen ini adalah satu kesatuan dengan Syarat & Ketentuan SAKSI dan menjelaskan data apa yang SAKSI kumpulkan, untuk apa, siapa yang bisa melihatnya, dan berapa lama disimpan.
@@ -16,7 +16,6 @@ Dokumen ini adalah satu kesatuan dengan Syarat & Ketentuan SAKSI dan menjelaskan
 | Nomor rekening tujuan dan nama bank | Diisi pihak yang menerima pembayaran | Ya, untuk kesepakatan yang melibatkan transfer |
 | Isi kesepakatan (deskripsi, nominal, tenggat) | Anda masukkan sendiri | Ya |
 | Bukti transfer atau pengembalian dana (gambar) | Anda unggah | Hanya jika Anda mengunggahnya |
-| Hasil verifikasi identitas (e-KYC) | Penyedia verifikasi pihak ketiga | Hanya pada tingkatan Bermeterai. SAKSI menyimpan status dan nomor rujukan verifikasi, **bukan** foto KTP atau NIK Anda |
 | Riwayat peristiwa kesepakatan | Dihasilkan sistem | Ya, ini fungsi utama SAKSI |
 
 SAKSI tidak mengumpulkan data lokasi, kontak telepon Anda, atau data dari aplikasi lain.
@@ -27,7 +26,7 @@ Sebagaimana Anda setujui saat membuat atau bergabung ke kesepakatan:
 
 1. **Mencatat kesepakatan** dan menyaksikan perjalanannya.
 2. **Menyusun riwayat kesepakatan Anda**: selesai, dibatalkan, diperpanjang, maupun tidak terpenuhi. Riwayat ini yang muncul saat seseorang memeriksa rekening atau nomor HP di halaman cek SAKSI.
-3. **Mengirim pemberitahuan** terkait kesepakatan Anda (misalnya pemberitahuan laporan dan hak jawab) melalui WhatsApp atau SMS.
+3. **Mengidentifikasi Anda kembali** setiap kali Anda melakukan tindakan pada kesepakatan (misalnya menanggapi laporan), dengan meminta nomor HP Anda lagi setiap saat, bukan lewat akun tersimpan. SAKSI saat ini belum mengirim pemberitahuan otomatis melalui WhatsApp, SMS, atau kanal lain; nomor HP Anda disimpan agar hal ini dapat diaktifkan di kemudian hari.
 4. **Mencegah penyalahgunaan**: pembatasan laju (rate limiting) dan penelusuran pelapor.
 
 Dasar hukum pemrosesan adalah persetujuan Anda dan pelaksanaan kesepakatan yang Anda buat, sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi.
@@ -57,11 +56,9 @@ SAKSI tidak pernah menampilkan skor, bintang, atau label "aman" untuk siapa pun.
 | Draf kesepakatan yang tidak pernah disetujui | **Dihapus otomatis setelah 7 hari** | Kesepakatan yang tidak pernah terbentuk tidak meninggalkan jejak |
 | Kesepakatan yang ditolak pada tahap pengajuan | **Dihapus saat ditolak** | Sama seperti di atas |
 | Rekaman kesepakatan yang disetujui kedua pihak, beserta riwayat peristiwanya | **Selama SAKSI beroperasi** | Ini adalah fungsi inti SAKSI sebagai saksi. Catatan yang bisa hilang bukan catatan |
-| Nomor HP (bentuk utuh) | Selama Anda memiliki kesepakatan aktif atau riwayat tercatat, untuk keperluan pemberitahuan dan verifikasi | Diperlukan agar hak jawab dan pemberitahuan dapat berjalan |
+| Nomor HP (bentuk utuh) | Selama Anda memiliki kesepakatan aktif atau riwayat tercatat, untuk keperluan identifikasi kembali dan hak jawab | Diperlukan agar hak jawab dapat berjalan |
 | Sidik jari nomor HP (hash) | **Selama SAKSI beroperasi** | Kunci pencocokan riwayat lintas kesepakatan. Tanpa ini, riwayat yang Anda dan pihak lain andalkan tidak dapat disusun |
 | Gambar bukti transfer | Selama rekaman kesepakatannya disimpan | Bagian dari catatan; dapat dibutuhkan dalam sengketa atau proses hukum |
-| Kode OTP | **Dihapus setelah 5 menit** (kedaluwarsa) dan disimpan hanya dalam bentuk hash selama berlaku | Hanya untuk verifikasi sesaat |
-| Status dan rujukan e-KYC | Selama rekaman kesepakatan terkait disimpan | Bobot pembuktian catatan bermeterai bergantung padanya |
 
 Prinsip yang mendasari tabel ini: **data yang menjadi bagian dari kesaksian disimpan selama kesaksiannya; data yang hanya alat bantu sesaat dihapus secepatnya.**
 
@@ -83,9 +80,7 @@ Semua permintaan: sapa@saksi.app. SAKSI menanggapi selambatnya dalam batas waktu
 |---|---|---|
 | Penyedia basis data dan penyimpanan (Supabase) | Menyimpan rekaman dan gambar bukti | Seluruh data pada Bagian 1, di pusat data kawasan Singapura |
 | Penyedia hosting (Vercel) | Menjalankan situs saksi.app | Data yang melintas saat Anda menggunakan situs |
-| Penyedia pengiriman WhatsApp/SMS | Mengirim OTP dan pemberitahuan | Nomor HP tujuan dan isi pesan |
 | Penyedia pembayaran (jika ada) | Memproses biaya tingkatan berbayar | Data pembayaran biaya; **bukan** uang transaksi antar pihak |
-| Penyedia verifikasi identitas (tingkatan Bermeterai) | e-KYC | Dokumen dan wajah Anda diproses oleh penyedia tersebut; SAKSI hanya menerima status dan rujukan |
 | Penyedia pemeriksaan konsistensi bukti | Membaca nominal, tanggal, dan rekening pada gambar bukti | Gambar bukti yang Anda unggah |
 
 SAKSI tidak menjual data pribadi Anda dan tidak membagikannya untuk iklan.

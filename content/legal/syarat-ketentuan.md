@@ -1,7 +1,7 @@
 # Syarat & Ketentuan SAKSI
 
-**Versi: 1.2 (DRAF, menunggu tinjauan hukum)**
-**Berlaku sejak: [tanggal publikasi]**
+**Versi: 1.2 (DRAF)**
+**Berlaku sejak: 1 Agustus 2026**
 **Hash dokumen (SHA-256): [diisi otomatis saat publikasi]**
 
 <!--
