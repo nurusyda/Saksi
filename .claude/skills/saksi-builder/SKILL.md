@@ -14,12 +14,12 @@ SAKSI is a 1-on-1 deal-witnessing app for Indonesian informal commerce (fandom s
 - **Next.js 14+ App Router** on Vercel (free tier), TypeScript, Tailwind.
 - **Supabase**: Postgres + Row Level Security, Storage (bukti uploads, private bucket), Edge Functions for webhooks. Free tier until it breaks.
 - **Identity = phone number. No accounts, no email, no passwords.** E.164 normalized. Public clustering key = SHA-256(phone). Deal links are unguessable tokens (nanoid ≥ 21 chars).
-- **OTP**: WhatsApp authentication template (Meta Cloud API direct, or Fonnte for speed). ~Rp430/message. SMS only as fallback.
+- **OTP**: REMOVED entirely (§25, 2026-07-21) — its only call site was the breach-filing gate; identity there is now `identifyPartyByPhone` (proves party-to-deal, not phone possession). `lib/otp.ts` is deleted. Do not reintroduce without reading copy-id.md §25 first.
 - **Payments**: Midtrans removed. No payment integration in the current product. Akun Saksi and Toko Saksi Pro fees are not yet collectable; tier upsell cards render inert with "Belum tersedia."
 - **e-KYC**: Didit removed. No e-KYC integration in the current product.
 - **e-Meterai** (Saksi Resmi, future): Rp30.000 per stamping per agreement. Buyer-initiated — the buyer chooses whether to apply meterai. One meterai per document, Rp30.000 official price (e-meterai via Peruri distributor integration). MOCK in demo with a clearly-labeled placeholder.
-- **Integrity**: SHA-256 of canonical record JSON at EVERY state transition, anchored via OpenTimestamps (free). Store hash + .ots proof alongside the record.
-- **Evidence pack**: server-side PDF (pdf-lib) following the IASC-accepted report format (see references/integrations.md §5).
+- **Integrity**: SHA-256 of canonical record JSON at EVERY state transition — live. OpenTimestamps anchoring is real code (`lib/db/anchor.ts`) but gated OFF behind `OTS_ANCHORING_ENABLED` pending an `ots verify` acceptance test that hasn't run (ops.md §44) — do not describe it as currently live.
+- **Evidence pack**: server-side PDF (pdf-lib) following the IASC-accepted report format (see references/integrations.md §5) — spec'd, not yet built.
 
 ## Architecture rules
 
@@ -28,7 +28,7 @@ SAKSI is a 1-on-1 deal-witnessing app for Indonesian informal commerce (fandom s
 3. Flag/check pages are server-rendered from derived views — no raw PII in any client bundle or API response.
 4. The copy-rekening button on the payer page MUST be disabled until the history card has rendered (the forced-check mechanic).
 5. Every user-facing Indonesian string comes from `references/copy-id.md` — verbatim, no paraphrasing. If a needed string is missing, ask the user; do not invent legal-adjacent copy.
-6. Rate-limit OTP sends (per phone: 3/hour) and record creation (per phone-hash: 20/day) from day one.
+6. Rate-limit record creation (per phone-hash: 20/day) and identity-check attempts on every mutating action (10/15min per deal, per `lib/db/party.ts`) from day one. OTP no longer exists in this app — do not add OTP-specific rate limiting.
 
 ## Read next (required before coding the relevant area)
 

@@ -13,16 +13,25 @@ backend (Postgres + RLS + Storage, `ap-southeast-1`). Highlights:
 - **Identity = phone, no accounts/emails/passwords.** Public clustering key =
   SHA-256(phone). Deal links are unguessable nanoid tokens.
 - **Append-only `deal_events` witness log**; `deals.status` is a materialized cache.
-  **SHA-256 + OpenTimestamps anchoring on every state transition.**
-- **Full state machine** (28 migrations): `DRAF → DISEPAKATI → BUKTI_UPLOADED →
+  **SHA-256 hashing on every state transition is live.** OpenTimestamps anchoring
+  is real, implemented code (`lib/db/anchor.ts`) but gated OFF behind
+  `OTS_ANCHORING_ENABLED` pending a manual `ots verify` acceptance test that has
+  never been run — see ops.md §44. Do not describe OTS as currently live.
+- **Full state machine** (39 migrations): `DRAF → DISEPAKATI → BUKTI_UPLOADED →
   DIBAYAR_DIKLAIM → DIKONFIRMASI_TERIMA → SELESAI` plus exit states (`KEDALUWARSA`,
   `DIBATALKAN_BERSAMA`, `TIDAK_DILANJUTKAN`, `TIDAK_DIPENUHI`,
-  `DIKEMBALIKAN_PENUH/SEBAGIAN`) and a `PERPANJANGAN` (deadline-extension) design.
+  `DIKEMBALIKAN_PENUH/SEBAGIAN`). `PERPANJANGAN` (deadline-extension) remains a
+  design pass only — not built, see data-model.md.
 - **Gemini OCR** for bukti consistency ("konsisten", never "asli").
-- **Midtrans** (payments), **Didit** (e-KYC, Bermeterai tier), **WA OTP**,
-  **OpenTimestamps**, evidence-pack PDF.
+- **Midtrans, Didit, and WA OTP have all been REMOVED** (2026-07-21 through
+  2026-07-25 — see ops.md). No payment integration, no e-KYC, no OTP anywhere in
+  the current product. Evidence-pack PDF is spec'd (integrations.md §5) but not
+  yet built — no `pdf-lib` usage exists in the codebase.
 - **Public surfaces:** check page, flag page, profile (8-bucket counts, **never a
-  score**), breach pipeline with reporter OTP + 14-day hak jawab.
+  score**), breach pipeline — reporting requires only `identifyPartyByPhone`
+  (proves party-to-this-deal, not phone possession) + 14-day hak jawab; the OTP
+  step described in earlier drafts of this doc was removed 2026-07-21 (§25) and
+  must not be reintroduced without reading that section first.
 - **Account-history ledger + fraud signals** (velocity, concentration, pair
   rate-limiting) — the seed of the B2B fraud-data asset.
 - **The one invariant** enforced throughout, and a `saksi-builder` skill holding

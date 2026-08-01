@@ -49,6 +49,33 @@ deferred, and the milestone it's tied to.
   it touches the state machine and migrations.
 - **Target:** Tier A+, when loan volume appears.
 
+### Refund flow (DIKEMBALIKAN_PENUH/DIKEMBALIKAN_SEBAGIAN) — design the buyer-rekening capture, then build, then ship the N8 warning with it
+- **What it is:** Right now `REFUND_UPLOADED`/`REFUND_CONFIRMED`/
+  `REFUND_CONFIRMED_PARTIAL` exist in `lib/db/transitions.ts`'s state graph
+  and `DikembalikanPenuhPanel.tsx`/`DikembalikanSebagianPanel.tsx` exist as
+  terminal-state display panels, but there is no server action or UI
+  anywhere that actually fires `REFUND_UPLOADED` — a seller currently has no
+  way to initiate a refund through the app at all. The whole leg is a
+  scaffold, not a working feature (confirmed in the 2026-08-01 supervisor
+  audit, which found `N8_REFUND_WARNING` defined in `lib/copy.ts` but
+  unreachable on either panel for exactly this reason — there's no live path
+  to reach either panel yet).
+- **The real design gap, not just the missing warning:** a refund requires
+  the seller to send money back to the buyer, but the buyer's own rekening
+  is never captured anywhere in the current flow — the buyer only ever
+  supplies a phone number (§26/§31). Before any refund upload UI can exist,
+  this needs its own design pass: where/when does the buyer's rekening get
+  collected (at refund time only, so it's not sitting on every deal
+  unnecessarily?), how is it attested/verified at the same discipline as
+  every other rekening field in the app, and does capturing it change the
+  RLS/PII surface for a party who otherwise only exists as a phone_hash.
+- **Why deferred:** Not building the refund-initiation flow until this is
+  designed properly — bolting the N8 warning onto a flow that doesn't exist
+  yet doesn't fix anything. Ship the warning together with the actual
+  refund-upload mechanism, not before it.
+- **Target:** Tier A+, same discipline as PERPANJANGAN above — real design
+  pass before code, not a piecemeal add.
+
 ## Tier B - scale hardening
 
 ### Rate-limit TOCTOU hardening
@@ -213,11 +240,15 @@ deferred, and the milestone it's tied to.
 
 ## When a paying use case demands it
 
-### Dukcapil-backed e-KYC swap
-- **What it is:** Replace/augment Didit with a Dukcapil-connected e-KYC
-  vendor (Verihubs/VIDA/Privy).
-- **Why deferred:** Didit is not a Dukcapil check; current e-KYC is
-  sufficient for the Bermeterai tier's needs.
+### Dukcapil-backed e-KYC vendor
+- **What it is:** A Dukcapil-connected e-KYC vendor (Verihubs/VIDA/Privy) for
+  identity verification, if/when it's needed again.
+- **Why deferred:** Didit was removed 2026-07-25 (no e-KYC integration exists
+  in the current product) and the BERMETERAI tier it served was removed
+  2026-08-01 (migration 0039 — the tier ladder is GRATIS-only now). There is
+  currently no live use case this would attach to; re-evaluate the vendor
+  from scratch when identity verification is actually needed (Saksi Resmi
+  e-meterai or a future verified tier), not as a swap for Didit.
 - **Target:** When a paying use case demands it.
 
 ## Paid-tier features (Toko Saksi Pro — Rp200rb)

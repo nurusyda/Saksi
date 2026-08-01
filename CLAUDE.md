@@ -18,7 +18,7 @@ Every string SAKSI shows must be true even when a user is lying to it. Claims ar
 
 ## Stack (locked)
 
-Next.js App Router + TypeScript + Tailwind on Vercel · Supabase (Postgres/RLS/Storage, project in ap-southeast-1) · identity = phone (no accounts/emails/passwords) · SHA-256 + OpenTimestamps on every state transition · Gemini for OCR consistency.
+Next.js App Router + TypeScript + Tailwind on Vercel · Supabase (Postgres/RLS/Storage, project in ap-southeast-1) · identity = phone (no accounts/emails/passwords) · SHA-256 on every state transition, live · OpenTimestamps anchoring built but gated OFF behind `OTS_ANCHORING_ENABLED` pending an `ots verify` acceptance test that hasn't run yet (ops.md §44) — do not describe it as currently live · Gemini for OCR consistency.
 
 ## Build order
 
