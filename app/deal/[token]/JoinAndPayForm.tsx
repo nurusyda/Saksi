@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import type { JoinDealState } from './actions';
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
+import { AttestationChecklist, allAttested } from '@/components/AttestationChecklist';
 import { ErrorBanner, FieldError, Field, inputClass, buttonClass, PendingContent } from '@/components/ui';
 import { usePersistedPhone } from '@/lib/usePersistedPhone';
 import {
@@ -60,13 +61,17 @@ export function JoinAndPayForm({
   const [state, formAction] = useActionState(action, initialState);
   const [phone, setPhone] = usePersistedPhone();
   const [tcChecked, setTcChecked] = useState(false);
+  const [attestChecked, setAttestChecked] = useState(() => Array(ATTESTATIONS.length).fill(false));
   const [buktiChecked, setBuktiChecked] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
   const fe = state.fieldErrors ?? {};
   const needsTc = mode === 'join';
   const ready =
-    Boolean(file) && buktiChecked && phone.trim().length > 0 && (!needsTc || tcChecked);
+    Boolean(file) &&
+    buktiChecked &&
+    phone.trim().length > 0 &&
+    (!needsTc || (allAttested(attestChecked) && tcChecked));
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -113,20 +118,16 @@ export function JoinAndPayForm({
       </label>
 
       {needsTc && (
-      <fieldset className="flex flex-col gap-2.5 border-t border-zinc-100 pt-4">
-        <legend className="sr-only">Pernyataan</legend>
-        <ol className="flex list-decimal flex-col gap-1 pl-5 text-[11px] leading-relaxed text-zinc-500">
-          {ATTESTATIONS.map((text, i) => (
-            <li key={i}>{text}</li>
-          ))}
-        </ol>
+      <fieldset className="flex flex-col gap-3 border-t border-zinc-100 pt-4">
+        <AttestationChecklist checked={attestChecked} onChange={setAttestChecked} />
         <label className="flex items-start gap-3 text-xs leading-relaxed text-zinc-700">
           <input
             type="checkbox"
             name="attest_tc"
             checked={tcChecked}
             onChange={() => setTcChecked((v) => !v)}
-            className="mt-0.5 shrink-0 accent-[var(--witness)]"
+            disabled={!allAttested(attestChecked)}
+            className="mt-0.5 shrink-0 accent-[var(--witness)] disabled:opacity-40"
           />
           <TCLabel />
         </label>

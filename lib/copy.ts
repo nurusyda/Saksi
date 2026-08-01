@@ -9,6 +9,15 @@ export const ATTESTATIONS: readonly string[] = [
   'Saya paham SAKSI hanya mencatat, tidak menahan dana atau menjamin pihak lain.',
 ];
 
+// copy-id.md §48 — new UI chrome, not legally adjacent (same category as
+// §23's INVOICE_* labels): a one-tap shortcut over the 4 individually
+// required checkboxes above. Ticking it flips every item at once, but each
+// remains its own real checkbox state afterward (still individually
+// uncheckable) — this does not bundle the 4 statements into one consent
+// event, it only saves taps for a reader who has read all 4.
+export const ATTEST_CHECK_ALL_LABEL = 'Centang semua pernyataan';
+export const ATTEST_UNCHECK_ALL_LABEL = 'Batalkan semua';
+
 export const TC_LABEL =
   'Saya menyetujui Syarat & Ketentuan SAKSI: publikasi kesepakatan tidak terpenuhi, hak menjawab dalam 14 hari jika dilaporkan, dan larangan bukti palsu.';
 

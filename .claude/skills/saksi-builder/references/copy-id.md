@@ -146,9 +146,11 @@ Fired once per transition, to whichever party must act next:
 
 > Simulasi meterai elektronik. Integrasi distributor resmi Peruri pada rilis produksi. Dokumen ini belum bermeterai.
 
-## 11. Landing tagline (landing page subheading + meta description — must be identical)
+## 11. Landing tagline (meta description — superseded on-page by §20)
 
 > Percaya itu baik. Tercatat lebih baik.
+
+**Superseded 2026-08-01, confirmed in supervisor audit.** This line's original "must be identical on landing page + meta description" rule no longer holds: §20's tagihan reframe (2026-07) deliberately replaced the landing page's own heading/subhead with `LANDING_HEADING`/`LANDING_SUBHEAD` ("Buat tagihan buat pembeli kamu." etc). This tagline now lives only in `app/layout.tsx`'s meta `description` (`LANDING_TAGLINE`), not on the page itself. That's intentional, not a regression — leaving this note so a future pass doesn't "fix" the landing page to restore text §20 deliberately removed.
 
 ## 12. Deal state UI (join flow)
 
@@ -1605,3 +1607,50 @@ acquirer implementation).
    see the decode-utility comment above. If a dispute ever turns on the exact
    NMID value, that caveat needs to be visible somewhere a reader outside the
    code would see it, not just in a source comment.
+
+## §48 — Attestations rebuilt as 4 individual checkboxes (2026-08-01, supervisor audit)
+
+**What was wrong.** §3 has always locked the 4 attestations as individual,
+not-bundleable checkboxes. They shipped instead as static, read-only `<li>`
+text under a single bundled `attest_tc` checkbox, on all three consent
+surfaces that existed at the time (`app/buat/page.tsx`, `JoinDealForm.tsx`,
+`JoinAndPayForm.tsx`) — every party who created or joined a deal had attested
+to all 4 statements with one click covering all five (the 4 plus T&C), never
+individually. Caught in a supervisor audit, not by `monster_check` at the
+time it shipped.
+
+**Why it happened.** The 2026-07-20 design pass documented in `data-model.md`
+("Accept step folded into join") and mirrored in `JoinDealForm.tsx`'s own
+comments explicitly reasoned that "collecting 5 individual checkbox clicks
+for what is legally one consent... added friction without adding consent
+quality" — a deliberate simplification that directly contradicted §3's
+"not bundleable" requirement instead of revising it. §3 was never updated to
+match, so the two docs disagreed with each other for over a week before this
+was caught.
+
+**The fix — `AttestationChecklist` (`components/AttestationChecklist.tsx`):**
+4 real checkboxes, individually required, each with its own `name={attest_${i}}`
+so the state actually reaches the server (a first version of this fix set
+`checked`/`onChange` but no `name` attribute — caught by `monster_check`
+before commit: without a name, unchecked client-side state can't be verified
+server-side, so a hand-crafted POST could bypass consent entirely). The
+single T&C checkbox (`attest_tc`) remains separate and still requires its own
+tap — it stays disabled until all 4 attestation boxes are individually true.
+Both `createDeal` (`app/buat/actions.ts`) and `joinDealCore`
+(`app/deal/[token]/actions.ts`) re-validate all 4 `attest_N` fields plus
+`attest_tc` server-side via `lib/attestations.ts`'s `hasAllAttestations`, so
+the client-side gate is not the only enforcement.
+
+**New UI chrome (not legally adjacent, same category as §23's INVOICE_\*
+labels):** `ATTEST_CHECK_ALL_LABEL = 'Centang semua pernyataan'` /
+`ATTEST_UNCHECK_ALL_LABEL = 'Batalkan semua'` — a one-tap shortcut that flips
+all 4 checkboxes at once. This does not re-bundle the 4 statements: each
+checkbox remains its own real, individually-uncheckable state afterward: the
+shortcut only saves taps for a reader who has read all 4, it doesn't collect
+one click in place of four.
+
+**Not touched:** the T&C consent line itself (`TC_LABEL`), the 4 attestation
+statement strings (`ATTESTATIONS`), and `JoinDealForm.tsx` — confirmed dead
+code (no live import anywhere, superseded by `JoinAndPayForm.tsx` per §31),
+left as-is rather than fixed, since fixing unreachable code isn't worth the
+diff.

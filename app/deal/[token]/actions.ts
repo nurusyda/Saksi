@@ -8,6 +8,7 @@ import { assertTransition, DealStatus, DealEventName } from '@/lib/db/transition
 import { submitAnchor } from '@/lib/db/anchor';
 import { setPartySession } from '@/lib/db/partySession';
 import { SYARAT_KETENTUAN_VERSION, SYARAT_KETENTUAN_HASH } from '@/lib/legal';
+import { hasAllAttestations } from '@/lib/attestations';
 import { recordBuktiForPayer } from './paymentActions';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
@@ -55,12 +56,14 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
   if (deal.status !== DealStatus.DRAF)
     return { error: ERROR_DEAL_CLOSED };
 
-  // Attestation gate — the four pernyataan (displayed as fine print above the
-  // T&C checkbox) are covered by the single T&C consent checkbox per the
-  // 2026-07-20 design: Syarat & Ketentuan already enumerates them, and
-  // collecting 5 individual checkbox clicks for what is legally one consent
-  // (accepting the terms) added friction without adding consent quality.
-  if (formData.get('attest_tc') !== 'on') return { error: ERROR_ATTESTATIONS_REQUIRED };
+  // Attestation gate — copy-id.md §3/§48: the 4 pernyataan are individual,
+  // not-bundleable checkboxes (AttestationChecklist), each re-checked here
+  // since the client gate can be bypassed by a hand-crafted POST; the
+  // separate T&C consent checkbox is its own distinct statement, checked in
+  // addition, not instead.
+  if (!hasAllAttestations(formData) || formData.get('attest_tc') !== 'on') {
+    return { error: ERROR_ATTESTATIONS_REQUIRED };
+  }
 
   // Parse counterpart phone
   const rawPhone = (formData.get('counterpart_phone') as string | null)?.trim() ?? '';

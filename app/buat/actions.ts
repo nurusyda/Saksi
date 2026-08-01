@@ -15,6 +15,7 @@ import { getRekeningLedger, isLedgerDetailEnabled, type LedgerResult } from '@/l
 import { getDefaultDeadlineWib } from '@/lib/format';
 import { uploadQrisImage } from '@/lib/db/storage';
 import { decodeQrisImage } from '@/lib/qris/decode';
+import { hasAllAttestations } from '@/lib/attestations';
 import {
   ERROR_ATTESTATIONS_REQUIRED,
   ERROR_RATE_LIMIT,
@@ -87,11 +88,14 @@ export async function createDeal(
   const deadline = getDefaultDeadlineWib();
   const tier = (formData.get('tier') as string | null) ?? 'GRATIS';
 
-  // Attestation gate — must pass before any field validation or DB write
-  // Single T&C consent checkbox covers the four pernyataan (displayed as fine
-  // print above it) — see JoinDealForm's 2026-07-20 design pass for the full
-  // reasoning (same consent model, same change applied to both forms).
-  if (formData.get('attest_tc') !== 'on') return { error: ERROR_ATTESTATIONS_REQUIRED };
+  // Attestation gate — must pass before any field validation or DB write.
+  // copy-id.md §3/§48: the 4 pernyataan are individual, not-bundleable
+  // checkboxes (AttestationChecklist), each re-checked here since the client
+  // gate can be bypassed by a hand-crafted POST; the separate T&C consent
+  // checkbox is its own distinct statement, checked in addition, not instead.
+  if (!hasAllAttestations(formData) || formData.get('attest_tc') !== 'on') {
+    return { error: ERROR_ATTESTATIONS_REQUIRED };
+  }
 
   const fieldErrors: Record<string, string> = {};
 

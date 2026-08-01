@@ -6,6 +6,7 @@ import { createDeal, checkAccountHistory, getRekeningLedgerAction, type CreateDe
 import { TCLabel } from '@/components/TCLabel';
 import { PrivacyLink } from '@/components/PrivacyLink';
 import { LedgerDetail } from '@/components/LedgerDetail';
+import { AttestationChecklist, allAttested } from '@/components/AttestationChecklist';
 import {
   PageShell,
   PageTitle,
@@ -88,6 +89,7 @@ const initialState: CreateDealState = {};
 export default function BuatPage() {
   const [state, formAction] = useActionState(createDeal, initialState);
   const [tcChecked, setTcChecked] = useState(false);
+  const [attestChecked, setAttestChecked] = useState(() => Array(ATTESTATIONS.length).fill(false));
   const [paymentMethod, setPaymentMethod] = useState<'REKENING' | 'QRIS'>('REKENING');
   const [qrisFileName, setQrisFileName] = useState('');
   const [bank, setBank] = useState('');
@@ -328,20 +330,16 @@ export default function BuatPage() {
         <input type="hidden" name="tier" value="GRATIS" />
 
         <Card>
-          <fieldset className="flex flex-col gap-3">
-            <legend className="text-sm font-semibold text-zinc-800">Pernyataan</legend>
-            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs leading-relaxed text-zinc-500">
-              {ATTESTATIONS.map((text, i) => (
-                <li key={i}>{text}</li>
-              ))}
-            </ol>
-            <label className="flex items-start gap-3 text-sm text-zinc-700">
+          <fieldset className="flex flex-col gap-4">
+            <AttestationChecklist checked={attestChecked} onChange={setAttestChecked} />
+            <label className="flex items-start gap-3 border-t border-zinc-100 pt-3 text-sm text-zinc-700">
               <input
                 type="checkbox"
                 name="attest_tc"
                 checked={tcChecked}
                 onChange={() => setTcChecked((v) => !v)}
-                className="mt-0.5 shrink-0 accent-[var(--witness)]"
+                disabled={!allAttested(attestChecked)}
+                className="mt-0.5 shrink-0 accent-[var(--witness)] disabled:opacity-40"
               />
               <TCLabel />
             </label>
@@ -349,7 +347,7 @@ export default function BuatPage() {
           </fieldset>
         </Card>
 
-        <SubmitButton allChecked={tcChecked} />
+        <SubmitButton allChecked={allAttested(attestChecked) && tcChecked} />
       </form>
     </PageShell>
   );
