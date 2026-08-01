@@ -144,9 +144,8 @@ export async function createDeal(
     fieldErrors.qris_image = ERROR_QRIS_FILE_REQUIRED;
   }
 
-  // Only GRATIS is selectable in the UI (paid tiers have no radio input at all,
-  // Phase 0.6) — reject anything else server-side too, since a direct form POST
-  // could otherwise still submit a paid tier the UI no longer offers.
+  // All deals are standard (GRATIS) — per-deal tiers are retired. Seller
+  // account tiers (Akun Saksi, Toko Saksi Pro) are a separate concept.
   if (tier !== 'GRATIS') fieldErrors.tier = 'Tier tidak valid.';
 
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };

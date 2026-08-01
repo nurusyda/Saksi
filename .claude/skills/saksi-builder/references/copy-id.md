@@ -13,17 +13,14 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 **Rung 2 — open-banking verified (roadmap; do not ship enabled):**
 > Pembayaran terverifikasi melalui mutasi bank.
 
-**Flag body templates by tier** (prepend the correct rung line):
-- GRATIS: `1 kesepakatan tercatat tidak dipenuhi ([tgl]). Identitas para pihak tidak diverifikasi. Terlapor tidak merespons dalam 14 hari.`
-- LIMA_RIBU: `1 kesepakatan tercatat tidak dipenuhi ([tgl]). Nomor HP kedua pihak terverifikasi. Terlapor tidak merespons dalam 14 hari.`
-- BERMETERAI: `1 kesepakatan bermeterai tidak dipenuhi ([tgl]). Identitas terverifikasi (e-KYC). Dokumen siap diajukan sebagai bukti. Terlapor tidak merespons dalam 14 hari.`
+**Flag body template** (prepend the correct rung line):
+- `1 kesepakatan tercatat tidak dipenuhi ([tgl]). Identitas para pihak tidak diverifikasi. Terlapor tidak merespons dalam 14 hari.`
 - DISPUTED suffix (replaces the last sentence when hak jawab filed): `Terlapor memberikan tanggapan. Status: klaim berbeda.`
   - If terlapor attached evidence, append: `Terlapor menyertakan bukti pada tanggapannya.`
 
-**Flag identifier lines** (shown below the flag body, per-tier gated — matches data-model.md's Breach pipeline tier gate: GRATIS shows rekening only, LIMA_RIBU adds phone_hash, BERMETERAI adds identity_verified):
-- Rekening (all tiers): `Rekening: [bank] [rekening_masked]`
-- Phone verified (LIMA_RIBU+): `Nomor HP terverifikasi · ID: [12-char hash fragment]`
-- Identity verified (BERMETERAI only): `Identitas terverifikasi (e-KYC)`
+**Flag identifier lines:**
+- Rekening: `Rekening: [bank] [rekening_masked]`
+- (Phone hash and identity-verification markers reserved for future seller-account-tier gating — not yet designed.)
 
 **Note:** `SENGKETA` remains the internal status value only (`DealStatus.SENGKETA`, `flags.hak_jawab_status`); the word "sengketa" must never appear on any user-facing surface.
 
@@ -59,13 +56,23 @@ Use these strings VERBATIM. They are legal load-bearing surfaces; paraphrasing t
 - `TIDAK_KONSISTEN`: `Bukti tidak konsisten dengan kesepakatan: [field yang berbeda]. Periksa kembali sebelum melanjutkan.`
 - `TIDAK_TERBACA`: `Bukti tidak dapat dibaca otomatis. Dicatat sebagai klaim tanpa pemeriksaan konsistensi.`
 
-## 6. Tier cards
+## 6. Seller account tiers
 
-- GRATIS — `Catat kesepakatan. Rekening tujuan terekam dari bukti transfer.`
-- LIMA_RIBU — `Rp5.000/pihak · Nomor HP kedua pihak terverifikasi (OTP WhatsApp).`
-- BERMETERAI — `Rp50.000/pihak · Identitas terverifikasi (e-KYC) + meterai elektronik + berkas bukti siap diajukan.`
-- Shared footer: `Tingkatan menunjukkan fitur tambahan untuk penjual, bukan keamanan kesepakatan. Mengajukan laporan selalu terbuka di semua tingkatan.`
-- Notify-me checkbox label (paid-tier disabled cards, shipped Phase 0.6): `Beri tahu saat tersedia.`
+⚠ **The original per-deal tier cards (GRATIS / LIMA_RIBU Rp5.000/pihak / BERMETERAI
+Rp50.000/pihak) are removed.** The old ladder priced counterparty verification
+for the flag; that model is superseded by seller-account tiers (SAKSI-MASTER.md §6):
+
+- **Akun Saksi** — Rp20.000 sekali bayar. Login HP, data rekening tersimpan, lencana rekam jejak ditampilkan.
+- **Toko Saksi Pro** — Rp200.000/tahun. Logo penjual di tagihan, dan halaman toko sendiri (`saksi.app/namatoko`).
+- **Saksi Resmi** — Rp30.000/perjanjian, inisiatif pembeli. Meterai elektronik + berkas bukti siap diajukan. (Mendatang.)
+
+**What the paid tiers do NOT do:** verify the other party, guarantee safety, or
+buy a clean track record. The track record stays free and cannot be bought.
+Mengajukan laporan selalu terbuka di semua tingkatan.
+
+**Current state:** Toko Saksi Pro renders as a greyed, inert card on the riwayat
+page (Belum tersedia). Akun Saksi is deliberately NOT surfaced anywhere — it is
+the price of an account, and accounts do not exist yet.
 
 ## 6a. Deal-type gating (create flow) — REMOVED 2026-07-20
 
@@ -200,13 +207,11 @@ Fired once per transition, to whichever party must act next:
 **Counterpart role fallback label (used when ROLE_PAIR returns null, i.e. LAINNYA; also used in deal summary card when counterpart role is indeterminate):**
 > Pihak lain
 
-**Tier short labels** (displayed in deal summary card; full descriptions in §6):
+**Tier short labels** (per-deal tier is retired; kept for schema compatibility only):
 
 | Value | Display |
 |---|---|
-| `GRATIS` | Gratis |
-| `LIMA_RIBU` | Rp5.000/pihak |
-| `BERMETERAI` | Rp50.000/pihak |
+| `GRATIS` | Standar |
 
 ## 14. Per-deal-type confirmation labels (keyed on role pair; shown on the fulfillment-confirmation action)
 
@@ -631,11 +636,11 @@ the `OTP_BREACH_REPORT` WA template.
 **Left in place deliberately:** the `otp_codes` table (0020) — dropping a table
 is irreversible, keeping an unused one is free.
 
-⚠ **Dormant strings that are now false if ever shipped:** `TIER_LIMA_RIBU_DESC`,
-`TIER_LABELS.LIMA_RIBU`, and `FLAG_BODY_STEM.LIMA_RIBU` all promise phone
-verification whose only implementation has been removed. None are rendered today
-(no tier selector; every deal is GRATIS). Do not ship that tier without first
-rebuilding a verification mechanism.
+⚠ **Removed 2026-08-01 (migration 0039).** The old tier strings (`TIER_LIMA_RIBU_DESC`,
+`TIER_LABELS.LIMA_RIBU`, `FLAG_BODY_STEM.LIMA_RIBU`, and their BERMETERAI
+counterparts) have been removed from the codebase. Phone verification was the
+LIMA_RIBU tier's only mechanism; it was deleted in §25 and will not be
+reintroduced without a verified implementation.
 
 ## §26 — Buyer flow merged into one page (2026-07-21)
 
@@ -1042,13 +1047,12 @@ price appears. Reasoning:
   the signal being measured. It gets introduced when accounts ship, because that
   is when it is attached to something real: durable cross-device riwayat.
 
-⚠ **Tier-naming drift to reconcile before any of this ships.** `feature_interest`
-(0012/0016) and `TIER_LABELS` still carry the *old* taxonomy —
-`LIMA_RIBU` (Rp5.000) / `BERMETERAI` (Rp50.000). SAKSI-MASTER.md §6.1 replaced
-those with **Akun Saksi (Rp20.000)** and **Toko Saksi Pro (Rp200.000/tahun)**. The
-schema, the copy constants, and the master doc must be reconciled in one pass —
-not patched independently — or the notify-me capture will key interest against
-tiers that no longer exist.
+⚠ **Reconciled 2026-08-01 (migration 0039).** The old `LIMA_RIBU`/`BERMETERAI`
+tier taxonomy has been removed from the schema CHECK constraint, `FLAG_BODY_STEM`,
+copy constants, and tier labels. The new model — Akun Saksi (Rp20.000) and Toko
+Saksi Pro (Rp200.000/tahun) — is the sole pricing taxonomy. `feature_interest`
+(0012/0016) still carries the old values and should be redesigned when paid tiers
+are built.
 
 ## §35 — Riwayat link restored to unconditional (2026-07-21)
 
@@ -1338,7 +1342,7 @@ Verified against production: goods loop across 2 full rounds (4 statements, chai
 intact, status unmoved), **plus** a payment-loop regression check confirming the
 shared RPC did not break the path that had only just started working.
 
-## §43 — T&C and tier taxonomy caught up to the built system (2026-07-21)
+## §43 — T&C, tier taxonomy, and schema caught up to the built system (2026-07-21, reconciled 2026-08-01)
 
 **T&C (`syarat-ketentuan.md`) → v1.1 (DRAF, pending legal review).** Three fixes
 to bring the document in line with what actually exists:
@@ -1359,19 +1363,19 @@ automatically for new consents while past consents keep their recorded version.
 Publication (Bagian 4) stays operationally gated pending legal review — the text
 remains as the consent basis.
 
-**Tier copy retired.** `TIER_LABELS` (LIMA_RIBU/BERMETERAI entries),
+**Tier copy retired (2026-07-21).** `TIER_LABELS` (LIMA_RIBU/BERMETERAI entries),
 `TIER_LIMA_RIBU_DESC`, `TIER_BERMETERAI_DESC`, `TIER_FOOTER`, `NOTIFY_ME_LABEL` —
 all had zero import sites and all described the dead OTP/e-KYC verification
 ladder — are removed. `TIER_GRATIS_DESC` kept (GRATIS is the only live tier).
-The forward model is already the greyed `TOKO_PRO_LOCKED_*` card (§32), the only
-place a price appears.
 
-The `deals.tier` **enum** values LIMA_RIBU/BERMETERAI stay in the schema/flag
-stems/feature_interest deliberately — renaming is a migration, and the new tiers
-don't carry the verification the old flag stems claim, so it's a redesign of
-what a paid tier *means*, deferred to the paid-tier build. `data-model.md`'s tier
-spec now documents this with the master-doc table and a "redesign together, not
-piecemeal" instruction.
+**Schema reconciled (2026-08-01, migration 0039).** The `deals.tier` CHECK
+constraint now accepts only `'GRATIS'`. `LIMA_RIBU` and `BERMETERAI` are removed
+from the schema, `FLAG_BODY_STEM`, and `TIER_LABELS`. The new seller-account
+tiers — Akun Saksi (Rp20.000 one-time) and Toko Saksi Pro (Rp200.000/year) —
+are the sole pricing taxonomy. `feature_interest` (0012/0016) still carries the
+old values and should be redesigned when paid tiers are built. The forward model
+is already the greyed `TOKO_PRO_LOCKED_*` card (§32), the only place a price
+appears.
 
 ## §44 — OpenTimestamps: real implementation, gated off until verified (2026-07-21)
 
@@ -1492,8 +1496,8 @@ is flipped. Verified against production (phone-mode BERHASIL=7/KLAIM_PEMBAYARAN=
 KLAIM_BARANG=2, 15 in-flight excluded; rekening-mode hides all 7 payment rows).
 
 **Moved to ROADMAP.md (deferred, per the operator 2026-07-22):**
-- Naughty-buyer visibility to sellers → Toko Saksi Pro (Rp200rb tier).
-- Integrated spreadsheet export for sellers → Rp200rb tier.
+- Naughty-buyer visibility to sellers → Toko Saksi Pro (Rp200rb/tahun tier).
+- Integrated spreadsheet export for sellers → Toko Saksi Pro (Rp200rb/tahun tier).
 - `/cek` per-role attribution (pooled phone view) → rides with the naughty-buyer
   work. No-scores invariant holds throughout ("50 klaim berbeda raises an
   eyebrow" is a human read, never a hardcoded threshold).

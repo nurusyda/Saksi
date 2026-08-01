@@ -78,32 +78,18 @@ local components. The problem was never missing libraries; it was the font.
 
 ---
 
-## 2. Pricing reconciliation — **DECISION NEEDED before Store**
+## 2. Pricing reconciliation — RESOLVED 2026-08-01
 
-The built tier spec (`data-model.md` "Tier spec (locked)") is **per-party,
-per-deal**: `GRATIS` / `LIMA_RIBU` (Rp5.000/pihak) / `BERMETERAI`
-(Rp50.000/pihak). The newer product model from strategy work is:
+The old per-deal tier model (`GRATIS` / `LIMA_RIBU` Rp5.000/pihak / `BERMETERAI`
+Rp50.000/pihak) has been removed (migration 0039). Resolution: option (a).
 
-- **Free loop** (link + OCR + record) — genuinely free, to maximize logged
-  deals (data + adoption).
-- **Saksi Store** — **Rp100.000 one-time per seller** (persistent profile:
-  saved rekening/QRIS, reusable link, bulk, verified-rekening marker, factual
-  record display). This is a **new charge dimension** (per-seller, not per-deal).
-- **Saksi Resmi (meterai)** — **buyer-initiated, ~Rp30.000 per deal**, replacing
-  the per-party `BERMETERAI` framing.
+The new seller-account model:
+- **Standard (free loop)** — genuinely free, to maximize logged deals.
+- **Akun Saksi** — **Rp20.000 sekali bayar** (phone login, saved rekening, track-record badge).
+- **Toko Saksi Pro** — **Rp200.000/tahun** (logo on invoice + `saksi.app/namatoko` storefront).
+- **Saksi Resmi (meterai)** — **buyer-initiated, Rp30.000 per deal** (future).
 
-**The tension:** charging Rp5.000 on every deal (`LIMA_RIBU`) adds friction to
-the exact behavior (logging deals) the free loop needs to maximize.
-
-**DECISION NEEDED (human):**
-- (a) Keep the loop **free**, fold `LIMA_RIBU`'s value (phone_hash on flags,
-  OTP) into either free or the Store, and move monetization to Store (one-time)
-  + meterai (per serious deal)? **[recommended]** — or
-- (b) Keep per-deal micro-fees and add Store on top?
-
-Whichever is chosen, **update `data-model.md` Tier spec + `copy-id.md` tier
-strings first**, then migrate. Do not ship a pricing model that contradicts the
-locked docs. Everything in §3–§6 assumes (a) unless told otherwise.
+All pricing docs, copy strings, and schema reconciled in this pass.
 
 ---
 
@@ -182,10 +168,10 @@ verified marker + custom slug behind `paid_at`.
 
 ---
 
-## 6. Buyer-initiated meterai (rework of BERMETERAI)
+## 6. Buyer-initiated meterai (Saksi Resmi, future)
 
-Current `BERMETERAI` is a per-party tier chosen at join. Rework to
-**buyer-initiated on the completed record**:
+The old `BERMETERAI` per-party tier has been removed (migration 0039). Saksi
+Resmi is a **buyer-initiated addon on the completed record**:
 
 - On a deal reaching a terminal confirmed state, the **buyer** may tap "Tambah
   meterai" and pay (~Rp30.000, Midtrans).

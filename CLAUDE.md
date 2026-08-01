@@ -23,7 +23,7 @@ Next.js App Router + TypeScript + Tailwind on Vercel · Supabase (Postgres/RLS/S
 ## Build order
 
 1. Schema + state machine + hash/anchor layer (migrations in `supabase/migrations/`, via CLI, committed)
-2. Free-tier happy path: create → link → attestations → accept → forced-check → bukti upload → OCR → SELESAI
+2. Standard happy path: create → link → attestations → accept → forced-check → bukti upload → OCR → SELESAI
 3. D5 exit states + PERPANJANGAN
 4. Breach path (identify, not OTP — §25 removed OTP from breach path)
 5. Public surfaces: check page, flag page, profile (counts, never a score)

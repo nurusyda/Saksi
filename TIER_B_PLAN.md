@@ -92,7 +92,7 @@ The highest-stakes code in the product. Everything here is behind the GATE 1 fea
 Scope:
 - The 14-day expiry check belongs in the existing daily sweep (one scheduler, new outcome branch: hak_jawab window lapsed → publish), not a second cron.
 - Flag rendering: rung line (0/1/2 per the record's actual proof state — never hardcoded) + tier body template (§1, verbatim) + DISPUTED suffix when applicable + evidence sub-line when applicable.
-- Identifier scope by tier (locked): GRATIS → masked rekening + bank. LIMA_RIBU → + phone hash. BERMETERAI → + verified-identity marker. Never a full phone number, never a NIK, never a bukti image.
+- Identifier scope: masked rekening + bank. Phone hash and identity-verified markers are reserved for future seller-account-tier gating (not yet designed). Never a full phone number, never a NIK, never a bukti image.
 - Late fulfillment after publication (T&C §5.4, locked): status can update on both parties' confirmation, but the history stays — "pemenuhan yang terlambat tercatat sebagai pemenuhan yang terlambat, bukan sebagai penghapusan."
 - Hash-chain every publication event. A published flag that SAKSI could silently unpublish would break the product's core promise in the exact place it matters most.
 

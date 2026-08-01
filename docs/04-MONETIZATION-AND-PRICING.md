@@ -24,9 +24,10 @@
 
 | Tier | Price | What it is |
 |------|-------|-----------|
-| **Gratis (free loop)** | Rp0 | Send invoice links, WA-send, the earned track record (accrues but not displayed as a badge on free), buyer check + dispute. The data engine. |
-| **Saksi Store** | **~Rp100k one-time** *(price is a scammer-filter dial; test 50–100k)* | The persistent seller profile: rekening/QRIS **embedded once** (never re-typed), one-tap **bulk / PO** invoicing, **verified-rekening marker**, custom store link, and the **displayed** factual record. |
-| **Saksi Resmi (e-meterai)** | **~Rp30k per deal, buyer-initiated** | A court-ready, meterai-stamped *completed-transaction document* for serious/high-value deals. |
+| **Standard (free loop)** | Rp0 | Send invoice links, the earned track record, buyer check + dispute. The data engine. |
+| **Akun Saksi** | **Rp20.000 sekali bayar** | Phone login, saved rekening, displayed track-record badge. The first paid rung — sells convenience (no retype) and a display surface for a real earned record. |
+| **Toko Saksi Pro** | **Rp200.000/tahun** | Seller logo on invoice + `saksi.app/namatoko` storefront. For power sellers (jastip/PO/resellers). |
+| **Saksi Resmi (e-meterai)** | **Rp30.000 per deal, buyer-initiated** | A court-ready, meterai-stamped *completed-transaction document* for serious/high-value deals. (Future.) |
 
 Notes:
 - **The Store's "pride badge" must obey the invariant** — it displays only *true
@@ -35,10 +36,12 @@ Notes:
   *display surface* for a real earned record, not fake status. The best upsell is:
   a free user accrues an *invisible* record, and once it's substantial you prompt
   "Kamu udah punya 34 transaksi bersih — upgrade biar pembeli bisa lihat."
-- **Why the Store justifies Rp100k:** for a power seller (jastip/PO doing dozens of
-  deals/day), the embedded rekening + one-tap bulk + auto-Sheets + verified
-  storefront is felt every day. The *friction of manual re-entry in the free tier
-  is the deliberate upsell engine.* Casual sellers stay free.
+- **Why Akun Saksi justifies Rp20.000 and Toko Saksi Pro justifies Rp200.000/tahun:**
+  Akun Saksi sells the convenience of never re-typing a rekening and the display of
+  an earned track record. Toko Saksi Pro adds a storefront and branded invoices —
+  felt every day by power sellers (jastip/PO/resellers doing dozens of deals). The
+  *friction of manual re-entry in the free tier is the deliberate upsell engine.*
+  Casual sellers stay free.
 
 ## 3. Saksi Resmi (buyer-initiated meterai) — the design
 
@@ -73,7 +76,8 @@ Notes:
 - **Do not store raw KTP/selfie** — use a licensed vendor (Privy/VIDA/Verihubs/
   Didit) that returns pass/fail + a token; hold the *result*, not the ID. Watch for
   vendor **monthly minimums** — keep KYC off until paying verified sellers offset
-  it. (In the current app, KYC = Didit, tied to the Bermeterai tier.)
+  it. (In the current app, Didit was tied to the old BERMETERAI tier — both are
+  removed; re-evaluate when Saksi Resmi is built.)
 
 ## 5. Who pays / who never pays
 
@@ -97,23 +101,21 @@ time using SAKSI's signal — the loop SAKSI can't close itself without rails), 
 ultimately a **governed fraud-indicator consortium.** All gated behind consent +
 purpose-limitation + score-not-raw-data (UU PDP). Full treatment in `06`.
 
-## 7. Pricing reconciliation with the CURRENT app — **DECISION NEEDED**
+## 7. Pricing reconciliation — RESOLVED 2026-08-01
 
-The built app's locked tier spec is **per-party, per-deal**: `GRATIS` /
-`LIMA_RIBU` (Rp5.000/pihak) / `BERMETERAI` (Rp50.000/pihak, includes Didit e-KYC +
-evidence-pack PDF). The newer model above is **free loop + Rp100k one-time Store +
-Rp30k buyer-meterai + credit/data later.**
+The old per-deal tier model (`GRATIS` / `LIMA_RIBU` Rp5.000/pihak / `BERMETERAI`
+Rp50.000/pihak) has been removed from the schema (migration 0039), the flag body
+templates, and all copy constants. The new seller-account model (Akun Saksi
+Rp20.000 one-time, Toko Saksi Pro Rp200.000/tahun, Saksi Resmi Rp30.000
+buyer-initiated) is the sole pricing taxonomy.
 
-These conflict. The tension: **charging Rp5.000 per deal (`LIMA_RIBU`) taxes the
-exact logging behavior the free loop needs to maximize for data and adoption.**
+**Decision:** Option (a) — the loop is genuinely free. Seller account tiers sell
+convenience and display, never counterparty verification and never a bought
+reputation. All deals are standard (GRATIS); tier is now a seller-account concept,
+not a per-deal one.
 
-**DECISION NEEDED (human, then update `data-model.md` + `copy-id.md`):**
-- (a) **Recommended:** make the loop genuinely free, fold `LIMA_RIBU`'s value
-  (phone_hash on flags, OTP) into free or the Store, reprice meterai to buyer-opt-in
-  Rp30k, and add the Store (Rp100k one-time) as the new charge dimension. — or
-- (b) Keep per-deal micro-fees and layer Store on top.
-
-Interim state in the code: the create form now hardcodes **`tier = GRATIS`** (the
-tier selector and the paid-interest signal were removed from the UI per the
-invoice-reframe; see `07`). This is consistent with option (a) but is not yet the
-formally-reconciled locked decision — resolve it before building the Store.
+All create-form tier selectors, paid-interest signals, and old tier labels have
+been removed from the UI. Toko Saksi Pro renders as a greyed, inert card on the
+riwayat page (Belum tersedia). Akun Saksi is deliberately NOT surfaced anywhere
+— it is the price of an account, and accounts do not exist yet. Payment
+integration is not implemented; re-evaluate providers when tier fees are enabled.

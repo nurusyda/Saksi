@@ -40,9 +40,8 @@ export interface LedgerRow {
   bank: string;
   rekeningMasked: string;
   // The OTHER party's phone_hash, tier-gated exactly like the flag ladder
-  // (data-model.md's Breach pipeline section): GRATIS -> null, LIMA_RIBU+ ->
-  // present. Gated per-deal on THAT deal's own tier, not the rekening's
-  // overall history.
+  // Phone hash is reserved for future seller-account-tier gating. All deals
+  // are standard (GRATIS) today, so this is always null for now.
   counterpartPhoneHash: string | null;
 }
 
@@ -151,7 +150,8 @@ async function assembleLedger(
 
   if (eligible.length === 0) return { status: 'empty' };
 
-  // Batched phone_hash lookup for tier-gated rows only (LIMA_RIBU/BERMETERAI).
+  // Batched phone_hash lookup for future seller-account-tier-gated rows.
+  // All deals are GRATIS today, so partyIdsNeeded is always empty for now.
   const partyIdsNeeded = new Set<string>();
   for (const { deal } of eligible) {
     if (deal.tier !== 'GRATIS' && deal.otherPartyId) partyIdsNeeded.add(deal.otherPartyId);

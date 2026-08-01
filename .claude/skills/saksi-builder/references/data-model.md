@@ -8,7 +8,7 @@ create table parties (
   id uuid primary key default gen_random_uuid(),
   phone_e164 text unique not null,          -- RLS-protected, never in public views
   phone_hash text unique not null,          -- sha256(phone_e164), public clustering key
-  phone_verified_at timestamptz,            -- set by OTP success (Rp5rb+ or breach filing)
+  phone_verified_at timestamptz,            -- set by OTP success (breach filing or future identity verification)
   ekyc_status text default 'NONE',          -- NONE | PASSED | FAILED (future: Saksi Resmi e-KYC)
   ekyc_ref text,                            -- e-KYC vendor session id (vendor TBD)
   created_at timestamptz default now()
@@ -17,7 +17,7 @@ create table parties (
 create table deals (
   id uuid primary key default gen_random_uuid(),
   token text unique not null,               -- nanoid(21), the share link
-  tier text not null default 'GRATIS',      -- GRATIS | LIMA_RIBU | BERMETERAI
+  tier text not null default 'GRATIS',      -- GRATIS only (per-deal tier is retired; seller tiers are separate)
   proposer_id uuid references parties,
   counterpart_id uuid references parties,   -- null until link opened & phone entered
   proposer_role text not null,              -- PENJUAL | PEMBELI | PEMBERI_PINJAMAN | ...
@@ -327,55 +327,43 @@ GATE 1 (lawyer review) and the T&C gap above both apply, same reasoning as the b
    §25 first — it documents exactly why it was removed.
 3. Notification to the other party (WA utility template) opens the 14-day hak jawab window.
 4. Window closes silent → flag publishes. Rung selection: bukti confirmed by counterpart earlier? rung 1 : rung 0. (Rung 2 reserved for open-banking roadmap.)
-5. Flag lands on identifiers by tier: GRATIS → rekening (masked) + bank; LIMA_RIBU → + phone_hash; BERMETERAI → + verified-identity marker (never the NIK itself).
+5. Flag lands on identifiers: rekening (masked) + bank. Phone hash and identity-verification markers are reserved for future seller-account-tier gating (not yet designed — do not ship without a verified mechanism).
 
-## Tier spec — SUPERSEDED (§43, 2026-07-21)
+## Tier model — seller-account tiers (not per-deal)
 
-⚠ **The table below is the ORIGINAL tier model and is no longer the product
-direction. Do not build against it.** It is kept for context on the existing
-`deals.tier` enum only.
-
-The original ladder priced *counterparty verification for the flag*: GRATIS
-(nothing) → LIMA_RIBU (both phones via WA OTP) → BERMETERAI (e-KYC +
-e-meterai). Two things retired it:
+⚠ **The original per-deal verification ladder (GRATIS / LIMA_RIBU Rp5.000/pihak /
+BERMETERAI Rp50.000/pihak) is removed.** It was superseded for two reasons:
 
 1. **WA OTP was deleted (§25).** The LIMA_RIBU rung's only verification
-   mechanism no longer exists, so its "both phones verified" claim — and the
-   matching `FLAG_BODY_STEM.LIMA_RIBU` line — are false as written.
+   mechanism no longer exists.
 2. **SAKSI-MASTER.md §6 replaced the ladder with a different product.** The new
-   tiers sell *seller convenience and display*, not counterparty verification:
+   model sells *seller convenience and display*, not counterparty verification:
 
    | | Akun Saksi (Rp20.000, one-time) | Toko Saksi Pro (Rp200.000/year) |
    |---|---|---|
    | What it is | phone login, saved rekening, displayed track-record badge | logo on invoice + `saksi.app/namatoko` storefront |
    | Verifies about the other party | nothing | nothing |
 
-   (e-meterai / e-KYC live on later, separate lines — Saksi Resmi and a future
-   verified tier — not on these two.)
+   Plus a per-deal addon:
+   - **Saksi Resmi** — Rp30.000/perjanjian, buyer-initiated e-meterai stamping
+     (e-KYC + e-meterai live on later, separate line — not on the two seller
+     account tiers above).
+
+**All deals are created as standard (GRATIS).** The `deals.tier` column is kept as
+a placeholder; it currently only accepts `'GRATIS'` (migration 0039). Seller
+account tiers (Akun Saksi, Toko Saksi Pro) are a separate concept — they govern
+what the *seller* can do (login, saved rekening, badge, storefront), not what a
+specific *deal* verifies.
 
 **Enum deferral, deliberate.** The `deals.tier` CHECK values `LIMA_RIBU` /
-`BERMETERAI` (0001), their `FLAG_BODY_STEM` entries, and the `feature_interest`
-values are **left in place**. Renaming them is a migration, and — the real
-reason — the new tiers do not carry the verification the old flag stems claim,
-so redesigning the flag's identity ladder is a genuine product decision (what,
-if anything, does a paid tier verify for a *published* flag?) that belongs with
-the paid-tier build. Doing a find-and-replace ahead of that decision would bake
-a false verification claim into the ledger. Every deal is GRATIS today and flag
-publication is gated off (`FLAGS_PUBLICATION_ENABLED`), so none of this renders
-in the meantime. When paid tiers are built, redesign the enum + flag stems +
-`feature_interest` + T&C §7 **together**, not piecemeal.
-
-<details><summary>Original table (historical)</summary>
-
-| | GRATIS | LIMA_RIBU (Rp5.000/pihak) | BERMETERAI (Rp50.000/pihak) |
-|---|---|---|---|
-| Verifies | nothing about the person | both phones (WA OTP) | legal identity (Didit e-KYC) + phones |
-| Payment | — | Midtrans **QRIS only** | QRIS preferred, VA allowed |
-| Extra artifacts | — | — | e-meterai (mock in demo) + evidence-pack PDF |
-
-Fee charged at DISEPAKATI, non-refundable, either party may pay for both.
-Verification cannot be delegated.
-</details>
+`BERMETERAI` were removed in migration 0039. The `FLAG_BODY_STEM` entries for
+those tiers and the `feature_interest` values for them are also removed — the new
+tiers do not carry the verification the old flag stems claimed. Redesigning the
+flag's identity ladder (what, if anything, does a paid seller tier surface on a
+*published* flag?) belongs with the paid-tier build. Every deal is standard today
+and flag publication is gated off (`FLAGS_PUBLICATION_ENABLED`), so none of this
+renders in the meantime. When paid seller tiers are built, design the flag-ladder
+implications together, not piecemeal.
 
 ## Profile page (public, per phone_hash or rekening)
 

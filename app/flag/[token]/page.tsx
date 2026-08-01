@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { supabaseServer } from '@/lib/supabase/server';
-import { renderFlag, type FlagTier, type FlagRung } from '@/lib/flags/render';
+import { renderFlag, type FlagRung } from '@/lib/flags/render';
 import { PageShell } from '@/components/ui';
 import { shortHashFragment } from '@/lib/format';
 import {
@@ -74,7 +74,6 @@ export default async function FlagPage({
 
   const rendered = renderFlag({
     rung: flag.rung as FlagRung,
-    tier: deal.tier as FlagTier,
     filedAtIso: filedEvent.created_at,
     disputed,
     hasEvidence,

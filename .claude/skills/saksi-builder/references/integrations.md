@@ -4,13 +4,11 @@
 
 Midtrans Snap was specified for collecting tier fees (Akun Saksi one-time, Toko Saksi Pro annual). Removed because no paid tier is active yet; tier upsell cards render inert with "Belum tersedia." When tier fees are enabled later, re-evaluate the payment provider — do not assume Midtrans is the right choice without confirming MDR, minimums, and QRIS floor at that time.
 
-<details><summary>Original spec (historical)</summary>
+<details><summary>Original spec (historical — superseded by seller-account tiers, 2026-08-01)</summary>
 
 - Product: Snap (hosted payment page). Sandbox: dashboard.sandbox.midtrans.com, free.
-- LIMA_RIBU tier: enable QRIS only. Disable VA/e-wallet/cards on this tier's Snap request (`enabled_payments: ["qris"]`). QRIS MDR ~0.7% (≈Rp35 on Rp5.000). VA is ~Rp4.000 flat — forbidden here.
-- BERMETERAI tier: QRIS preferred; VA acceptable (Rp4.000 on Rp50.000 = 8%).
-- Verify the acquirer's QRIS minimum amount in sandbox before demo (some floors ~Rp1.500; Rp5.000 clears, but confirm).
-- Webhook: Supabase Edge Function; verify signature; idempotent by `order_id`; on `settlement` → emit fee-paid event and advance flow. Fee is charged at DISEPAKATI and is non-refundable (state in T&C).
+- The old per-deal tier ladder (LIMA_RIBU Rp5.000, BERMETERAI Rp50.000) specified QRIS-only for LIMA_RIBU and QRIS+VA for BERMETERAI. This ladder is removed (migration 0039); payment collection for Akun Saksi (Rp20.000) and Toko Saksi Pro (Rp200.000) will use a different flow when built.
+- Webhook: Supabase Edge Function; verify signature; idempotent by `order_id`; on `settlement` → emit fee-paid event. Fee is charged at purchase and is non-refundable (state in T&C).
 
 </details>
 
@@ -37,7 +35,7 @@ that never shared `lib/otp.ts`'s implementation in the first place per its own
 
 ## 3. Didit e-KYC — REMOVED 2026-07-25
 
-Didit was specified for identity verification on the old BERMETERAI tier. Removed — no e-KYC integration in the current product. When identity verification is needed later (Saksi Resmi or a future verified tier), re-evaluate the vendor; Didit is not a Dukcapil check and the claim discipline around "terverifikasi" remains critical regardless of which vendor is chosen.
+Didit was specified for identity verification on the old BERMETERAI tier (removed — migration 0039). No e-KYC integration in the current product. When identity verification is needed later (Saksi Resmi e-meterai or a future verified tier), re-evaluate the vendor; Didit is not a Dukcapil check and the claim discipline around "terverifikasi" remains critical regardless of which vendor is chosen.
 
 <details><summary>Original spec (historical)</summary>
 

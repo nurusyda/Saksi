@@ -127,12 +127,12 @@ export async function fileBarangTidakSesuaiReport(
     deal.payment_method === 'QRIS'
       ? { qris_merchant_name: deal.qris_merchant_name, qris_nmid: deal.qris_nmid }
       : { rekening_masked: maskRekening(deal.rekening_tujuan as string), bank: deal.rekening_bank };
-  if ((deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') && flagged.phoneHash) {
-    identifiers.phone_hash = flagged.phoneHash;
-  }
-  if (deal.tier === 'BERMETERAI' && flagged.ekycPassed) {
-    identifiers.identity_verified = true;
-  }
+  // Phone hash and identity-verified markers are reserved for future
+  // seller-account-tier gating. All deals are GRATIS today, so neither is
+  // ever added. Kept as a structured comment with the original logic shape
+  // so the gating points are findable when seller tiers are built.
+  // if (deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') ... phone_hash
+  // if (deal.tier === 'BERMETERAI') ... identity_verified
 
   for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));
@@ -261,12 +261,12 @@ export async function fileDeadlineLapseReport(
     deal.payment_method === 'QRIS'
       ? { qris_merchant_name: deal.qris_merchant_name, qris_nmid: deal.qris_nmid }
       : { rekening_masked: maskRekening(deal.rekening_tujuan as string), bank: deal.rekening_bank };
-  if ((deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') && flagged.phoneHash) {
-    identifiers.phone_hash = flagged.phoneHash;
-  }
-  if (deal.tier === 'BERMETERAI' && flagged.ekycPassed) {
-    identifiers.identity_verified = true;
-  }
+  // Phone hash and identity-verified markers are reserved for future
+  // seller-account-tier gating. All deals are GRATIS today, so neither is
+  // ever added. Kept as a structured comment with the original logic shape
+  // so the gating points are findable when seller tiers are built.
+  // if (deal.tier === 'LIMA_RIBU' || deal.tier === 'BERMETERAI') ... phone_hash
+  // if (deal.tier === 'BERMETERAI') ... identity_verified
 
   for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 50 * attempt));

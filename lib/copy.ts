@@ -50,35 +50,30 @@ export const ROLE_PAIR: Record<string, string | null> = {
 export const ROLE_PAIR_HELPER_PREFIX = 'Pihak lain akan tercatat sebagai:';
 export const COUNTERPART_FALLBACK_LABEL = 'Pihak lain';
 
-// §43 (2026-07-21) — the legacy tier-card copy is REMOVED (six exports:
-// TIER_LABELS, TIER_GRATIS_DESC, TIER_LIMA_RIBU_DESC, TIER_BERMETERAI_DESC,
-// TIER_FOOTER, NOTIFY_ME_LABEL). Every one had zero import sites — dead
-// exports — and every one described the original verification ladder that no
-// longer exists: GRATIS · LIMA_RIBU (Rp5.000, both phones verified via WA
-// OTP) · BERMETERAI (Rp50.000, e-KYC + e-meterai).
+// §43 (2026-07-21, reconciled 2026-08-01) — the legacy tier-card copy is
+// REMOVED (six exports: TIER_LABELS, TIER_GRATIS_DESC, TIER_LIMA_RIBU_DESC,
+// TIER_BERMETERAI_DESC, TIER_FOOTER, NOTIFY_ME_LABEL). Every one had zero
+// import sites — dead exports — and every one described the original
+// verification ladder that no longer exists.
 //
-// That model is superseded twice. Its verification mechanism, WA OTP, was
-// deleted (§25) — so "Nomor HP kedua pihak terverifikasi (OTP WhatsApp)" is
-// now false. And SAKSI-MASTER.md §6 replaced the ladder with a different
-// product: Akun Saksi (Rp20.000 one-time — phone login, saved rekening, the
-// displayed track-record badge) and Toko Saksi Pro (Rp200.000/year —
-// logo on the invoice + a saksi.app/namatoko storefront). The new tiers sell
-// seller convenience and display, NOT counterparty verification.
+// The old per-deal verification ladder (GRATIS / LIMA_RIBU Rp5.000 /
+// BERMETERAI Rp50.000) has been fully removed from the schema (migration
+// 0039), FLAG_BODY_STEM, and tier labels. The new product model is
+// seller-account tiers:
+//   - Akun Saksi (Rp20.000 one-time) — phone login, saved rekening, badge
+//   - Toko Saksi Pro (Rp200.000/year) — logo on invoice + storefront
+//   - Saksi Resmi (Rp30.000/perjanjian, future) — buyer-initiated e-meterai
 //
-// The forward model is already surfaced honestly and is the ONLY place a
-// price appears: the greyed, inert TOKO_PRO_LOCKED_* card (§32) on the
-// riwayat page, which renders as not-yet-available. So the human-facing tier
-// story lives there, correctly, and these dead constants are gone rather than
-// reworded into a second source of truth.
+// The new tiers sell seller convenience and display, NOT counterparty
+// verification. The human-facing tier story is the greyed, inert
+// TOKO_PRO_LOCKED_* card (§32) on the riwayat page. Akun Saksi is
+// deliberately NOT surfaced anywhere — it is the price of an account, and
+// accounts do not exist yet.
 //
-// The `deals.tier` enum values LIMA_RIBU / BERMETERAI remain as schema CHECK
-// constants (0001), FLAG_BODY_STEM keys, and feature_interest values, left
-// deliberately: renaming a schema enum is a migration, and the new tiers do
-// not carry the verification the old FLAG_BODY_STEM entries claim, so this is
-// a redesign of what a paid tier means — a real product decision that belongs
-// with the paid-tier build, not a find-and-replace done ahead of it. Every
-// deal is GRATIS today and flag publication is gated off, so none of it
-// renders in the meantime. See data-model.md's tier spec for the deferral.
+// FLAG_BODY_STEM is now tier-agnostic (one template — identity is not
+// verified for any deal today). When seller account tiers are built,
+// redesigning the flag's identity ladder (what, if anything, does a paid
+// seller tier surface on a published flag?) belongs with that build.
 
 
 // copy-id.md §8 — canonical domain line for badge/share card/footer
@@ -667,15 +662,11 @@ export const FLAG_RUNG_LINES: Record<0 | 1 | 2, string> = {
 // [tgl] is filled in by the caller (lib/flags/render.ts) via formatDate on
 // the originating TENGGAT_LEWAT event's created_at — the date the deal was
 // recorded as unfulfilled, matching every other §7 exit-state line's [tgl].
-const FLAG_BODY_STEM: Record<'GRATIS' | 'LIMA_RIBU' | 'BERMETERAI', (tgl: string) => string> = {
-  GRATIS: (tgl) => `1 kesepakatan tercatat tidak dipenuhi (${tgl}). Identitas para pihak tidak diverifikasi.`,
-  LIMA_RIBU: (tgl) => `1 kesepakatan tercatat tidak dipenuhi (${tgl}). Nomor HP kedua pihak terverifikasi.`,
-  BERMETERAI: (tgl) =>
-    `1 kesepakatan bermeterai tidak dipenuhi (${tgl}). Identitas terverifikasi (e-KYC). Dokumen siap diajukan sebagai bukti.`,
-};
+const FLAG_BODY_STEM = (tgl: string) =>
+  `1 kesepakatan tercatat tidak dipenuhi (${tgl}). Identitas para pihak tidak diverifikasi.`;
 
-export function formatFlagBodyStem(tier: 'GRATIS' | 'LIMA_RIBU' | 'BERMETERAI', tgl: string): string {
-  return FLAG_BODY_STEM[tier](tgl);
+export function formatFlagBodyStem(tgl: string): string {
+  return FLAG_BODY_STEM(tgl);
 }
 
 export const FLAG_TAIL_SILENT = 'Terlapor tidak merespons dalam 14 hari.';
@@ -687,10 +678,9 @@ export const FLAG_TAIL_SILENT = 'Terlapor tidak merespons dalam 14 hari.';
 export const FLAG_TAIL_DISPUTED = 'Terlapor memberikan tanggapan. Status: klaim berbeda.';
 export const FLAG_EVIDENCE_SUB_LINE = 'Terlapor menyertakan bukti pada tanggapannya.';
 
-// copy-id.md §1 — flag identifier lines (locked 2026-07-20). Per-tier gated
-// exactly as data-model.md's Breach pipeline tier gate specifies: GRATIS
-// shows rekening only, LIMA_RIBU adds phone_hash, BERMETERAI adds
-// identity_verified.
+// copy-id.md §1 — flag identifier lines. All deals are standard (GRATIS) today,
+// so only the rekening line is shown. Phone hash and identity-verified markers
+// are reserved for future seller-account-tier gating.
 export function formatFlagRekeningLine(bank: string, rekeningMasked: string): string {
   return `Rekening: ${bank} ${rekeningMasked}`;
 }

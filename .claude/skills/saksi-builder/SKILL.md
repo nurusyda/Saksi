@@ -18,7 +18,6 @@ SAKSI is a 1-on-1 deal-witnessing app for Indonesian informal commerce (fandom s
 - **Payments**: Midtrans removed. No payment integration in the current product. Akun Saksi and Toko Saksi Pro fees are not yet collectable; tier upsell cards render inert with "Belum tersedia."
 - **e-KYC**: Didit removed. No e-KYC integration in the current product.
 - **e-Meterai** (Saksi Resmi, future): Rp30.000 per stamping per agreement. Buyer-initiated — the buyer chooses whether to apply meterai. One meterai per document, Rp30.000 official price (e-meterai via Peruri distributor integration). MOCK in demo with a clearly-labeled placeholder.
-- **e-Meterai**: MOCK in demo with a clearly-labeled placeholder ("Simulasi meterai — integrasi distributor Peruri pada rilis produksi"). One meterai per document, Rp10.000 official price.
 - **Integrity**: SHA-256 of canonical record JSON at EVERY state transition, anchored via OpenTimestamps (free). Store hash + .ots proof alongside the record.
 - **Evidence pack**: server-side PDF (pdf-lib) following the IASC-accepted report format (see references/integrations.md §5).
 
@@ -41,9 +40,9 @@ SAKSI is a 1-on-1 deal-witnessing app for Indonesian informal commerce (fandom s
 ## Build order (when starting from zero)
 
 1. Schema + state machine + hash/anchor layer (the witness core).
-2. Free-tier happy path: create deal → counterpart opens link → attestations → accept → payer forced-check page → bukti upload → OCR consistency → confirm → SELESAI.
+2. Happy path: create deal → counterpart opens link → attestations → accept → payer forced-check page → bukti upload → OCR consistency → confirm → SELESAI.
 3. D5 exit states + PERPANJANGAN.
-4. Breach path: deadline lapse → reporter OTP (free, we pay) → notification + hak jawab window (14 days) → flag published at correct rung.
+4. Breach path: deadline lapse → reporter identified as deal party (no OTP) → notification + hak jawab window (14 days) → flag published at correct rung.
 5. Public surfaces: check page, flag page, profile (counts per outcome — NEVER a score).
 6. Saksi Resmi tier (e-meterai Rp30rb/perjanjian, buyer-initiated stamping + evidence-pack PDF).
 

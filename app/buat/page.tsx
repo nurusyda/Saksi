@@ -45,9 +45,9 @@ import {
 } from '@/lib/copy';
 
 // Seller-first invoice form. The proposer is always PENJUAL (hidden field
-// below) and every deal is created GRATIS — the role selector and tier
-// selector are both gone, and app/buat/actions.ts enforces PENJUAL-only at
-// the data layer (§22), so neither is a UI-only assumption.
+// below) and every deal is standard (no per-deal tier) — the role selector
+// is gone, and app/buat/actions.ts enforces PENJUAL-only at the data layer
+// (§22), so this is not a UI-only assumption.
 //
 // §27 (2026-07-21): moved onto the shared UI kit. This page had drifted into
 // its own look — its own container, its own card treatment, its own input

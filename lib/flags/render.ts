@@ -16,14 +16,12 @@ import {
   FLAG_EVIDENCE_SUB_LINE,
 } from '@/lib/copy';
 
-export type FlagTier = 'GRATIS' | 'LIMA_RIBU' | 'BERMETERAI';
 export type FlagRung = 0 | 1 | 2;
 
 export interface RenderFlagInput {
   rung: FlagRung;
-  tier: FlagTier;
   // ISO timestamp of the originating TENGGAT_LEWAT event — the [tgl] in
-  // every tier template (copy-id.md §7's convention: date of the specific
+  // the flag body template (copy-id.md §7's convention: date of the specific
   // transition being recorded, not today's date).
   filedAtIso: string;
   // Whether the flagged party ever filed HAK_JAWAB_FILED (DISPUTED is
@@ -42,7 +40,7 @@ export interface RenderedFlag {
 
 export function renderFlag(input: RenderFlagInput): RenderedFlag {
   const tgl = formatDate(input.filedAtIso);
-  const stem = formatFlagBodyStem(input.tier, tgl);
+  const stem = formatFlagBodyStem(tgl);
   const tail = input.disputed ? FLAG_TAIL_DISPUTED : FLAG_TAIL_SILENT;
 
   return {
