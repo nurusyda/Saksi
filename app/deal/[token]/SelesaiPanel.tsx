@@ -1,5 +1,5 @@
 import { DealTimeline } from './DealTimeline';
-import { SELESAI_CLOSING_LINE, RIWAYAT_HEADING } from '@/lib/copy';
+import { SELESAI_CLOSING_LINE, RIWAYAT_HEADING, SAYA_STATUS_LABELS } from '@/lib/copy';
 
 // C7 — minimal, both sides identical, no action buttons, so no phone gate:
 // nothing here depends on which party is looking (deal_events carries no
@@ -11,7 +11,7 @@ export function SelesaiPanel({ token }: { token: string }) {
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5">
         <span className="inline-block rounded-full bg-green-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-green-800">
-          Selesai
+          {SAYA_STATUS_LABELS.SELESAI}
         </span>
         <p className="mt-3 text-sm text-zinc-700">{SELESAI_CLOSING_LINE}</p>
       </div>
