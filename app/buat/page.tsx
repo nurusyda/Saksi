@@ -103,7 +103,6 @@ export default function BuatPage() {
 
   useEffect(() => {
     if (!effectiveBank || !rekening) {
-      setHistory({ status: 'idle' });
       return;
     }
     let ignore = false;
@@ -121,6 +120,9 @@ export default function BuatPage() {
       clearTimeout(timer);
     };
   }, [effectiveBank, rekening]);
+
+  const displayedHistory: AccountHistoryDisplay =
+    !effectiveBank || !rekening ? { status: 'idle' } : history;
 
   const fe = state.fieldErrors ?? {};
 
@@ -280,24 +282,24 @@ export default function BuatPage() {
                 </div>
               </div>
 
-              {history.status !== 'idle' && (
+              {displayedHistory.status !== 'idle' && (
                 <p className="text-xs leading-relaxed text-zinc-500">
-                  {history.status === 'found' &&
+                  {displayedHistory.status === 'found' &&
                     formatAccountHistory(
                       effectiveBank,
-                      history.rekeningMasked,
-                      history.berhasilCount,
-                      history.klaimBarangCount,
-                      history.belumDikonfirmasiCount,
-                      history.pernahKlaimBelumTerimaCount,
-                      history.sinceLabel,
+                      displayedHistory.rekeningMasked,
+                      displayedHistory.berhasilCount,
+                      displayedHistory.klaimBarangCount,
+                      displayedHistory.belumDikonfirmasiCount,
+                      displayedHistory.pernahKlaimBelumTerimaCount,
+                      displayedHistory.sinceLabel,
                     )}
-                  {history.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
-                  {history.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
+                  {displayedHistory.status === 'empty' && FORCED_CHECK_EMPTY_STATE}
+                  {displayedHistory.status === 'error' && ERROR_ACCOUNT_HISTORY_UNAVAILABLE}
                 </p>
               )}
 
-              {history.status === 'found' && history.ledgerEnabled && (
+              {displayedHistory.status === 'found' && displayedHistory.ledgerEnabled && (
                 <LedgerDetail onFetch={() => getRekeningLedgerAction(effectiveBank, rekening)} />
               )}
             </>
