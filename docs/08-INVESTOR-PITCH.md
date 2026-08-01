@@ -10,10 +10,12 @@ middle sections ordered most-interesting-first. Show the *math*, and *actually a
 
 > "SAKSI is how Indonesia's social-media sellers prove they're trustworthy. A
 > seller sends buyers a payment link instead of a bare bank number; the buyer pays
-> and uploads the receipt; and every completed deal builds the seller a verified
-> track record they can't fake. Sellers pay Rp100k to verify their store, buyers
-> pay Rp30k for a legally-stamped receipt — and because we quietly see each
-> seller's real income, we can later connect proven sellers to lenders for a fee."
+> and uploads the receipt; and every completed deal builds the seller a track
+> record they can't fake — free, and it can't be bought. Sellers pay Rp20k once for
+> a saved account and a track-record badge, or Rp200k/year for a branded storefront;
+> buyers can pay Rp30k to add a legally-stamped e-meterai to a completed deal — and
+> because we quietly see each seller's real income, we can later connect proven
+> sellers to lenders for a fee."
 
 Example (use the specific story): *Sinta runs a jastip. She wants Rp10M to fund a
 big order but no bank will touch her — no salary slip, no records. SAKSI has watched
@@ -50,7 +52,8 @@ second invoice?) — that's the whole company in one number.
 ## 5. Market size — **show the math, don't quote reports**
 
 - Bottoms-up: **~5M** off-marketplace social sellers (SAM).
-- Consumer revenue: Rp100k verify + Rp30k stamped receipts.
+- Consumer revenue: Rp20k one-time (Akun Saksi) / Rp200k-per-year (Toko Saksi
+  Pro) seller tiers + Rp30k buyer-initiated stamped receipts (Saksi Resmi).
 - The real market is **credit**: Indonesia's MSME credit gap is **$165–234B**;
   digital lending is **$15B, +29%/yr**.
 - The calculation: *"If just 100,000 of our sellers borrow Rp15M twice a year,

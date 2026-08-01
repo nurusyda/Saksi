@@ -29,7 +29,7 @@ codebase that has already been partially reframed from an abstract "kesepakatan"
 | 01 | `01-PRODUCT-THESIS-AND-RESEARCH.md` | Why this exists: the 64-case scam-victim study, the problem, the core "invoice × rekening ledger" thesis, the dual tagihan/kesepakatan frame, the ICP |
 | 02 | `02-CUSTOMER-DISCOVERY-JOURNEY.md` | Every strategic pivot and *why each earlier idea was rejected* (checker, escrow, "nobody reports", who has the most pain, the seller-first link-substitution wedge, trustless→verifiable, Kredibel's failure mode) |
 | 03 | `03-LEDGER-DESIGN-AND-LEGAL.md` | The neutral event ledger, the one invariant, the two doors (good/bad ledger), tamper-evidence, and the legal walls (UU ITE defamation, UU PDP, crypto/legal-tender, meterai law) |
-| 04 | `04-MONETIZATION-AND-PRICING.md` | Free loop + Saksi Store (Rp100k) + Saksi Resmi meterai (Rp30k) + KYC + B2B data; "sell services, never earned status"; reconciliation with the current app's tiers |
+| 04 | `04-MONETIZATION-AND-PRICING.md` | Free loop + seller tiers (Akun Saksi Rp20k one-time, Toko Saksi Pro Rp200k/yr) + Saksi Resmi meterai (Rp30k) + KYC + B2B data; "sell services, never earned status"; reconciliation with the current app's tiers |
 | 05 | `05-FINANCIAL-MODEL.md` | TAM/SAM/SOM, full CapEx/OpEx with an infra bill-of-materials and real provider prices, COGS, month-by-milestone projections, break-even, ROI, caveats |
 | 06 | `06-CREDIT-AND-LENDING.md` | The income-data unlock, the fraud-data → credit-score → embedded-lending ladder, ICS regulation, the plain-English lending model, loan sizing, ethical guardrails |
 | 07 | `07-CURRENT-APP-AND-CHANGES.md` | What is already built, what was already changed in the invoice reframe, what remains to do (due-date field, Store layer, WA/Sheets, meterai rework), discipline & gotchas |
@@ -62,10 +62,18 @@ copy, marketing, or the ledger.
   selector removed, "Cek Rekening" removed from the landing, and the tagihan vs
   kesepakatan boundary documented as `copy-id.md` §20. Front-door strings are
   centralized in `lib/copy.ts`. Typecheck passes.
-- **Immediate pending piece:** a visible **due-date field** on the create form
-  (currently every deal silently uses a default deadline, which mis-fires the
-  breach state machine) and an optional reorder to lead with item + price.
-- **Bigger pending pieces:** the Saksi Store layer, WA-send, Google Sheets sync,
-  buyer-initiated meterai rework, and the pricing reconciliation decision.
+- **Resolved, not pending (§29, 2026-07-21):** the "visible due-date field on
+  the create form" item this line used to list as immediate/pending was
+  decided the other way — the deadline box was removed from the create form
+  entirely (a warning about failure before the seller has done anything reads
+  wrong on a "make a bill" form); the deadline still shows, read-only,
+  load-bearing on the invoice the buyer reads (`formatDeadlineWib`), not as an
+  editable input anywhere.
+- **Resolved, not pending (2026-08-01):** the pricing reconciliation decision
+  — see docs/04 §7 — landed on the two-tier seller model (Akun Saksi Rp20k
+  one-time, Toko Saksi Pro Rp200k/yr), applied to the app in migration 0039.
+- **Bigger pending pieces:** the Saksi Store layer, WA-send (re-evaluate the
+  channel; Fonnte was tried and removed, see ops.md), Google Sheets sync,
+  buyer-initiated meterai build-out.
 - **Not started (later phases):** B2B fraud-data product, credit scoring / lending
   referral.

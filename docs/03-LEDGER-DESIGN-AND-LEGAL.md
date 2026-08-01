@@ -40,9 +40,16 @@ conceptually the primitives are:
 - `DELIVERY_OK` / fulfillment confirmed — the buyer's positive attestation
   (against their own interest → credible). The only *positive* event.
 - `DEADLINE_REACHED` — computed from the clock, no signer.
-- `DISPUTE_OPENED` / breach report — one party attests, with an evidence hash;
-  requires reporter OTP (traceable reporter → serial false accusers are as visible
-  as serial breachers).
+- `DISPUTE_OPENED` / breach report — one party attests, with an evidence hash.
+  **Corrected 2026-08-01 (supervisor audit):** this no longer requires OTP —
+  removed from the breach-filing path 2026-07-21 (copy-id.md §25) because
+  gating a wronged party's only recourse on a WhatsApp OTP delivery meant an
+  outage could block a real complaint from ever being recorded. Identity is
+  now `identifyPartyByPhone` (proves the filer is a party to this deal,
+  re-derived server-side, but does NOT prove phone possession). Serial false
+  accusers are still visible in the pattern — attribution is to "the phone
+  number recorded as a party to this deal," not to a phone-possession-proven
+  identity. Do not reintroduce OTP here without reading §25 first.
 - `RESPONSE_FILED` — the counterpart's recorded reply (the hak jawab / right to
   respond, 14-day window).
 
@@ -68,11 +75,16 @@ conceptually the primitives are:
   independent, payment-anchored reports against one NMID is a signal no honest
   seller produces. Thresholds gate whether a signal line renders; they never soften
   it into reassurance.
-- **Rate limits from day one** — 3 OTP/hour per phone, 20 record-creations/day per
-  phone-hash; a pair rate-limit circuit-breaker on repeated SELESAI between the same
-  two phone-hashes (see data-model.md).
+- **Rate limits from day one** — 20 record-creations/day per phone-hash,
+  identity-check attempts capped at 10/15min per deal (`lib/db/party.ts`,
+  post-§25 — no OTP send limit applies since OTP no longer exists on any
+  path); a pair rate-limit circuit-breaker on repeated SELESAI between the
+  same two phone-hashes (see data-model.md).
 - **Right-to-respond** recorded — the defamation shield and the symmetry.
-- **Personhood-lite** via phone identity + OTP; no accounts/emails/passwords.
+- **Personhood-lite** via phone identity, re-verified on every mutating
+  action (`identifyPartyByPhone`); no accounts/emails/passwords, and no OTP
+  either as of §25 — this proves party-to-deal membership, not phone
+  possession.
 
 ## 6. The legal walls (all confirmed against Indonesian law)
 
@@ -119,7 +131,9 @@ nothing to do with meterai.
   riwayat di SAKSI. Ini bukan jaminan aman. Sebagian besar rekening belum
   tercatat."*
 - **Flag page:** the breach/wanprestasi record at the correct tier rung, published
-  only after the hak jawab window, attributed to a traceable (OTP'd) reporter.
+  only after the hak jawab window, attributed to the phone number recorded as
+  the reporting party to this deal (`identifyPartyByPhone`, not OTP-verified
+  possession — see §25 correction above).
 - **Forced-check mechanic:** on the payer page the copy-rekening button stays
   disabled until the destination account's history card has rendered — the buyer is
   *made* to see the record before paying.

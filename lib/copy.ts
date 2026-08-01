@@ -250,7 +250,7 @@ export const STATUS_DISEPAKATI_PLACEHOLDER =
 // — comment corrected 2026-07-20, string itself unchanged and still live.
 export const ERROR_TOO_MANY_ATTEMPTS = 'Terlalu banyak percobaan. Coba lagi nanti.';
 
-// Cross-file duplicated UI chrome (JoinDealForm.tsx + AcceptDealForm.tsx) —
+// Cross-file duplicated UI chrome (app/buat/page.tsx + JoinAndPayForm.tsx) —
 // not legally adjacent copy, but Law 3 still applies to identical strings
 // used verbatim in more than one file.
 export const PHONE_FIELD_LABEL = 'Nomor HP Anda';

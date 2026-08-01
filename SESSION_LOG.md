@@ -1,7 +1,19 @@
 # SAKSI — Session Log
 
-Running log of build sessions. Newest entry on top. Read this first in any
-new chat or Claude Code session to know exactly where things stand.
+Running log of build sessions. Newest entry on top.
+
+> **⚠ This log stops at 19 Jul 2026 and does not cover any of the major
+> removals since (WA/Fonnte 2026-07-24, Midtrans and Didit e-KYC 2026-07-25,
+> OTP from the breach path 2026-07-21 §25, the per-deal tier ladder collapsed
+> to GRATIS-only migration 0039). Its own instruction below ("read this first
+> ... to know exactly where things stand") is no longer accurate for current
+> state — for that, read `ops.md` and `.claude/skills/saksi-builder/references/`
+> instead. Kept here as a historical record of Sessions 1-3, not a live
+> status doc.**
+
+Read this first in any new chat or Claude Code session to know exactly where
+things stood as of Session 3 (19 Jul 2026) — see the warning above for what's
+changed since.
 
 ---
 

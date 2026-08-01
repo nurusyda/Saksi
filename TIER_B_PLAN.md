@@ -1,5 +1,25 @@
 # SAKSI — Tier B Build Plan
 
+> **⚠ SUPERSEDED, 2026-08-01 (supervisor audit) — do not build against Phase B0/B1 below.**
+> This plan's whole premise — the breach pipeline requires OTP-verified reporters,
+> which requires a working Fonnte/WA client — is no longer true. **Both were
+> removed**: WA/Fonnte (`lib/wa/send.ts`) on 2026-07-24, and OTP from the
+> breach-filing path specifically on 2026-07-21 (copy-id.md §25) — the OTP step
+> meant a Fonnte outage could block the wronged party's only recourse, the worst
+> failure mode this pipeline can have. **Do not reintroduce OTP on this path
+> without reading §25 first.**
+>
+> What actually shipped instead: Phases B2-B5 (laporan filing, hak jawab,
+> publication, public check pages) **are built and live** — gated behind
+> `FLAGS_PUBLICATION_ENABLED` for publication specifically (see ops.md) — but
+> identity on the filing path is `identifyPartyByPhone` (proves the filer is a
+> party to this deal, not that they possess the phone), not OTP. Phase B0/B1
+> (the WA client, the OTP verification flow) were never built and should not
+> be, per §25. For the current accurate state of the breach pipeline, read
+> `data-model.md`'s "Breach → flag pipeline" section and `ops.md`, not this
+> file's B0/B1 phases below — those are kept only as a historical record of a
+> plan that was abandoned, not a living spec.
+
 Tier B = the breach pipeline goes live: laporan filing, hak jawab, publication, and public check pages — the actual point of the product. Plus the WA/OTP infrastructure everything above depends on.
 
 **What makes Tier B different from Tier A:** Tier A's output was records visible only to the two parties. Tier B's output is **published statements about real, identifiable people** that third parties will read and act on. Every phase here carries defamation-adjacent risk that Tier A never did. The truth-conditions rule ("true in every possible world") stops being philosophy and becomes the legal defense. Copy review gets stricter, not looser, from here.

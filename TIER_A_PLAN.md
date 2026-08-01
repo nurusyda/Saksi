@@ -46,6 +46,13 @@ got `42501`. Fixed via migration `0019` (grant to `service_role` only; `anon`
 stays revoked, matching `0018`'s own boundary) and verified with a direct RPC
 probe against both keys.
 
+**Superseded 2026-07-24 (later still, supervisor-audit note added 2026-08-01):**
+`lib/wa/send.ts` and the entire Fonnte integration described above were
+removed — see ops.md. The nudge branch in the deadline sweep is now gated
+behind `NUDGE_ENABLED` (unset = no-op); no `NUDGE_SENT` events fire and no WA
+delivery happens until a real channel (Meta Cloud API) is wired. Do not read
+the paragraph above as describing current behavior.
+
 ---
 
 ## Phase 0 — UI copy batch ✅ done, committed (`54cdceb`)
@@ -128,7 +135,9 @@ probe against both keys.
 
 - Full switchable guided-template system for deal descriptions
 - Xendit/Flip/OY! bank account-holder name lookup
-- Real Fonnte/Meta Cloud API WA client
+- Real WA client (Meta Cloud API — Fonnte was tried and fully removed
+  2026-07-24; re-evaluate the channel choice from scratch, don't just rebuild
+  the Fonnte integration, see ops.md)
 - Rate-limit TOCTOU hardening
 - Proposer/counterpart role auto-display
 - Two-leg loan model (disbursement + repayment)

@@ -134,9 +134,9 @@ export async function createDeal(
   if (!Number.isFinite(amountIdr) || !Number.isInteger(amountIdr) || amountIdr < 1)
     fieldErrors.amount_idr = 'Nominal harus bilangan bulat lebih dari 0.';
 
-  // C1 — only Penjual has a destination account to offer at create time; a
-  // Pembeli-proposed deal leaves these null until the joining Penjual
-  // supplies them (see JoinDealForm.tsx / joinDeal, C2).
+  // C1 — validRoles is PENJUAL-only (§22), so the proposer always has a
+  // destination account to offer at create time; no counterpart-supplies-
+  // rekening branch exists anymore.
   const rekeningRequired = proposerRole === 'PENJUAL' && paymentMethod === 'REKENING';
   if (rekeningRequired && !rekeningTujuanRaw) fieldErrors.rekening_tujuan = 'Nomor rekening wajib diisi.';
   if (rekeningRequired && !rekeningBankRaw) fieldErrors.rekening_bank = 'Nama bank wajib diisi.';

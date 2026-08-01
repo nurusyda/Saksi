@@ -16,8 +16,18 @@ claim and a weaker true one, ship the weaker true one.
 
 **Stack (locked):** Next.js App Router + TS + Tailwind v4 on Vercel · Supabase
 (Postgres/RLS/Storage, ap-southeast-1) · **identity = phone, no accounts /
-emails / passwords** · SHA-256 + OpenTimestamps on every state transition ·
-Gemini OCR · Midtrans Snap · Didit e-KYC.
+emails / passwords** · SHA-256 on every state transition, live · OpenTimestamps
+anchoring built but gated OFF behind `OTS_ANCHORING_ENABLED` pending an unrun
+`ots verify` acceptance test (ops.md §44) · Gemini OCR.
+
+**⚠ Superseded 2026-08-01 (supervisor audit):** Midtrans Snap and Didit e-KYC,
+both listed above in an earlier version of this doc, were fully removed
+2026-07-25 — no payment integration, no e-KYC anywhere in the current
+product. Any Store/pricing work below that assumes either is available needs
+its own vendor re-evaluation from scratch, not a reconnect. Also: no reusable
+OTP module exists anymore either (`lib/otp.ts` deleted, §25) — every "OTP"
+reference below describing the proposed Store login is a NEW thing to build,
+not something to wire up against existing code.
 
 ---
 
@@ -113,7 +123,7 @@ create table seller_profiles (
   saved_bank text,
   saved_qris_nmid text,                      -- parsed client-side from QRIS payload
   store_verified_at timestamptz,             -- set when rekening control proven (penny-test/name-match)
-  paid_at timestamptz,                       -- Store one-time fee paid (Midtrans)
+  paid_at timestamptz,                       -- Store one-time fee paid (provider TBD, Midtrans removed)
   created_at timestamptz default now()
 );
 -- RLS: public read of NON-sensitive columns only (slug, display_name,
@@ -150,8 +160,9 @@ rekening** at "kak aku mau bayar." Build:
   profile + a paid-vs-unpaid board reading existing `deals.status`. No new state
   machine; it's a view over existing rows.
 
-Store one-time fee: Midtrans Snap, set `seller_profiles.paid_at`. Gate bulk +
-verified marker + custom slug behind `paid_at`.
+Store one-time fee: provider TBD (Midtrans removed 2026-07-25, re-evaluate
+from scratch), set `seller_profiles.paid_at`. Gate bulk + verified marker +
+custom slug behind `paid_at`.
 
 ---
 
@@ -174,7 +185,7 @@ The old `BERMETERAI` per-party tier has been removed (migration 0039). Saksi
 Resmi is a **buyer-initiated addon on the completed record**:
 
 - On a deal reaching a terminal confirmed state, the **buyer** may tap "Tambah
-  meterai" and pay (~Rp30.000, Midtrans).
+  meterai" and pay (~Rp30.000, provider TBD — Midtrans removed, re-evaluate).
 - Affix e-meterai (via a licensed distributor API — Mekari Sign / Privy; see
   `integrations.md`) to a generated **completed-transaction document** (kwitansi
   capturing item, amount, rekening, timestamps, and the bukti), NOT a blank
@@ -203,8 +214,9 @@ Resmi is a **buyer-initiated addon on the completed record**:
 
 - All schema changes via Supabase CLI migrations, committed. No dashboard edits.
 - Keep the daily `supabase db dump` GitHub Action (backup + keepalive) green.
-- Anchoring (SHA-256 + OpenTimestamps) fires on every NEW state transition —
-  any new transition you add must anchor too.
+- SHA-256 hashing fires on every NEW state transition — any new transition you
+  add must hash too. OpenTimestamps anchoring is built but gated OFF
+  (`OTS_ANCHORING_ENABLED`, ops.md §44) — don't treat it as currently live.
 - UI strings come from `copy-id.md`. New strings get added there first, verbatim,
   after human sign-off — do not inline Indonesian copy in components.
 

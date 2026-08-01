@@ -93,7 +93,7 @@ export function CekForm() {
 
         {mode === 'rekening' ? (
           // Stacks below `sm` (640px) — same fix as the identical
-          // bank+rekening fields in app/buat/page.tsx and JoinDealForm.tsx
+          // bank+rekening fields in app/buat/page.tsx
           // (label-wrap misalignment at 320px, found via viewport testing
           // 2026-07-20).
           <div className="flex flex-col gap-3 sm:flex-row">

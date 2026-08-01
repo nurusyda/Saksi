@@ -143,19 +143,31 @@ async function buildHistoryFromDeals(
     const goodsDisputed = dealHas(d.id, 'BARANG_TIDAK_SESUAI');
     const paymentDisputed = dealHas(d.id, 'DANA_BELUM_MASUK');
 
+    // Outcome classification (mutually exclusive, one bucket per deal) —
+    // deliberately does NOT branch on paymentDisputed: a dispute that later
+    // resolves (buyer resubmits, seller confirms) still lands in whichever
+    // outcome bucket the deal actually reached.
     if (d.status === 'SELESAI') {
       berhasilCount++; // barang diterima
     } else if (goodsDisputed || publishedBreach.has(d.id)) {
       klaimBarangCount++;
     } else if (d.status === 'DIKONFIRMASI_TERIMA' || (d.status === 'KEDALUWARSA' && receiptConfirmed)) {
       berhasilCount++; // pembayaran diterima — seller confirmed money, no goods complaint
-    } else if (paymentDisputed) {
-      klaimPembayaranCount++; // the buyer's payment is in question
-      pernahKlaimBelumTerimaCount++; // the seller made this claim — fact about the seller
     } else if (d.status === 'KEDALUWARSA') {
       belumDikonfirmasiCount++; // paid, seller never confirmed, timed out
     }
     // DISEPAKATI / DIBAYAR_DIKLAIM still in-flight (not timed out) → not counted
+
+    // Fact-of-claim tracking (additive, independent of outcome) — a
+    // DANA_BELUM_MASUK claim is a fact about the seller "regardless of
+    // whether it was honest" (per this function's header comment), so it
+    // must not disappear once the dispute is resolved. Previously this was
+    // one branch in the if/else chain above, meaning a later resolution
+    // (e.g. SELESAI) silently erased it from both counts — bug fixed here.
+    if (paymentDisputed) {
+      klaimPembayaranCount++; // the buyer's payment is in question
+      pernahKlaimBelumTerimaCount++; // the seller made this claim — fact about the seller
+    }
   }
 
   const earliest = deals.reduce((min, d) => (d.created_at < min ? d.created_at : min), deals[0].created_at);

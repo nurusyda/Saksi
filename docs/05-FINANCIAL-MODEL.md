@@ -4,6 +4,18 @@ All figures **illustrative**, to be pressure-tested. IDR primary; USD at
 **1 USD = 18,000 IDR**. Indonesian minimum wage anchor: **UMP Jakarta ≈ Rp5.8M/mo**
 (a mid Jakarta full-stack dev is ~3–4× that, ~Rp18–20M/mo).
 
+> **⚠ Pricing input stale, 2026-08-01 (supervisor audit) — every "Saksi Store
+> 100k one-time" figure below (assumptions, COGS table, projection table,
+> phasing table) is built on a single-tier price point that no longer exists.**
+> The resolved pricing (docs/04 §7, locked since 2026-08-01) is two separate
+> seller tiers — Akun Saksi Rp20.000 one-time and Toko Saksi Pro Rp200.000/year
+> (recurring, not one-time) — not one Rp100k fee. Recomputing the margin/
+> projection/break-even numbers below needs real assumptions this pass isn't
+> making up: the split between sellers choosing Akun Saksi vs. Toko Saksi Pro,
+> and an annual-renewal rate for the recurring tier. Treat every number derived
+> from "Saksi Store 100k" as needing a redo with a human decision on those
+> inputs, not as current.
+
 ## 1. Market sizing (TAM / SAM / SOM)
 
 Grounded in: 64M MSMEs in Indonesia; ~63% digital (~40M); 86% of Indonesians
