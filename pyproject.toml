@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "N", "A", "PTH"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts/tests"]
+pythonpath = ["scripts"]
+# --cov-fail-under=95: the suite actually measures 99% (108 tests) as of
+# writing — 95 leaves real slack for incidental changes rather than pinning
+# to the exact number achieved today.
+addopts = "--disable-socket --cov=monster_check --cov-report=term-missing --cov-fail-under=95"
+
+[tool.coverage.run]
+branch = true

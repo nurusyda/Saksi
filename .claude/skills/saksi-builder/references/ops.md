@@ -56,6 +56,15 @@ OpenTimestamps proves a hash existed; it does not preserve the record. On the fr
 - Secrets needed by the Action: `SUPABASE_DB_URL` (or project ref + access token) stored as GitHub Actions secrets, never in the workflow file.
 - Storage bucket (bukti images) is NOT covered by a db dump — add object storage sync to the backup job before real bukti exist in production.
 
+## CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`, two parallel jobs:
+
+- **`check`** (pre-existing): `tsc --noEmit`, `npm run lint`, `npm run build` for the Next.js app.
+- **`python-check`**: covers `scripts/monster_check.py`, the only Python in this repo. `ruff check` + `ruff format --check` (config: `pyproject.toml`, line-length 100), `mypy` (strict, `scripts/` including its test suite), `pytest` (`scripts/tests/`, coverage-gated via `--cov-fail-under=95` in `pyproject.toml` — 108 tests, 99% measured, all mocked with no real network/API calls, `pytest-socket`'s `--disable-socket` enforcing that mechanically rather than by convention alone), `semgrep --config=auto --error scripts/` (SAST), `pip-audit -r requirements-dev.txt` (dependency audit — three CVEs in `mcp`, a transitive dependency of semgrep itself with no non-vulnerable version available upstream as of this writing, are ignored by ID with a comment in the workflow; every other dependency is audited normally). Tool versions pinned in `requirements-dev.txt`, installed fresh each run — no assumption that any given version is "whatever's already installed."
+
+Neither job applies migrations — that's still the manual `supabase db push` step below.
+
 ## Pre-push checklist
 
 Before every `git push` that includes migration files:

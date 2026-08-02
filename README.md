@@ -1,5 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Tooling
+
+![coverage](coverage.svg)
+
+`scripts/monster_check.py` (the DeepSeek-backed pre-commit reviewer) has a
+pytest suite covering it — run `pytest --cov` from the repo root (see
+`pyproject.toml` for the ruff/mypy/pytest config, `requirements-dev.txt` for
+pinned tool versions). The coverage badge above is a snapshot generated from
+a real test run, not live-updated by CI on every push — the actual
+regression guard is the `--cov-fail-under` floor pytest enforces.
+
 ## Getting Started
 
 First, run the development server:

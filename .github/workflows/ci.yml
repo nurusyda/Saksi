@@ -39,3 +39,51 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  python-check:
+    name: Python lint, typecheck, test, security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (ruff)
+        run: ruff format --check .
+
+      - name: Typecheck (mypy --strict)
+        run: mypy
+
+      - name: Test + coverage (pytest)
+        run: pytest
+
+      - name: SAST (semgrep)
+        run: semgrep --config=auto --error scripts/
+
+      - name: Dependency audit (pip-audit)
+        # PYSEC-2026-3481/3482/3483 are in `mcp`, a transitive dependency of
+        # semgrep itself (the scanner, not any code it scans) — confirmed
+        # unavoidable: even semgrep's latest release (1.172.0, checked via
+        # PyPI metadata) hard-pins mcp==1.23.3. That mcp copy lives only
+        # inside this CI job's own venv, is never imported by anything in
+        # this repo, and nothing here invokes semgrep's optional MCP-server
+        # feature (the only code path that would exercise it) — so there is
+        # no reachable vulnerability, only an unfixed upstream pin. Ignored
+        # explicitly, by ID, rather than silenced broadly; every other
+        # dependency in requirements-dev.txt is still audited normally.
+        run: >-
+          pip-audit -r requirements-dev.txt
+          --ignore-vuln PYSEC-2026-3481
+          --ignore-vuln PYSEC-2026-3482
+          --ignore-vuln PYSEC-2026-3483

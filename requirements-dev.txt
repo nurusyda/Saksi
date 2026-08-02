@@ -1,0 +1,12 @@
+# Dev/CI tooling for scripts/monster_check.py — the only Python in this repo.
+# Pinned to exact versions so `pip install -r requirements-dev.txt` is
+# reproducible in CI, not "whatever is latest today."
+ruff==0.16.1
+mypy==2.3.0
+pytest==9.1.1
+openai==2.52.0
+pytest-socket==0.8.0
+pytest-cov==7.1.0
+coverage-badge==1.1.2
+pip-audit==2.10.1
+semgrep==1.172.0

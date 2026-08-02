@@ -44,3 +44,8 @@ analysis/forensic_audit.log
 # python (scripts/monster_check.py)
 __pycache__/
 *.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
