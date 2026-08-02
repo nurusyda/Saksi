@@ -1,3 +1,5 @@
+[![CI](https://github.com/nurusyda/Saksi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nurusyda/Saksi/actions/workflows/ci.yml)
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Tooling

@@ -1,6 +1,12 @@
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Scoped to match [tool.mypy]'s `files` below exactly. Without this, ruff
+# format's default include glob also walks every .md file in the repo
+# (it formats embedded Python code fences in Markdown) — none contain
+# Python, so they trivially report "already formatted" and inflate the
+# file count with nothing real behind it.
+include = ["scripts/**/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF", "N", "A", "PTH"]
