@@ -23,7 +23,7 @@ SAKSI is a 1-on-1 deal-witnessing app for Indonesian informal commerce (fandom s
 
 ## Architecture rules
 
-1. One deal = one record = one row in `deals`, with append-only `deal_events` capturing every transition (actor, timestamp, prior_hash, new_hash). Never UPDATE state history — only INSERT events; `deals.status` is a materialized latest-state.
+1. One deal = one record = one row in `deals`, with append-only `deal_events` capturing every transition (actor, timestamp, prior_hash, new_hash). Never UPDATE state history — only INSERT events; `deals.status` is a materialized latest-state. **One narrow, deliberate exception** (migration 0041, `cleanup_draf_deals()`): a DRAF deal that no counterpart ever opened was never witnessed by a second party, so it carries no agreement to protect — deleting its lone CREATED event does not touch what this rule exists to protect. The exception is scoped exactly that narrowly (`status = 'DRAF' and counterpart_id is null`, re-checked by the trigger itself against the live row, not trusted from the caller) and exists only to make the 7-day DRAF auto-delete promise (copy-id.md, privasi-retensi.md) actually true — it had silently never worked since migration 0003. Any deal a second party has ever engaged with remains permanently un-deletable, no exceptions.
 2. All PII (phone, uploaded KTP artifacts, bukti images) lives behind RLS; public pages render only derived data: masked identifiers (0812••••34), counts, statuses, account age.
 3. Flag/check pages are server-rendered from derived views — no raw PII in any client bundle or API response.
 4. The copy-rekening button on the payer page MUST be disabled until the history card has rendered (the forced-check mechanic).

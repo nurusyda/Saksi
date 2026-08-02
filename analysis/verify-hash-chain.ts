@@ -10,77 +10,15 @@
  * menyalin canonical payload yang ditampilkan, menjalankan
  * `echo -n '<payload>' | sha256sum`, dan mendapat hash yang sama —
  * tanpa harus memercayai database Saksi.
+ *
+ * Requires migration 0040+: CREATED and COUNTERPART_JOINED now store their
+ * {tnc_version, tnc_hash} payload directly in deal_events.payload, read
+ * below like any other event — no more brute-forcing git revisions of the
+ * T&C file to find a payload that happens to match the stored hash.
  */
 
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
-import path from 'path';
 import { createClient } from '@supabase/supabase-js';
-
-// ─── T&C hash — identical to lib/legal.ts ──────────────────────
-// CREATED and COUNTERPART_JOINED events include this payload in the
-// hash, but the RPC does NOT store it in deal_events.payload — so
-// we must compute it here to match.
-//
-// IMPORTANT: the T&C body is hashed at runtime when the deal is
-// created. If the T&C file was edited after deal creation, the hash
-// will have changed. We load ALL git versions of the T&C body and
-// try each one — the first that produces a matching CREATED hash
-// is the one that was active when this deal was written.
-
-import { execSync } from 'child_process';
-
-const BODY_MARKER = '\n## 1.';
-const VERSION_RE = /\*\*Versi:\s*([^*]+)\*\*/;
-
-function tncPayloadFromText(raw: string) {
-  const bodyStart = raw.indexOf(BODY_MARKER);
-  if (bodyStart === -1) throw new Error('T&C: body marker not found');
-  const versionMatch = raw.match(VERSION_RE);
-  const version = versionMatch ? versionMatch[1].trim() : 'unknown';
-  const body = raw.slice(bodyStart + 1);
-  const hash = createHash('sha256').update(body).digest('hex');
-  return { tnc_version: version, tnc_hash: hash };
-}
-
-// Collect every distinct T&C payload that has ever existed in git.
-function collectTncPayloads(): Array<{ tnc_version: string; tnc_hash: string }> {
-  const payloads: Array<{ tnc_version: string; tnc_hash: string }> = [];
-  const seen = new Set<string>();
-
-  // Current file on disk
-  const current = readFileSync(
-    path.join(process.cwd(), 'content/legal/syarat-ketentuan.md'),
-    'utf-8',
-  );
-  const cp = tncPayloadFromText(current);
-  payloads.push(cp);
-  seen.add(cp.tnc_hash);
-
-  // All git revisions
-  try {
-    const hashes = execSync(
-      'git log --format="%H" -- content/legal/syarat-ketentuan.md',
-      { encoding: 'utf-8', cwd: process.cwd() },
-    ).trim().split('\n').filter(Boolean);
-    for (const h of hashes) {
-      const text = execSync(`git show ${h}:content/legal/syarat-ketentuan.md`, {
-        encoding: 'utf-8', cwd: process.cwd(),
-      });
-      const p = tncPayloadFromText(text);
-      if (!seen.has(p.tnc_hash)) {
-        payloads.push(p);
-        seen.add(p.tnc_hash);
-      }
-    }
-  } catch {
-    // git might not be available; just use the current file
-  }
-
-  return payloads;
-}
-
-const TNC_PAYLOADS = collectTncPayloads();
 
 // ─── Credentials ───────────────────────────────────────────────
 // Disusun dari .env.local — jangan commit ulang dengan key hardcoded.
@@ -100,14 +38,20 @@ const db = createClient(SUPABASE_URL, SERVICE_ROLE, {
 
 // ─── Hash functions (identical to lib/db/hash.ts) ──────────────
 
-function sortedKeys<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)),
-  ) as T;
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, canonicalize(v)]),
+    );
+  }
+  return value;
 }
 
 function hashDeal(payload: Record<string, unknown>): string {
-  const canonical = JSON.stringify(sortedKeys(payload));
+  const canonical = JSON.stringify(canonicalize(payload));
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
@@ -245,22 +189,13 @@ async function main() {
     counterpart_id: null,
   };
 
-  // Temukan T&C payload yang cocok dengan CREATED hash.
-  let matchedTnc: { tnc_version: string; tnc_hash: string } | null = null;
-  if (events.length > 0 && events[0].event === 'CREATED') {
-    for (const tnc of TNC_PAYLOADS) {
-      const testCanonical = buildCanonicalPayload(
-        { ...vDeal },
-        { name: 'CREATED', actor: events[0].actor, payload: tnc },
-        null,
-      );
-      if (hashDeal(testCanonical) === events[0].new_hash) {
-        matchedTnc = tnc;
-        break;
-      }
-    }
-    if (!matchedTnc) matchedTnc = TNC_PAYLOADS[0];
-  }
+  // Migration 0040+: CREATED/COUNTERPART_JOINED payloads are read straight
+  // from deal_events.payload, same as every other event — no more searching
+  // for a T&C revision that happens to produce a matching hash.
+  const matchedTnc =
+    events.length > 0 && events[0].payload && typeof events[0].payload === 'object'
+      ? (events[0].payload as { tnc_version?: string })
+      : null;
 
   // Komputasi semua hash dulu, simpan ke array
   interface VerifiedEvent {
@@ -278,17 +213,12 @@ async function main() {
     if (ns) vDeal.status = ns;
     if (ev.event === 'COUNTERPART_JOINED') vDeal.counterpart_id = deal.counterpart_id;
 
-    let eventPayload: unknown = ev.payload;
-    if ((ev.event === 'CREATED' || ev.event === 'COUNTERPART_JOINED') && matchedTnc) {
-      eventPayload = matchedTnc;
-    }
-
     const canonical = buildCanonicalPayload(
       vDeal,
-      { name: ev.event, actor: ev.actor, payload: eventPayload },
+      { name: ev.event, actor: ev.actor, payload: ev.payload ?? null },
       expectedPrior,
     );
-    const canonicalJson = JSON.stringify(sortedKeys(canonical));
+    const canonicalJson = JSON.stringify(canonicalize(canonical));
     const recomputed = hashDeal(canonical);
     const match = recomputed === ev.new_hash;
     if (!match) allMatch = false;

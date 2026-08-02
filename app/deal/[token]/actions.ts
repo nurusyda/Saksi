@@ -138,12 +138,13 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
     rekening_tujuan: rekeningTujuan ?? deal.rekening_tujuan,
     rekening_bank: rekeningBank ?? deal.rekening_bank,
   };
+  const joinPayload = { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH };
   const joinCanonical = buildCanonicalPayload(
     virtualDealAfterJoin,
     {
       name: DealEventName.COUNTERPART_JOINED,
       actor: 'COUNTERPART',
-      payload: { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH },
+      payload: joinPayload,
     },
     joinPriorHash,
   );
@@ -170,6 +171,7 @@ async function joinDealCore(token: string, formData: FormData): Promise<JoinCore
       p_accept_new_hash: acceptNewHash,
       p_rekening_tujuan: rekeningTujuan,
       p_rekening_bank: rekeningBank,
+      p_join_payload: joinPayload,
     })
     .single();
 

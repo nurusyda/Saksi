@@ -417,6 +417,19 @@ THE LAWS (architectural, not suggestions — each violation is a BLOCKER):
   Law 1: deal_events is append-only. No UPDATE, no DELETE, ever — enforced
          at the database level (trigger or REVOKE), not just convention.
          deals.status is a materialized latest-state, rebuilt from events.
+         ONE REVIEWED EXCEPTION, not a violation to re-flag: migration 0041's
+         cleanup_draf_deals() deletes deal_events rows, but ONLY for a DRAF
+         deal with counterpart_id is null — a deal no second party ever
+         opened, so there is no witnessed agreement to protect. The guard
+         trigger re-checks that condition itself against the live deals row
+         (status/counterpart_id), not merely trusted from the caller. Any
+         deal a counterpart has ever engaged with stays permanently
+         un-deletable. This exists only to make the 7-day DRAF auto-delete
+         promise (copy-id.md, privasi-retensi.md) actually true — it had
+         silently never worked since migration 0003. Do not flag this
+         specific, narrowly-scoped path as a Law 1 blocker; a NEW path that
+         deletes deal_events for any deal that is not DRAF-with-no-
+         counterpart is still a real blocker.
   Law 2: PII stays behind RLS. parties.phone_e164, bukti.storage_path, and
          any KTP artifact are service-role-only. Public pages render ONLY
          derived data: masked identifiers (0812••••34), phone_hash, counts,

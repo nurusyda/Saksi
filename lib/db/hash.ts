@@ -30,22 +30,43 @@ export interface CanonicalDealPayload {
   prior_hash: string | null;
 }
 
-function sortedKeys<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))
-  ) as T;
+// Recursive: sorts keys at every nesting level, not just the top one.
+// `payload` (event-specific, e.g. PERPANJANGAN's {old_deadline, new_deadline}
+// or the T&C {tnc_version, tnc_hash}) is itself an object whose key order
+// must be canonical too, or two semantically-identical payloads built with
+// keys in a different order would hash differently. Codepoint order (plain
+// `<`), not localeCompare — a fixed, locale-independent ordering rather than
+// one that depends on the running ICU.
+//
+// SAFETY: every key that enters the canonical form today is ASCII (fixed
+// field names — id, token, tnc_version, etc. — never user-supplied text).
+// Codepoint `<` and `localeCompare` agree on plain ASCII, so this is safe
+// as-is. If a non-ASCII key name is ever added, re-verify that agreement —
+// codepoint and locale order can diverge outside ASCII, and diverging would
+// make every hash computed before the change unverifiable.
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, v]) => [k, canonicalize(v)]),
+    );
+  }
+  return value;
 }
 
 /**
  * Compute the SHA-256 hash of a canonical deal state.
  *
- * The canonical form is: stable alphabetical key order, no whitespace,
- * amounts as integers, dates as ISO-8601 strings, prior_hash included in
- * the payload to chain events. This makes the hash chain tamper-evident:
- * altering any prior event changes every subsequent hash.
+ * The canonical form is: stable alphabetical key order at every nesting
+ * level, no whitespace, amounts as integers, dates as ISO-8601 strings,
+ * prior_hash included in the payload to chain events. This makes the hash
+ * chain tamper-evident: altering any prior event changes every subsequent
+ * hash.
  */
 export function hashDeal(payload: CanonicalDealPayload): string {
-  const canonical = JSON.stringify(sortedKeys(payload));
+  const canonical = JSON.stringify(canonicalize(payload));
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 

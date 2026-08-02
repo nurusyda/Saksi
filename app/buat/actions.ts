@@ -256,12 +256,13 @@ export async function createDeal(
     status: 'DRAF',
     meterai_applied: false,
   };
+  const createdPayload = { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH };
   const canonical = buildCanonicalPayload(
     virtualDeal,
     {
       name: DealEventName.CREATED,
       actor: 'PROPOSER',
-      payload: { tnc_version: SYARAT_KETENTUAN_VERSION, tnc_hash: SYARAT_KETENTUAN_HASH },
+      payload: createdPayload,
     },
     null,
   );
@@ -287,6 +288,7 @@ export async function createDeal(
       p_qris_merchant_name: qrisMerchantName,
       p_qris_merchant_city: qrisMerchantCity,
       p_qris_image_path: qrisImagePath,
+      p_payload: createdPayload,
     })
     .single();
 

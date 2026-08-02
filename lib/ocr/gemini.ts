@@ -76,13 +76,14 @@ Use null for any field that is not legible. If the image is not a transfer recei
   try {
     const parsed = JSON.parse(text);
     return {
-      nominal: typeof parsed.nominal === 'number' ? parsed.nominal : null,
+      nominal: toIdrOrNull(parsed.nominal),
       tanggal: typeof parsed.tanggal === 'string' ? parsed.tanggal : null,
       rekening_tujuan: typeof parsed.rekening_tujuan === 'string' ? parsed.rekening_tujuan : null,
       bank: typeof parsed.bank === 'string' ? parsed.bank : null,
     };
   } catch {
-    console.error('[ocr] JSON parse failed on Gemini response text:', text.slice(0, 200));
+    // Never log raw model text here — it can carry rekening_tujuan.
+    console.error('[ocr] JSON parse failed on Gemini response text (%d chars)', text.length);
     return null;
   }
 }
@@ -91,12 +92,44 @@ function digitsOnly(s: string): string {
   return s.replace(/\D/g, '');
 }
 
+// Gemini is asked for an integer but is not schema-constrained (only
+// responseMimeType, no responseSchema), so it sometimes returns the amount
+// as a string. Rp uses "." for thousands and "," for the decimal tail.
+function toIdrOrNull(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isInteger(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const stripped = v
+    .replace(/^Rp\s*/i, '')
+    .replace(/[.\s]/g, '')
+    .replace(/,\d{1,2}$/, '');
+  return /^\d+$/.test(stripped) ? Number(stripped) : null;
+}
+
 /**
  * Compare OCR-extracted fields against the deal record and return a verdict
  * from the closed vocabulary. Never blocks the caller from proceeding on a
  * TIDAK_KONSISTEN result — copy-id.md §5/integrations.md §6: the mismatch
  * itself is evidence, not a reason to refuse the upload.
  */
+/**
+ * Decide the verdict from already-compared fields. Pure and exported so the
+ * decision (the part that must never be wrong) can be tested without a live
+ * API call. KONSISTEN requires an affirmative match on both essentials —
+ * amount and rekening — not merely the absence of a detected mismatch: a
+ * field OCR couldn't read (null) is not evidence it matched, per the
+ * invariant that SAKSI never claims a check it didn't actually perform.
+ */
+export function computeVerdict(
+  amount_match: boolean | null,
+  rekening_match: boolean | null,
+  bank_match: boolean | null,
+): OcrVerdict {
+  const anyMismatch = [amount_match, rekening_match, bank_match].some((v) => v === false);
+  if (anyMismatch) return 'TIDAK_KONSISTEN';
+  const essentialsVerified = amount_match === true && rekening_match === true;
+  return essentialsVerified ? 'KONSISTEN' : 'TIDAK_TERBACA';
+}
+
 export async function checkBuktiConsistency(
   imageBytes: Buffer,
   mimeType: string,
@@ -132,8 +165,7 @@ export async function checkBuktiConsistency(
   const date_ok = extracted.tanggal !== null ? extracted.tanggal <= deal.deadline : null;
 
   const ocrResult: OcrResult = { amount_match, date_ok, rekening_match, bank_match };
-  const anyMismatch = [amount_match, rekening_match, bank_match].some((v) => v === false);
-  const verdict: OcrVerdict = anyMismatch ? 'TIDAK_KONSISTEN' : 'KONSISTEN';
+  const verdict = computeVerdict(amount_match, rekening_match, bank_match);
 
   return { ocrResult, verdict };
 }
@@ -204,12 +236,13 @@ Use null for any field that is not legible. If the image is not a QRIS payment c
   try {
     const parsed = JSON.parse(text);
     return {
-      nominal: typeof parsed.nominal === 'number' ? parsed.nominal : null,
+      nominal: toIdrOrNull(parsed.nominal),
       tanggal: typeof parsed.tanggal === 'string' ? parsed.tanggal : null,
       merchant_name: typeof parsed.merchant_name === 'string' ? parsed.merchant_name : null,
     };
   } catch {
-    console.error('[ocr] JSON parse failed on Gemini response text (qris):', text.slice(0, 200));
+    // Never log raw model text here — it can carry the merchant name.
+    console.error('[ocr] JSON parse failed on Gemini response text (qris, %d chars)', text.length);
     return null;
   }
 }
@@ -223,6 +256,17 @@ function namesRoughlyMatch(a: string, b: string): boolean {
   const na = norm(a);
   const nb = norm(b);
   return na.length > 0 && nb.length > 0 && (na.includes(nb) || nb.includes(na));
+}
+
+/** QRIS counterpart to computeVerdict — only two signals, same rule. */
+export function computeQrisVerdict(
+  amount_match: boolean | null,
+  merchant_name_match: boolean | null,
+): OcrVerdict {
+  const anyMismatch = [amount_match, merchant_name_match].some((v) => v === false);
+  if (anyMismatch) return 'TIDAK_KONSISTEN';
+  const essentialsVerified = amount_match === true && merchant_name_match === true;
+  return essentialsVerified ? 'KONSISTEN' : 'TIDAK_TERBACA';
 }
 
 export async function checkQrisBuktiConsistency(
@@ -251,8 +295,7 @@ export async function checkQrisBuktiConsistency(
   const date_ok = extracted.tanggal !== null ? extracted.tanggal <= deal.deadline : null;
 
   const ocrResult: QrisOcrResult = { amount_match, date_ok, merchant_name_match };
-  const anyMismatch = [amount_match, merchant_name_match].some((v) => v === false);
-  const verdict: OcrVerdict = anyMismatch ? 'TIDAK_KONSISTEN' : 'KONSISTEN';
+  const verdict = computeQrisVerdict(amount_match, merchant_name_match);
 
   return { ocrResult, verdict };
 }
