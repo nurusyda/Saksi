@@ -1,0 +1,21 @@
+# Triaged 2026-08-06 · gitleaks 8.30.1 · L1-B02
+# All entries are generic-api-key matches on SHA hash digests, not credentials.
+# Entropy 3.9-4.5 — a hash and a key have the same entropy profile, which is
+# what this rule keys on. Compared by hand against live credentials: no match.
+# See SECURITY-AUDIT.md.
+
+# --- git history (gitleaks git . --log-opts="--all") ---
+# hash digests in verification output
+290cac085ae9bcbb14ff517c5627f83e10d11c76:analysis/hash-verification-output.txt:generic-api-key:15
+290cac085ae9bcbb14ff517c5627f83e10d11c76:analysis/hash-verification-output.txt:generic-api-key:36
+290cac085ae9bcbb14ff517c5627f83e10d11c76:analysis/hash-verification-output.txt:generic-api-key:41
+# expected-hash fixtures in test assertions
+3d7518ceee0c5429da34e5e67e4e399446ed9900:scripts/tests/test_monster_check.py:generic-api-key:381
+3d7518ceee0c5429da34e5e67e4e399446ed9900:scripts/tests/test_monster_check.py:generic-api-key:991
+
+# --- worktree (gitleaks dir .) ---
+analysis/hash-verification-output.txt:generic-api-key:15
+analysis/hash-verification-output.txt:generic-api-key:36
+analysis/hash-verification-output.txt:generic-api-key:41
+scripts/tests/test_monster_check.py:generic-api-key:381
+scripts/tests/test_monster_check.py:generic-api-key:991
